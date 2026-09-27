@@ -166,7 +166,7 @@ hard level. Levels get harder in these ways:
 | 1     | Training caves | flying, landing, fuel pads                  | 16 m          | 2×, 1.4×      |
 | 2     | Old mine       | keys, doors, switches                       | 12 m          | 1.6×          |
 | 3     | Furnace        | flamethrowers, lava                         | 10 m          | 1.4×          |
-| 4     | Works          | fans, crushers, moving blocks               | 10 m          | 1.3×          |
+| 4     | Works          | fans, crushers, moving blocks, magnets      | 10 m          | 1.3×          |
 | 5     | Deep dark      | darkness, lasers, turrets                   | 8 m           | 1.25×         |
 | 6     | Core           | falling rock, crumbling floors, rising lava | 7 m           | 1.2×          |
 
@@ -376,7 +376,7 @@ landing, and glow with a churning surface and a heat haze. A blob (`things` kind
 0.6 s before; it destroys what it hits. All of it keeps the level clock. The HUD
 says what did it: "Burned up!", "Into the lava!" or "Crashed!". Worlds can have
 their own rock colours now (`colors` in `levels/index.js`): browner for the mine,
-dark red for the furnace; phase 6 does the rest of the palettes.
+dark red for the furnace; phase 9 does the rest of the palettes.
 
 The autopilot steers round flames that are always on, and where its path crosses a
 cycling flame, a "near" one or a blob's column, it holds 3 m short until the
@@ -411,30 +411,23 @@ a second on a phone (2-3, with several fuel pads to weigh), and less per leg.
 - [ ] It flies every level without help, from the start and when switched on halfway.
 - [ ] You can always tell it's flying, and take back the controls at once.
 
-### Phase 6: Game feel
-Sound made in code with Web Audio (no files): an engine roar that follows the
-burn, scrapes, bumps, crash, key, crystal, door, fuel pump, flame hiss, a low-fuel
-beep and a level complete jingle. Volume and mute go in the pause menu. Particles:
-exhaust smoke, sparks on scrapes, debris and smoke on a crash, embers near fire. A
-small camera shake on hits, and a buzz on hits and landings where the phone can
-vibrate. Each world gets its palette, lighting and background, and an intro on the
-levels page. This phase can move earlier if the game feels flat while testing.
-- [ ] You can tell you're burning from the sound alone.
-- [ ] Hits feel like hits (sound, shake, sparks, buzz) and landings feel solid.
-- [ ] Mute is remembered.
-
-### Phase 7: Machinery
+### Phase 6: Machinery and magnets
 Fans blow the rocket along a column of moving dust, and some switch on and off.
 Crushers are pistons that slam across a tunnel on a cycle, with a warning before
 each slam. Moving blocks slide back and forth along a path, and some carry a pad.
 Moving rock pushes the rocket and carries it when it's landed on top, and being
-squeezed against rock is a crash. Then world 4, *Works*: 8 levels with an
-industrial palette.
+squeezed against rock is a crash. Magnets pull the rocket towards them, hardest
+close up, and some push it away instead; some switch on and off on a cycle. Their
+pull shows as rings closing in on them (or spreading out, for a push), so you can
+see it before you feel it, and a magnet by the rock can drag a careless rocket into
+the wall or hold it off a pad. Then world 4, *Works*: 8 levels with an industrial
+palette.
 - [ ] A full burn can fight a fan, except where the fan is meant to win.
 - [ ] Moving blocks push and carry the rocket, and it never ends up stuck inside one.
 - [ ] Crushers warn you before every slam.
+- [ ] You can see a magnet's pull, and which way it goes, before it has hold of you.
 
-### Phase 8: Deep dark and defences
+### Phase 7: Deep dark and defences
 Dark levels have no light but the rocket's headlight, which points where the nose
 points, and whatever glows: crystals, pads, lava and fire. Laser gates are beams
 between two emitters, switched by a cycle or a switch, and touching one is a crash.
@@ -444,7 +437,7 @@ and each shot costs hull. Then world 5, *Deep dark*: 8 levels.
 - [ ] A turret shot can always be dodged if you're paying attention.
 - [ ] You can always tell whether a laser is on or off.
 
-### Phase 9: The core
+### Phase 8: The core
 Stalactites shake, then drop, when the rocket passes under them. Crumbling rock
 (`%`) cracks and falls away a moment after the rocket touches it or lands on it.
 In escape levels lava rises at a set speed, from the start or from a trigger, and
@@ -454,6 +447,18 @@ prototype are waiting.
 - [ ] Stalactites always shake before they fall.
 - [ ] Crumbling floor gives you time to take off if you're quick.
 - [ ] The last level is hard but fair, and feels like an ending.
+
+### Phase 9: Game feel
+Sound made in code with Web Audio (no files): an engine roar that follows the
+burn, scrapes, bumps, crash, key, crystal, door, fuel pump, flame hiss, a low-fuel
+beep and a level complete jingle. Volume and mute go in the pause menu. Particles:
+exhaust smoke, sparks on scrapes, debris and smoke on a crash, embers near fire. A
+small camera shake on hits, and a buzz on hits and landings where the phone can
+vibrate. Each world gets its palette, lighting and background, and an intro on the
+levels page. (This was phase 6; it moved to the end, so the game's all there first.)
+- [ ] You can tell you're burning from the sound alone.
+- [ ] Hits feel like hits (sound, shake, sparks, buzz) and landings feel solid.
+- [ ] Mute is remembered.
 
 ## Later
 
@@ -465,6 +470,6 @@ prototype are waiting.
 - **Cargo:** carry a pod on a rope under the rocket, like Thrust, and set it down at the exit.
 - **Assist mode:** more hull and fuel and slower hazards, for anyone who wants to see
   every level without the fight.
-- **More worlds:** water (floaty and slow), low gravity, magnets, portals.
+- **More worlds:** water (floaty and slow), low gravity, portals.
 - **Offline:** a service worker, so it plays with no connection.
 - **Gamepad** support.
