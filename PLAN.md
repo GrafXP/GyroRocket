@@ -1,0 +1,329 @@
+# Gyro Rocket: plan
+
+A cave-flying game for the phone. Tilt to steer a little rocket, hold the screen to
+burn, and get it through a cave to the exit pad in one piece. Caves have locked
+doors and the keys that open them, flamethrowers and other hazards, and only so much
+fuel, with fuel pads along the way. There are many levels, grouped into worlds;
+each world brings in something new, and the levels get harder as you go.
+
+It builds on the prototype (phase 0): the flight model, tilt controls and the app
+shell from factorygame. Same stack: Vite + vanilla JS + three.js, SPA routes,
+light/dark theme, fullscreen PWA, `node --test`.
+
+## Core decisions
+
+- **2D game, 3D look.** The sim is flat, like the prototype: x sideways, y up.
+  three.js draws it from the side with a perspective camera, and the rock is
+  extruded towards the camera so the cave has depth. Nothing moves in z.
+- **Levels are tile maps written as text.** Each level is a JS module whose map is
+  rows of characters (`#` rock, `.` air, `F` a fuel pad…), plus a few settings. They
+  are easy to write and change by hand (or by Claude), easy to diff, and a test can
+  check every one. A tile is 2 m, so the rocket (5 m tall, 2.7 m across its fins) is
+  about 2½ tiles tall and 1½ wide. A level editor can come later.
+- **Smooth-cornered caves from square tiles.** Marching squares turns the tile grid
+  into rock outlines: straight walls stay on tile edges and corners are cut at 45°.
+  The same outline is drawn and collided with, so what you see is what you hit.
+- **Steering stays as it is.** Tilt sets how far the rocket leans (up to 60°), and
+  it can't flip over. At full lean a full burn just about hovers while pushing
+  sideways, which suits tunnels; going down means letting gravity do it. Retuning
+  for caves should keep that.
+- **Walls hurt, they don't always kill.** The rocket has a hull (100). Hitting rock
+  costs hull by how hard you hit (a scrape a little, a slam a lot, and past a limit
+  it's a crash), and the rocket bounces off. Tilt isn't precise enough for a single
+  touch to kill fairly. Landing gently and nearly upright on any flat floor is safe,
+  as now.
+- **Fuel pads are checkpoints.** Landing on one fills the tank, repairs the hull and
+  saves a checkpoint. After a crash, or when you're stranded with an empty tank, you
+  start again from the last pad, with the level as it was when you landed there
+  (keys, doors, crystals). The level clock keeps running.
+- **Keys are kept and open every door of their colour.** There are four keys (red,
+  yellow, green, blue), each with its own shape as well as its colour. Fly through a
+  key to pick it up, and doors of its colour slide open when you come near. Keys are
+  never used up, so you can't lock yourself out of a level.
+- **Hazards warn first and keep time.** Anything that fires or moves on a cycle
+  flickers, hisses or glows before it's dangerous. Cycles run on the level clock, so
+  a hazard does the same thing on every attempt and can be learned.
+- **Three stars a level.** ★ finish it, ★ beat its par time, ★ collect all its
+  crystals (one to three, off the main route). Finishing a level unlocks the next;
+  stars are for replay and bragging.
+- **The sim stays separate and deterministic.** `src/sim/` has no DOM and no
+  three.js, runs at 60 ticks/s, and gives the same run from the same inputs. So it
+  is tested in node, a checkpoint is just a copy of the level's state, and ghost
+  replays later are just recorded inputs.
+- **Landscape first, portrait works.** Holding the phone sideways like a steering
+  wheel suits tilt best and shows more of the cave. The camera always shows at least
+  18 tiles (36 m) across the screen's short side, so portrait works too, just with
+  less to the sides.
+- **Progress in localStorage.** Unlocked levels, best times, stars and settings are
+  small, so they go in localStorage (behind try/catch, like the theme), not IndexedDB.
+- **Performance target:** 60 fps on a mid-range phone in a 200×100-tile level with
+  30 hazards on screen.
+
+## Layout
+
+```
+src/
+  main.js          routes and pages: home, levels, play, help
+  game.js          owns the level in play, the view and the controls; fixed-timestep loop
+  controls.js      tilt, touch and keys → { steer, thrust }
+  progress.js      unlocked levels, best times, stars, settings (localStorage)
+  sim/
+    rocket.js      flight: thrust, gravity, lean, fuel, hull
+    level.js       parses a level's text into tiles, pads, keys, doors and hazards
+    outline.js     marching squares: tiles → rock outline segments, looked up by tile
+    collide.js     the rocket against the outline and closed doors; landing
+    world.js       a level in play: rocket, pickups, doors, hazards, checkpoint, clock
+    hazards/       one file per kind: its state, step(), and what it hits
+  levels/
+    index.js       the worlds in order, each with its levels and colours
+    1-1.js …       one level per file
+  render/
+    view.js        scene, camera, lights
+    cave.js        the rock mesh, built once per level from the outline
+    rocket.js      rocket model, flame, legs, light
+    things.js      pads, keys, doors, crystals, hazards
+  ui/              HUD, pause menu, level complete sheet, icons
+  theme.js, fullscreen.js, style.css
+test/              node:test specs for sim/, and a check of every level
+```
+
+## The level format
+
+```js
+// src/levels/2-3.js
+export default {
+  name: "Key under the falls",
+  fuel: 12, // seconds of full burn in a full tank
+  par: 45, // seconds, for the time star
+  map: `
+    ##############################
+    #.........#####..........#####
+    #.........#####.....*....#####
+    #..SSS....#####..........R...#
+    ###########......1.......R.E.#
+    …
+  `,
+  // Things that need more than a letter, by the digit that marks them.
+  things: {
+    1: { kind: "flame", facing: "left", on: 1.5, off: 2, offset: 0 },
+  },
+};
+```
+
+| Letter      | Meaning                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `#`         | rock                                                       |
+| `.`         | air                                                        |
+| `S`         | start pad: the rocket starts landed on it                  |
+| `E`         | exit pad: land on it to finish                             |
+| `F`         | fuel pad (a checkpoint)                                    |
+| `*`         | crystal                                                    |
+| `r y g b`   | key                                                        |
+| `R Y G B`   | door; a run of door tiles is one door                      |
+| `< > ^ v`   | flamethrower facing that way, with the default cycle       |
+| `~`         | lava                                                       |
+| `1`–`9`     | a thing set up in `things`                                 |
+
+A pad is a run of at least 3 of its letter on the air row just above a flat floor.
+Later hazards get letters as they arrive.
+
+## Worlds and difficulty
+
+Six worlds of eight levels: 48 levels to start, with room for more worlds. Each
+world brings in one new thing. It teaches it in its first level, where mistakes are
+cheap, mixes it with what came before in the middle levels, and ends with a long,
+hard level. Levels get harder in these ways:
+
+- **Room:** tunnels and gaps get narrower.
+- **Fuel:** the tank holds less compared with what the route needs, and pads get further apart.
+- **Timing:** hazard windows get shorter, and hazards start to overlap.
+- **Routes:** more keys, more branches and backtracking, crystals in nastier places.
+- **Pressure:** timed gates, and at the end, rising lava.
+
+| World | Name           | Brings in                                   | Narrowest gap | Tank vs route |
+| ----- | -------------- | ------------------------------------------- | ------------- | ------------- |
+| 1     | Training caves | flying, landing, fuel pads                  | 16 m          | 2×            |
+| 2     | Old mine       | keys, doors, switches                       | 12 m          | 1.6×          |
+| 3     | Furnace        | flamethrowers, lava                         | 10 m          | 1.4×          |
+| 4     | Works          | fans, crushers, moving blocks               | 10 m          | 1.3×          |
+| 5     | Deep dark      | darkness, lasers, turrets                   | 8 m           | 1.25×         |
+| 6     | Core           | falling rock, crumbling floors, rising lava | 7 m           | 1.2×          |
+
+These figures are starting points, to be tuned by playing. Each world has its own
+rock colour, lighting and background, so you can see yourself getting deeper.
+
+Level design rules:
+
+- Teach, then test. Something new first appears where a mistake costs little.
+- No blind drops. You can see what's below before you commit to it.
+- A pad before every hard part, and never much more than a minute's flying between
+  pads (less in the early worlds).
+- Crystals are off the main route and never needed to finish.
+- Everything dangerous reads at a glance on a small screen, and not by colour alone.
+- Par times come from real runs, not guesses (the dev overlay times them).
+
+## How each phase works
+
+- It ends with a build you can play on the phone and a short checklist to try by hand.
+- New sim logic gets `npm test` coverage, and from phase 3 every level is checked
+  by `test/levels.test.js`.
+- A new hazard gets a sim file in `sim/hazards/`, a model in `render/things.js`, a
+  letter or a `things` kind, and its first level teaches it.
+- Commit when tests and build pass.
+
+## Phases
+
+### Phase 0: Prototype ✅ (done)
+Tilt to steer, hold to burn, over a flat field that fades into space. Land slower
+than 5 m/s and nearly upright, or crash; tap to go again. Home, Play and Help
+pages, theme and fullscreen, 13 tests.
+
+### Phase 1: Caves
+Levels become caves. `sim/level.js` parses a map; `sim/outline.js` makes the rock
+outline with marching squares; `render/cave.js` extrudes it into a rock mesh with a
+dark back wall behind the tunnels. For collision the rocket is a capsule along its
+body plus two feet. Both feet down on a flat floor, slowly and nearly upright, is a
+landing. Anything else is a hit: the rocket bounces off and loses hull, by how hard
+it hit. The sim takes smaller steps at speed so nothing passes through rock. The
+rocket starts landed on the `S` pad, and landing on `E` shows *Level complete* with
+the time. The HUD gets a hull bar. The camera follows with a little look-ahead in
+the direction of flight, shows at least 36 m across the short side, and stays
+inside the level. `/play` loads a test cave and the open field goes. The rocket
+gets landing legs and a small light of its own, and the flight is retuned for tight
+spaces (thrust, turn rate, drag) by flying the test cave.
+- [ ] The cave looks like rock with smooth corners, not squares, and the rocket is always easy to spot.
+- [ ] Brushing a wall bounces off with a little damage; flying into one fast destroys the rocket.
+- [ ] You can land on any flat floor, but not on a slope or a ledge narrower than the rocket's legs.
+- [ ] Landing on the exit pad finishes the level and shows the time.
+- [ ] Nothing ever sticks in or passes through rock, even at full speed.
+- [ ] Still 60 fps on the phone.
+
+### Phase 2: Fuel and checkpoints
+The rocket's tank holds the level's `fuel` in seconds of full burn (15 if not set).
+Burning uses it, and with none left the engine only sputters. Landing on a fuel pad
+(`F`) fills the tank and repairs the hull over a second or two, with a pump
+animation, and saves a checkpoint (a copy of the level's state). After a crash, or
+standing empty away from a pad, a tap restarts you from the last pad (the start pad
+if there's none yet), with the level as it was then. The HUD gets a fuel bar that
+goes amber, then red and flashing, as it runs low, and the level clock. Restarts are
+counted for the level complete screen.
+- [ ] Fuel only goes down while burning, and the bar reads at a glance mid-flight.
+- [ ] With an empty tank you fall; landed and empty, you're offered a restart from the last pad.
+- [ ] Landing on a fuel pad fills up and repairs, and a later crash puts you back on it.
+- [ ] The clock keeps running across restarts.
+
+### Phase 3: Levels, worlds and progress
+The game becomes a series of levels. `levels/index.js` lists the worlds and their
+levels. A new page, `/levels`, shows each world as a grid of its levels with the
+stars earned; locked levels are greyed out. Levels play at `/play/1-3`. Crystals
+(`*`) are collected and counted on the HUD. The level complete sheet shows the time
+against par, crystals and stars (new ones animate in), with Retry, Levels and Next.
+A pause menu (button, P or Esc, and whenever the app is hidden) has Resume, Restart
+from pad, Restart level and Levels, plus settings: tilt sensitivity (`FULL_TILT`),
+theme and fullscreen. `progress.js` saves unlocked levels, best times, stars and
+settings. Home gets Continue, which plays the next unfinished level.
+
+`test/levels.test.js` checks every level. It must parse and have one start pad and
+one exit pad, and every pad must sit on flat floor and be wide enough. Every door
+needs its key. A flood fill over the air, narrowed by the rocket's size, must get
+from the start to the exit and to every crystal, opening each door only once its
+key has been reached. A dev overlay (`?dev`) shows the tile under your finger and
+the fuel and time since the last pad, with keys for no damage and endless fuel, to
+build and tune levels.
+
+Then world 1, *Training caves*: 8 levels that teach flying up, across and down,
+landing on small ledges, and fuel and pads, ending with a long level that needs
+every pad.
+- [ ] A new player can tell where to go in 1-1 without reading anything.
+- [ ] Finishing a level unlocks the next, and stars and best times survive a reload.
+- [ ] Pause and restart work from the keyboard and with one thumb.
+- [ ] The eight levels get harder smoothly: none is a wall, and 1-8 is a real test.
+- [ ] A change of tilt sensitivity is noticeable straight away.
+
+### Phase 4: Keys, doors and switches
+Keys (`r y g b`) float and spin, and flying through one picks it up and shows it on
+the HUD. Doors (`R Y G B`) are solid rock-like slabs with their key's colour and
+shape on them; they slide open, and stay open, when you come near with the key.
+Switches are small pads you land on. Each opens a numbered gate, either for good or
+for a set time, with a countdown on the gate: the first time you have to hurry. A
+map (button or M) shows the parts of the cave you've seen, with pads, keys and
+doors marked, since levels now branch. Then world 2, *Old mine*: 8 levels of keys,
+branches and backtracking, with timed gates in the second half.
+- [ ] Keys stand out from a distance, and you can tell which door each one opens.
+- [ ] A door opens as you arrive with its key; without it, it's clearly locked.
+- [ ] A timed gate's countdown can be seen from its switch, or the route makes it obvious.
+- [ ] Restarting from a pad puts keys, doors and gates back as they were when you landed there.
+- [ ] The map helps you find your way back without giving the level away.
+
+### Phase 5: Flamethrowers and lava
+Flamethrowers (`< > ^ v`, or numbered in `things` for their own settings) are set
+in the rock and shoot a jet of flame several tiles long on a cycle: half a second
+of flicker and hiss, then on, then off. Their settings are length, on time, off
+time and offset, so a row of them can fire in a wave. Some are always on, and some
+fire when the rocket comes near. Flame burns hull fast while you're in it, so
+clipping the tip is survivable but sitting in it isn't. Lava (`~`) glows on cave
+floors and destroys the rocket on touch, and some pools throw up blobs on a cycle.
+Then world 3, *Furnace*: 8 levels with a hot palette, flamethrower timing and lava
+floors that make every landing count.
+- [ ] You can always see a flamethrower is about to fire before it does.
+- [ ] The flame hurts exactly where it's drawn.
+- [ ] A row of offset flamethrowers makes a wave you can read and time.
+- [ ] 20 flamethrowers on screen still run at 60 fps.
+
+### Phase 6: Game feel
+Sound made in code with Web Audio (no files): an engine roar that follows the
+burn, scrapes, bumps, crash, key, crystal, door, fuel pump, flame hiss, a low-fuel
+beep and a level complete jingle. Volume and mute go in the pause menu. Particles:
+exhaust smoke, sparks on scrapes, debris and smoke on a crash, embers near fire. A
+small camera shake on hits, and a buzz on hits and landings where the phone can
+vibrate. Each world gets its palette, lighting and background, and an intro on the
+levels page. This phase can move earlier if the game feels flat while testing.
+- [ ] You can tell you're burning from the sound alone.
+- [ ] Hits feel like hits (sound, shake, sparks, buzz) and landings feel solid.
+- [ ] Mute is remembered.
+
+### Phase 7: Machinery
+Fans blow the rocket along a column of moving dust, and some switch on and off.
+Crushers are pistons that slam across a tunnel on a cycle, with a warning before
+each slam. Moving blocks slide back and forth along a path, and some carry a pad.
+Moving rock pushes the rocket and carries it when it's landed on top, and being
+squeezed against rock is a crash. Then world 4, *Works*: 8 levels with an
+industrial palette.
+- [ ] A full burn can fight a fan, except where the fan is meant to win.
+- [ ] Moving blocks push and carry the rocket, and it never ends up stuck inside one.
+- [ ] Crushers warn you before every slam.
+
+### Phase 8: Deep dark and defences
+Dark levels have no light but the rocket's headlight, which points where the nose
+points, and whatever glows: crystals, pads, lava and fire. Laser gates are beams
+between two emitters, switched by a cycle or a switch, and touching one is a crash.
+Turrets wind up and fire slow, glowing shots at the rocket when they can see it,
+and each shot costs hull. Then world 5, *Deep dark*: 8 levels.
+- [ ] In the dark you can see enough to fly carefully, but not far.
+- [ ] A turret shot can always be dodged if you're paying attention.
+- [ ] You can always tell whether a laser is on or off.
+
+### Phase 9: The core
+Stalactites shake, then drop, when the rocket passes under them. Crumbling rock
+(`%`) cracks and falls away a moment after the rocket touches it or lands on it.
+In escape levels lava rises at a set speed, from the start or from a trigger, and
+the camera keeps it in view. Then world 6, *Core*: 8 levels, ending with a long
+escape from the core up to the surface, where the sky and stars from the
+prototype are waiting.
+- [ ] Stalactites always shake before they fall.
+- [ ] Crumbling floor gives you time to take off if you're quick.
+- [ ] The last level is hard but fair, and feels like an ending.
+
+## Later
+
+- **Level editor** on the phone: paint tiles, place things, fly the level at once,
+  and share it as a link (the map compressed into the URL).
+- **Ghosts:** record your best run's inputs and race against it. The sim is
+  deterministic, so replaying the inputs replays the run.
+- **Endless caves:** a generated cave each day, the same for everyone.
+- **Cargo:** carry a pod on a rope under the rocket, like Thrust, and set it down at the exit.
+- **Assist mode:** more hull and fuel and slower hazards, for anyone who wants to see
+  every level without the fight.
+- **More worlds:** water (floaty and slow), low gravity, magnets, portals.
+- **Offline:** a service worker, so it plays with no connection.
+- **Gamepad** support.
