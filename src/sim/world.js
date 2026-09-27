@@ -1,9 +1,10 @@
 import { buildOutline } from "./outline.js";
 import { deepestContact } from "./collide.js";
 import { TILE } from "./level.js";
-import { createRocket, step as stepRocket, circlesAt, hurt, TICK_RATE, CENTRE_Y, HULL, TANK } from "./rocket.js";
+import { createRocket, step as stepRocket, circlesAt, hurt, TICK_RATE, CENTRE_Y, FOOT_X, HULL, TANK } from "./rocket.js";
 import { flamePhase, armFlame, inFlame, FLAME_DAMAGE } from "./hazards/flame.js";
 import { inBlob } from "./hazards/blob.js";
+import { fieldAt, moverBox } from "./machines.js";
 
 export const REFUEL_TIME = 1.5; // seconds on a fuel pad to fill an empty tank, or mend a wrecked hull
 export const RETRY_AFTER = TICK_RATE; // ticks after a crash, getting stranded or the finish before a tap goes on
@@ -23,7 +24,9 @@ const SEEN_RADIUS = 12; // tiles round the rocket that count as seen, for the ma
 // but not on the rocket.
 //
 // Flamethrowers burn the hull while the rocket is in their flame; lava, and the
-// blobs it throws up, destroy it. They all keep to the level clock (world.tick).
+// blobs it throws up, destroy it. Fans and magnets push it about, and moving blocks
+// shove it, carry it when it's landed on them, and crush it against rock. They all
+// keep to the level clock (world.tick).
 //
 // Landing on a fuel pad fills the tank, mends the hull and saves a checkpoint: the
 // pad, and the level as it is (crystals, keys, doors and gates open for good).
@@ -100,7 +103,17 @@ export function step(world, input) {
   }
   r.god = world.cheats.god;
   if (world.cheats.fuel) r.fuel = r.tank;
-  stepRocket(r, input, world.outline, shut(world));
+  const { level, tick } = world;
+  // Blocks at any point through this tick (0 to 1), with doors and gates.
+  const doors = shut(world);
+  const boxesAt = (f) => (level.movers.length ? [...doors, ...level.movers.map((m) => moverBox(m, tick - 1 + f))] : doors);
+  const now = level.movers.map((m) => moverBox(m, tick));
+  if (r.state === "landed") carry(world, r, now);
+  stepRocket(r, input, world.outline, {
+    boxes: boxesAt,
+    boxSpeed: Math.max(0, ...now.map((b) => Math.hypot(b.vx, b.vy))),
+    field: fieldAt(level, tick, r.x, r.y),
+  });
   if (world.startTick < 0 && r.state === "flying") world.startTick = world.tick;
   if (r.state !== "crashed") {
     collect(world);
@@ -169,6 +182,18 @@ function hazards(world) {
     if (flamePhase(f, world.flames[i], world.tick) === "on" && inFlame(f, circles)) hurt(r, FLAME_DAMAGE / TICK_RATE, "flame");
   });
   if (world.level.blobs.some((b) => inBlob(b, circles, world.tick))) hurt(r, r.hull, "lava");
+}
+
+// Moves a landed rocket along with the block it's standing on, if it is.
+function carry(world, r, now) {
+  const feet = r.y - CENTRE_Y;
+  world.level.movers.forEach((m, i) => {
+    const was = moverBox(m, world.tick - 1);
+    const on = Math.abs(was.y1 - feet) < 0.05 && r.x + FOOT_X >= was.x0 && r.x - FOOT_X <= was.x1;
+    if (!on) return;
+    r.x += now[i].x0 - was.x0;
+    r.y += now[i].y0 - was.y0;
+  });
 }
 
 // Opens any shut door whose key the rocket holds, once it's near.

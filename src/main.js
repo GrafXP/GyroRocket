@@ -133,6 +133,8 @@ function help(el) {
     <p>Fly through a key to pick it up; the doors of its colour and shape open as you come near. Land on an orange switch to open the gate with its number. Some gates shut again: the countdown starts as you lift off. The map (▦ or M) shows where you've been.</p>
     <h2>Flames and lava</h2>
     <p>Flamethrowers flicker before they fire, and burn the hull fast: a quick pass hurts, lingering kills. Some fire on a beat, some when you come near, and some never stop. Lava, and the blobs it throws up, destroy the rocket at a touch.</p>
+    <h2>Machinery and magnets</h2>
+    <p>Fans blow you along their column of dust: burn hard to fight them. Magnets pull you in (their rings close in) or push you away (their rings spread out), hardest close up. Moving blocks shove you and carry you if you land on them. Crushers shake before they slam: don't be in the way, or squeezed against the rock.</p>
     <h2>Stars</h2>
     <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
     <h2>Tilt not working?</h2>

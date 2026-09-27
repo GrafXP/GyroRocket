@@ -4,6 +4,7 @@ import { circlesAt, CENTRE_Y, GRAVITY, THRUST, DRAG, MAX_LEAN, TICK_RATE } from 
 import { padUnder, RETRY_AFTER } from "./sim/world.js";
 import { flamePhase, inFlame, distanceToFlame } from "./sim/hazards/flame.js";
 import { blobAt } from "./sim/hazards/blob.js";
+import { fieldAt, moverBox } from "./sim/machines.js";
 
 // A cautious autopilot: given a level in play (sim/world.js), it gives the input
 // for each tick to fly the level's route. The game can hand it the controls, and
@@ -17,10 +18,12 @@ import { blobAt } from "./sim/hazards/blob.js";
 // (E). Doors open on the way once their key is held. Without a route, it lands on
 // the fuel pads in order of distance from the start, then the exit.
 //
-// It steers round flames that are always on. Where its path crosses any other
-// flame or a lava blob's column, it slows as it comes up to it and waits, hovering,
-// until the hazard's schedule shows a gap long enough to get across; then it goes,
-// and doesn't change its mind.
+// It steers round flames that are always on, and allows for the push of fans and
+// magnets. Where its path crosses any other flame, a lava blob's column, or the
+// ground a crusher or moving block covers, it slows as it comes up to it and waits,
+// hovering, until the hazard's schedule shows a gap long enough to get across;
+// then it goes, and doesn't change its mind. If there's a way round the ground a
+// block covers, it takes that instead.
 
 const MAX_SPEED = 9; // m/s it flies at, at most
 const BRAKE = 3; // m/s² it plans to slow down at
@@ -95,7 +98,9 @@ export function createPilot(world, { restart = true } = {}) {
       if (pilot.next >= route.length) return fail("the route doesn't end on the exit");
       const stop = route[pilot.next];
       if (stop.missing) return fail(`nothing on the map for ${stop.name} in the route`);
-      const path = findPath(world, here(r), stop.target, blocking(world));
+      // Round the ground moving blocks cover, if there's a way; else through it, waiting.
+      const boxes = blocking(world);
+      const path = findPath(world, here(r), stop.target, [...boxes, ...level.movers.map(sweep)]) ?? findPath(world, here(r), stop.target, boxes);
       if (!path) return fail(`${from} → ${stop.name}: no way through`);
       leg = { stop, path, zones: hazardZones(world, path), at: 0, duty: 0, tick: world.tick, fuel: r.fuel };
       pilot.status = `Autopilot: to the ${stop.name}`;
@@ -164,10 +169,12 @@ function steer(world, leg) {
     const speed = Math.min(cap, Math.sqrt(2 * BRAKE * (left + 1)), d * 2);
     [vx, vy] = [((tx - r.x) / d) * speed, ((ty - r.y) / d) * speed];
   }
-  // The push it needs: towards that velocity, plus holding up against gravity and
-  // drag; the engine's on/off, so it burns for that share of the ticks.
-  const ax = 2.5 * (vx - r.vx) + DRAG * r.vx;
-  const ay = 2.5 * (vy - r.vy) + DRAG * r.vy + GRAVITY;
+  // The push it needs: towards that velocity, plus holding up against gravity,
+  // drag, fans and magnets; the engine's on/off, so it burns for that share of the
+  // ticks.
+  const field = fieldAt(world.level, world.tick, r.x, r.y);
+  const ax = 2.5 * (vx - r.vx) + DRAG * r.vx - field.ax;
+  const ay = 2.5 * (vy - r.vy) + DRAG * r.vy + GRAVITY - field.ay;
   const lean = Math.max(-MAX_LEAN, Math.min(MAX_LEAN, Math.atan2(ax, Math.max(ay, 0.1))));
   const along = ax * Math.sin(r.angle) + ay * Math.cos(r.angle);
   leg.duty += Math.max(0, Math.min(1, along / THRUST));
@@ -242,6 +249,7 @@ const blocking = (world) => world.level.doors.filter((d, i) => !world.doors[i].o
 export function findPath(world, [x0, y0], [x1, y1], boxes) {
   const { level, outline } = world;
   const walls = level.flames.filter((f) => f.mode === "always");
+  const gales = level.fans.filter(tooStrong);
   const [gx0, gy0] = [-Math.floor(x0), -Math.floor(y0)];
   const cols = Math.floor(level.width * TILE - x0) - gx0 + 1;
   const rows = Math.floor(level.height * TILE - y0) - gy0 + 1;
@@ -251,7 +259,11 @@ export function findPath(world, [x0, y0], [x1, y1], boxes) {
   const goal = index(goalX, goalY);
   const fits = (x, y, margin) => {
     const circles = circlesAt(x, y, 0).map((c) => ({ ...c, r: c.r + margin }));
-    return !deepestContact(outline, circles, boxes) && !walls.some((f) => inFlame(f, circles, HAZARD_MARGIN));
+    return (
+      !deepestContact(outline, circles, boxes) &&
+      !walls.some((f) => inFlame(f, circles, HAZARD_MARGIN)) &&
+      !gales.some((f) => x > f.x0 && x < f.x1 && y > f.y0 && y < f.y1)
+    );
   };
   const tight = new Int8Array(cols * rows); // 0 not checked, 1 fits, 2 doesn't
   const from = new Int32Array(cols * rows);
@@ -293,29 +305,50 @@ export function findPath(world, [x0, y0], [x1, y1], boxes) {
   return null;
 }
 
+// Whether a fan that's always on blows harder than the rocket can fly against:
+// down harder than its burn beats gravity, or sideways harder than it can push
+// at full lean while holding itself up.
+const tooStrong = (f) => f.mode === "always" && (f.dir[1] < 0 ? f.strength > 8 : f.dir[0] !== 0 && f.strength > 15);
+
 // The stretches of `path` (as index ranges, 1 m apiece) where the rocket would be
-// in reach of a flame that isn't always on, or of a lava blob's column.
+// in reach of a flame that isn't always on, of a lava blob's column, or of the
+// ground a mover or crusher covers.
 function hazardZones(world, path) {
-  const { flames, blobs } = world.level;
+  const { flames, blobs, movers } = world.level;
   const hazards = [
     ...flames.map((flame, i) => ({ flame, state: world.flames[i] })).filter((h) => h.flame.mode !== "always"),
     ...blobs.map((blob) => ({ blob })),
+    ...movers.map((mover) => ({ mover, swept: sweep(mover) })),
   ];
   const zones = [];
   for (const h of hazards) {
     let from = -1;
     path.forEach(([x, y], i) => {
       const circles = circlesAt(x, y, 0);
-      const inside = h.flame ? inFlame(h.flame, circles, HAZARD_MARGIN) : inColumn(h.blob, circles);
+      const inside = h.flame ? inFlame(h.flame, circles, HAZARD_MARGIN) : h.blob ? inColumn(h.blob, circles) : inBox(h.swept, circles);
       if (inside && from < 0) from = i;
       if ((!inside || i === path.length - 1) && from >= 0) {
-        zones.push({ ...h, from, to: inside ? i : i - 1 });
+        const to = inside ? i : i - 1;
+        zones.push({ ...h, from, to, points: path.slice(from, to + 1) });
         from = -1;
       }
     });
   }
   return zones.sort((a, b) => a.from - b.from);
 }
+
+// The whole of the ground a mover or crusher covers on its travel.
+function sweep(m) {
+  const [dx, dy] = m.to;
+  return { x0: m.x0 + Math.min(0, dx), y0: m.y0 + Math.min(0, dy), x1: m.x1 + Math.max(0, dx), y1: m.y1 + Math.max(0, dy) };
+}
+
+// Whether any circle comes within HAZARD_MARGIN of the box.
+const inBox = (b, circles) =>
+  circles.some((c) => {
+    const [px, py] = [Math.max(b.x0, Math.min(b.x1, c.x)), Math.max(b.y0, Math.min(b.y1, c.y))];
+    return Math.hypot(c.x - px, c.y - py) < c.r + HAZARD_MARGIN;
+  });
 
 // Whether any circle is in the space a blob flies through.
 const inColumn = (blob, circles) =>
@@ -356,13 +389,20 @@ function dangerSoon(world) {
       const state = world.flames[i];
       if (flame.mode === "near" && (state.fired < 0 || (world.tick - state.fired) / TICK_RATE > flame.warn + flame.on + flame.off)) return true;
       return soon((t) => burningAt({ flame, state }, t));
-    }) || world.level.blobs.some((blob) => inColumn(blob, circles) && soon((t) => blobAt(blob, t).up))
+    }) ||
+    world.level.blobs.some((blob) => inColumn(blob, circles) && soon((t) => blobAt(blob, t).up)) ||
+    world.level.movers.some((m) => soon((t) => inBox(moverBox(m, t), circles)))
   );
 }
 
 // Whether a zone's hazard could hurt at `tick`, as far as can be told now.
-function burningAt({ flame, state, blob }, tick) {
+function burningAt({ flame, state, blob, mover, points }, tick) {
   if (blob) return blobAt(blob, tick).up;
+  if (mover) {
+    // The block where it'll be then, against the rocket anywhere along the stretch.
+    const box = moverBox(mover, tick);
+    return points.some(([x, y]) => inBox(box, circlesAt(x, y, 0)));
+  }
   if (flame.mode === "near") {
     const s = (tick - state.fired) / TICK_RATE;
     return s < flame.warn + flame.on || s > flame.warn + flame.on + flame.off - flame.warn; // near its next firing

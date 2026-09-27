@@ -18,20 +18,40 @@ const FLAME_LETTERS = { ">": "right", "<": "left", "^": "up", v: "down" };
 export const FLAME = { length: 5, on: 1.5, off: 2, warn: 0.5, offset: 0, mode: "cycle", reach: 4 };
 // A lava blob: thrown `height` tiles up every `period` seconds, bubbling for `warn` first.
 export const BLOB = { height: 6, period: 3, warn: 0.6, offset: 0 };
+// A fan blows a column `width` tiles wide and `length` long, pushing at `strength`
+// m/s² (a full burn beats 14); a magnet pulls (or with `push`, pushes) at up to
+// `strength` m/s² right by it, fading to nothing at `range` metres. Either can be
+// "always" on or "cycle" like a flamethrower, winding up for `warn` seconds.
+export const FAN = { length: 8, width: 3, strength: 14, mode: "always", on: 3, off: 3, warn: 0.5, offset: 0 };
+export const MAGNET = { strength: 16, range: 16, push: false, mode: "always", on: 3, off: 3, warn: 0.5, offset: 0 };
+// A mover slides `to` [dx, dy] tiles from where it's drawn and back, smoothly, once
+// every `period` seconds. A crusher rests where it's drawn, shakes for `warn`,
+// slams out by `to` in `slam` seconds, holds, and goes `back`.
+export const MOVER = { to: [0, 0], period: 6, offset: 0 };
+export const CRUSHER = { to: [0, 0], rest: 2, warn: 0.6, slam: 0.15, hold: 0.6, back: 1, offset: 0 };
+const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything
 // wrong with it, naming the row and column as written.
 //
 // Besides rock, air and pads, a map has crystals (*), keys (r y g b) and the doors
 // they open (R Y G B: a rectangle of its letter), flamethrowers (> < ^ v, facing
-// that way), lava (~), and digits for the things set up in `things` by digit:
+// that way), lava (~), and digits (or other letters not used for anything else)
+// for the things set up in `things` by that character:
 // - { kind: "switch", opens: "2", time: 8 } is a small pad that opens gate 2 when
 //   landed on (for `time` seconds, or for good);
 // - { kind: "gate" } is a rectangle that stays shut until then;
 // - { kind: "flame", facing: "left", ...FLAME settings } is a flamethrower;
-// - { kind: "blob", ...BLOB settings } is lava that throws up blobs.
-// Door and gate tiles are air to the rock outline; they block as rectangles while
-// shut (level.doors). Flamethrowers and lava are rock.
+// - { kind: "blob", ...BLOB settings } is lava that throws up blobs;
+// - { kind: "fan", facing: "up", ...FAN settings } is a fan;
+// - { kind: "magnet", ...MAGNET settings } is a magnet;
+// - { kind: "mover", to: [dx, dy], ...MOVER settings } is a sliding block, a
+//   rectangle of its character where it starts;
+// - { kind: "crusher", to: [dx, dy], ...CRUSHER settings } is a piston's head, a
+//   rectangle of its character where it rests.
+// Door, gate, mover and crusher tiles are air to the rock outline; they block as
+// rectangles (level.doors, level.movers). Flamethrowers, fans, magnets and lava are
+// rock.
 export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const lines = map.split("\n");
   while (lines.length && !lines[0].trim()) lines.shift();
@@ -41,7 +61,7 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const width = Math.max(...rows.map((r) => r.length));
   const height = rows.length;
   const where = (c, j) => `${name}: row ${height - j}, column ${c + 1}`;
-  const kindOf = (ch) => (/[1-9]/.test(ch) ? things[ch]?.kind : null);
+  const kindOf = (ch) => (RESERVED.has(ch) ? null : (things[ch]?.kind ?? null));
 
   const solid = new Uint8Array(width * height);
   const lava = new Uint8Array(width * height);
@@ -50,6 +70,8 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const keys = [];
   const nozzles = [];
   const blobs = [];
+  const fans = [];
+  const magnets = [];
   rows.forEach((row, r) => {
     const j = height - 1 - r;
     for (let c = 0; c < width; c++) {
@@ -62,21 +84,45 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
       } else if (ch === "~" || kindOf(ch) === "blob") {
         solid[j * width + c] = lava[j * width + c] = 1;
         if (kindOf(ch) === "blob") blobs.push({ ...BLOB, ...things[ch], x: at.x, y: (j + 1) * TILE });
+      } else if (kindOf(ch) === "fan") {
+        solid[j * width + c] = 1;
+        fans.push({ c, j, ...FAN, ...things[ch] });
+      } else if (kindOf(ch) === "magnet") {
+        solid[j * width + c] = 1;
+        magnets.push({ ...MAGNET, ...things[ch], ...at });
       } else if (ch === "*") crystals.push(at);
       else if (KEY_COLORS[ch]) {
         if (keys.some((k) => k.color === KEY_COLORS[ch])) throw new Error(`${where(c, j)}: a second ${KEY_COLORS[ch]} key`);
         keys.push({ color: KEY_COLORS[ch], ...at });
-      } else if (/[1-9]/.test(ch) && !["switch", "gate", "flame", "blob"].includes(kindOf(ch))) {
-        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame or blob`);
-      } else if (ch !== "." && !PAD_KINDS[ch] && !DOOR_COLORS[ch] && !kindOf(ch)) {
-        throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
+      } else if (!RESERVED.has(ch) && !kindOf(ch)) {
+        if (!/[0-9A-Za-z]/.test(ch)) throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
+        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame, blob, fan, magnet, mover or crusher`);
+      } else if (kindOf(ch) && !["switch", "gate", "mover", "crusher"].includes(kindOf(ch))) {
+        throw new Error(`${where(c, j)}: "${ch}" is set up as a "${kindOf(ch)}", which isn't a kind of thing`);
       }
       letters.push(ch);
     }
   });
 
   if (settings.fuel !== undefined && !(settings.fuel > 0)) throw new Error(`${name}: fuel must be a number of seconds`);
-  const level = { name, width, height, solid, lava, pads: [], crystals, keys, doors: [], flames: [], blobs, things, ...settings };
+  const level = {
+    name,
+    width,
+    height,
+    solid,
+    lava,
+    pads: [],
+    crystals,
+    keys,
+    doors: [],
+    flames: [],
+    blobs,
+    fans: [],
+    magnets,
+    movers: [],
+    things,
+    ...settings,
+  };
   const letter = (c, j) => (c < 0 || j < 0 || c >= width || j >= height ? "#" : letters[(height - 1 - j) * width + c]);
 
   // A pad is a run of its letter in a row, standing on rock with air above. So is
@@ -101,46 +147,52 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     }
   }
 
-  // Doors and gates: each a rectangle of its letter.
+  // Doors, gates, movers and crushers: each a rectangle of its character.
   const taken = new Uint8Array(width * height);
+  const rectangle = (c, j) => {
+    const ch = letter(c, j);
+    // All the tiles joined to this one, which must fill their bounding box.
+    let [cMin, c1, j1, count] = [c, c, j, 0];
+    const todo = [[c, j]];
+    taken[j * width + c] = 1;
+    while (todo.length) {
+      const [cc, jj] = todo.pop();
+      count++;
+      [cMin, c1, j1] = [Math.min(cMin, cc), Math.max(c1, cc), Math.max(j1, jj)];
+      for (const [nc, nj] of [
+        [cc + 1, jj],
+        [cc - 1, jj],
+        [cc, jj + 1],
+        [cc, jj - 1],
+      ]) {
+        if (letter(nc, nj) === ch && !taken[nj * width + nc]) {
+          taken[nj * width + nc] = 1;
+          todo.push([nc, nj]);
+        }
+      }
+    }
+    // It was met at its lowest row's first tile, so its box starts at (c, j) if it's a rectangle.
+    if (cMin !== c || count !== (c1 - c + 1) * (j1 - j + 1)) throw new Error(`${where(c, j)}: a ${kindOf(ch) ?? "door"} must be a rectangle`);
+    return { c0: c, j0: j, c1, j1, x0: c * TILE, y0: j * TILE, x1: (c1 + 1) * TILE, y1: (j1 + 1) * TILE };
+  };
   for (let j = 0; j < height; j++) {
     for (let c = 0; c < width; c++) {
       const ch = letter(c, j);
-      if ((!DOOR_COLORS[ch] && kindOf(ch) !== "gate") || taken[j * width + c]) continue;
-      // All the tiles joined to this one, which must fill their bounding box.
-      let [cMin, c1, j1, count] = [c, c, j, 0];
-      const todo = [[c, j]];
-      taken[j * width + c] = 1;
-      while (todo.length) {
-        const [cc, jj] = todo.pop();
-        count++;
-        [cMin, c1, j1] = [Math.min(cMin, cc), Math.max(c1, cc), Math.max(j1, jj)];
-        for (const [nc, nj] of [
-          [cc + 1, jj],
-          [cc - 1, jj],
-          [cc, jj + 1],
-          [cc, jj - 1],
-        ]) {
-          if (letter(nc, nj) === ch && !taken[nj * width + nc]) {
-            taken[nj * width + nc] = 1;
-            todo.push([nc, nj]);
-          }
-        }
+      const kind = DOOR_COLORS[ch] ? "door" : kindOf(ch);
+      if (!["door", "gate", "mover", "crusher"].includes(kind) || taken[j * width + c]) continue;
+      const box = rectangle(c, j);
+      if (kind === "door" || kind === "gate") {
+        level.doors.push({
+          key: DOOR_COLORS[ch] ?? null, // the key that opens it, for a door
+          gate: DOOR_COLORS[ch] ? null : ch, // its character, for a gate
+          ...box,
+        });
+      } else {
+        const spec = { ...(kind === "mover" ? MOVER : CRUSHER), ...things[ch] };
+        const to = things[ch].to;
+        if (!Array.isArray(to) || to.length !== 2 || !(to[0] || to[1])) throw new Error(`${where(c, j)}: a ${kind} needs to: [dx, dy], in tiles`);
+        level.movers.push({ ...spec, kind, ...box, to: [spec.to[0] * TILE, spec.to[1] * TILE] });
       }
-      // It was met at its lowest row's first tile, so its box starts at (c, j) if it's a rectangle.
-      if (cMin !== c || count !== (c1 - c + 1) * (j1 - j + 1)) throw new Error(`${where(c, j)}: a door or gate must be a rectangle`);
-      level.doors.push({
-        key: DOOR_COLORS[ch] ?? null, // the key that opens it, for a door
-        gate: DOOR_COLORS[ch] ? null : ch, // its digit, for a gate
-        c0: c,
-        j0: j,
-        c1,
-        j1,
-        x0: c * TILE,
-        y0: j * TILE,
-        x1: (c1 + 1) * TILE,
-        y1: (j1 + 1) * TILE,
-      });
     }
   }
 
@@ -155,6 +207,37 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     const [x0, y0] = [(n.c + 0.5 + dir[0] / 2) * TILE, (n.j + 0.5 + dir[1] / 2) * TILE];
     const { c, j, facing, on, off, warn, offset, mode, reach } = n;
     level.flames.push({ c, j, facing, on, off, warn, offset, mode, reach, x0, y0, x1: x0 + dir[0] * tiles * TILE, y1: y0 + dir[1] * tiles * TILE });
+  }
+
+  // Fans: their column of air, from the housing's face as far as `length` tiles
+  // or the first rock, `width` tiles wide.
+  for (const f of fans) {
+    const dir = FACINGS[f.facing];
+    if (!dir) throw new Error(`${where(f.c, f.j)}: a fan faces left, right, up or down, not "${f.facing}"`);
+    let tiles = 0;
+    while (tiles < f.length && !isSolid(level, f.c + dir[0] * (tiles + 1), f.j + dir[1] * (tiles + 1))) tiles++;
+    if (!tiles) throw new Error(`${where(f.c, f.j)}: this fan blows into rock`);
+    const [cx, cy] = [(f.c + 0.5) * TILE, (f.j + 0.5) * TILE];
+    const [along, across] = [TILE / 2 + tiles * TILE, (f.width * TILE) / 2];
+    const [ex, ey] = [cx + dir[0] * along, cy + dir[1] * along]; // the far end's middle
+    const [fx, fy] = [cx + (dir[0] * TILE) / 2, cy + (dir[1] * TILE) / 2]; // the face's middle
+    const { facing, strength, mode, on, off, warn, offset } = f;
+    level.fans.push({
+      c: f.c,
+      j: f.j,
+      facing,
+      dir,
+      strength,
+      mode,
+      on,
+      off,
+      warn,
+      offset,
+      x0: Math.min(fx, ex) - (dir[1] ? across : 0),
+      x1: Math.max(fx, ex) + (dir[1] ? across : 0),
+      y0: Math.min(fy, ey) - (dir[0] ? across : 0),
+      y1: Math.max(fy, ey) + (dir[0] ? across : 0),
+    });
   }
 
   for (const kind of ["start", "exit"]) {

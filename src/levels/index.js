@@ -22,6 +22,14 @@ import l3_5 from "./3-5.js";
 import l3_6 from "./3-6.js";
 import l3_7 from "./3-7.js";
 import l3_8 from "./3-8.js";
+import l4_1 from "./4-1.js";
+import l4_2 from "./4-2.js";
+import l4_3 from "./4-3.js";
+import l4_4 from "./4-4.js";
+import l4_5 from "./4-5.js";
+import l4_6 from "./4-6.js";
+import l4_7 from "./4-7.js";
+import l4_8 from "./4-8.js";
 import testCave from "./testcave.js";
 
 // The worlds in order, each with its levels in order. A level's id is
@@ -44,6 +52,12 @@ export const WORLDS = [
     about: "Flamethrowers fire on the clock or when you come near, and lava destroys whatever touches it.",
     colors: { face: 0x6e3b2e, wall: 0x8a4a36, rim: 0xe0875a, back: 0x2a0d08 },
     levels: [l3_1, l3_2, l3_3, l3_4, l3_5, l3_6, l3_7, l3_8],
+  },
+  {
+    name: "Works",
+    about: "Fans blow, magnets pull and push, blocks slide, and crushers slam.",
+    colors: { face: 0x5d646e, wall: 0x707a86, rim: 0xa9b4c2, back: 0x1b1f26 },
+    levels: [l4_1, l4_2, l4_3, l4_4, l4_5, l4_6, l4_7, l4_8],
   },
 ].map((world, w) => ({
   ...world,

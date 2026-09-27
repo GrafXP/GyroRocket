@@ -75,6 +75,7 @@ src/
     collide.js     the rocket against the outline and closed doors; landing
     world.js       a level in play: rocket, pickups, doors and gates, checkpoint, clock
     hazards/       one file per kind: its schedule, and what it hits
+    machines.js    fans, magnets, movers and crushers: their push, and where they are
   levels/
     index.js       the worlds in order, each with its levels and colours
     1-1.js …       one level per file
@@ -84,6 +85,8 @@ src/
     rocket.js      rocket model, flame, legs, light
     things.js      pads, crystals, hazards
     doors.js       keys, doors, gates and switch posts
+    hazards.js     flamethrowers, lava and blobs
+    machines.js    fans, magnets, movers and crushers
   ui/
     dom.js         shared page bits: icons, stars, theme picker, fullscreen button
     play.js        the play page: HUD, pause menu, level complete sheet, dev overlay
@@ -136,7 +139,7 @@ export default {
 | `R Y G B`   | door: a rectangle of its letter, opened by its key         |
 | `< > ^ v`   | flamethrower facing that way, with the default cycle       |
 | `~`         | lava: rock that destroys the rocket                        |
-| `1`–`9`     | a thing set up in `things`: a switch (a pad), a gate (a rectangle), a flamethrower, or a lava blob |
+| `1`–`9`, other letters | a thing set up in `things` by that character: a switch (a pad), a gate, mover or crusher (rectangles), a flamethrower, a lava blob, a fan or a magnet |
 
 A pad is a run of at least 3 of its letter on the air row just above a flat floor;
 so is a switch. Door and gate tiles are air to the rock outline, and block as
@@ -411,7 +414,7 @@ a second on a phone (2-3, with several fuel pads to weigh), and less per leg.
 - [ ] It flies every level without help, from the start and when switched on halfway.
 - [ ] You can always tell it's flying, and take back the controls at once.
 
-### Phase 6: Machinery and magnets
+### Phase 6: Machinery and magnets ✅ (done)
 Fans blow the rocket along a column of moving dust, and some switch on and off.
 Crushers are pistons that slam across a tunnel on a cycle, with a warning before
 each slam. Moving blocks slide back and forth along a path, and some carry a pad.
@@ -426,6 +429,31 @@ palette.
 - [ ] Moving blocks push and carry the rocket, and it never ends up stuck inside one.
 - [ ] Crushers warn you before every slam.
 - [ ] You can see a magnet's pull, and which way it goes, before it has hold of you.
+
+What was built: any character a map doesn't use for something else (so not `r y g
+b v`) can name a thing, since nine digits weren't enough. A fan is a housing in
+the rock blowing a column `width` tiles wide for `length` tiles (or to the first
+rock) at `strength` m/s², 14 by default, which a full burn beats; its rotor turns
+and streaks of dust fly along the column while it blows. A magnet in the rock pulls
+(or with `push`, pushes) at up to `strength` m/s² (16) right by it, fading to
+nothing at `range` (16 m), shown by rings closing in or spreading out. Both can be
+"always" on or "cycle". Movers are rectangles that slide to `to` and back smoothly
+every `period`; crushers rest, shake for `warn`, slam out by `to` in `slam`
+seconds, hold, and go `back`, a red head on a piston rod with a warning lamp. The
+rocket collides with them at their speed, bounces off relative to it, lands on them
+and rides along, takes off when its floor slides away, and is "Crushed!" if it's
+left pinned in rock or hit by a slam. The sim reads their positions at points
+through each tick, so a slam can't jump through the rocket.
+
+The autopilot allows for the push of fans and magnets, steers round always-on fans
+it couldn't beat (down more than 8 m/s², sideways more than 15), takes a way round
+the ground a block covers if there is one, and otherwise waits for it to clear
+like a flame.
+
+World 4, *Works*: 4-1 Updraft, 4-2 Crosswinds, 4-3 Piston alley, 4-4 Sliding
+doors, 4-5 Lodestone (magnets over lava), 4-6 Repulsor, 4-7 The press, 4-8 The
+works. Tanks are about 1.3× the longest stretch between fuel pads. Crushers rest
+2.5 s, which the autopilot needs to get under one; players will find that roomy.
 
 ### Phase 7: Deep dark and defences
 Dark levels have no light but the rocket's headlight, which points where the nose

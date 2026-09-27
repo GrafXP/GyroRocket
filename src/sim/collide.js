@@ -3,9 +3,10 @@ import { segmentsNear } from "./outline.js";
 const near = []; // reused, to keep the hot path free of garbage
 
 // The deepest overlap between any of `circles` ({ x, y, r, foot }) and rock, or the
-// rectangles in `boxes` ({ x0, y0, x1, y1 }: shut doors and gates), or null if none
-// touch. Returns { depth, nx, ny, px, py, foot }: moving the circle `depth` along
-// (nx, ny) frees it, and (px, py) is the point it touches.
+// rectangles in `boxes` ({ x0, y0, x1, y1 }: shut doors and gates, moving blocks),
+// or null if none touch. Returns { depth, nx, ny, px, py, foot, box }: moving the
+// circle `depth` along (nx, ny) frees it, (px, py) is the point it touches, and
+// `box` is the rectangle it touches, if it's one.
 export function deepestContact(outline, circles, boxes = []) {
   let x0 = Infinity;
   let y0 = Infinity;
@@ -67,7 +68,7 @@ export function deepestContact(outline, circles, boxes = []) {
         ].sort((p, q) => p[0] - q[0]);
         [depth, nx, ny] = [c.r + sides[0][0], sides[0][1], sides[0][2]];
       }
-      if (!best || depth > best.depth) best = { depth, nx, ny, px, py, foot: c.foot };
+      if (!best || depth > best.depth) best = { depth, nx, ny, px, py, foot: c.foot, box: b };
     }
   }
   return best;

@@ -185,7 +185,7 @@ export function play(el, id) {
       const on = padUnder(level, r);
       const timer = gateTimers(w)[0];
       let text = "";
-      const how = { flame: "Burned up!", lava: "Into the lava!" }[r.cause] ?? "Crashed!";
+      const how = { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!" }[r.cause] ?? "Crashed!";
       if (w.done) text = "";
       else if (game?.pilot) text = game.pilot.status;
       else if (performance.now() < lostUntil) text = game.lastPilot.status;

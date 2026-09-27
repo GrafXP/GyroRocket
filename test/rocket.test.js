@@ -70,7 +70,7 @@ test("with an empty tank the engine only sputters", () => {
 
 test("steering leans the rocket, no further than MAX_LEAN", () => {
   const { outline } = room();
-  const r = run(createRocket(40, FLOOR), outline, { thrust: true }, 10);
+  const r = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
   run(r, outline, { thrust: true, steer: 5 }, TICK_RATE / 2);
   assert.equal(r.angle, MAX_LEAN);
   assert.ok(r.vx > 0);
