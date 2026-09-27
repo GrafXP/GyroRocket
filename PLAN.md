@@ -212,15 +212,22 @@ flying the test cave.
 - [ ] Nothing ever sticks in or passes through rock, even at full speed.
 - [ ] Still 60 fps on the phone.
 
-### Phase 2: Fuel and checkpoints
-The rocket's tank holds the level's `fuel` in seconds of full burn (15 if not set).
-Burning uses it, and with none left the engine only sputters. Landing on a fuel pad
-(`F`) fills the tank and repairs the hull over a second or two, with a pump
-animation, and saves a checkpoint (a copy of the level's state). After a crash, or
-standing empty away from a pad, a tap restarts you from the last pad (the start pad
-if there's none yet), with the level as it was then. The HUD gets a fuel bar that
-goes amber, then red and flashing, as it runs low, and the level clock. Restarts are
-counted for the level complete screen.
+### Phase 2: Fuel and checkpoints ✅ (done)
+The rocket's tank holds the level's `fuel` in seconds of full burn (`TANK`, 15, if
+not set). Burning uses it, and with none left the engine only sputters (a weak,
+broken flame). Landing on a fuel pad (`F`, any number of them) fills an empty tank
+and mends a wrecked hull in 1.5 s (`REFUEL_TIME`), and makes that pad the
+checkpoint. The pad is blue, and its pump behind has a gauge that fills with the
+rocket's tank and a lamp that's lit while it's the checkpoint. After a crash, or
+when stranded (out of fuel and landed away from a fuel pad, or stuck still for a
+second somewhere it can't land), a tap after a second puts a fresh rocket on the
+checkpoint, the start pad until the first fuel pad. The checkpoint is only the pad
+for now; phase 4 adds keys and doors to it. The clock keeps running through
+crashes and restarts. The HUD has fuel and hull bars: fuel goes amber below 30%
+and flashes red below 15%, hull goes amber below 60% and red below 30%. Messages
+say where a tap takes you back to, and the *Level complete* banner counts the
+restarts. The test cave has a fuel pad at the top of the shaft and one at the
+bottom of the drop, and a 12 s tank.
 - [ ] Fuel only goes down while burning, and the bar reads at a glance mid-flight.
 - [ ] With an empty tank you fall; landed and empty, you're offered a restart from the last pad.
 - [ ] Landing on a fuel pad fills up and repairs, and a later crash puts you back on it.

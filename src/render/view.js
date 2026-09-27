@@ -63,7 +63,7 @@ export function createView(container, level, outline) {
     render(world, dt = 1 / 60) {
       const r = world.rocket;
       rocket.update(r);
-      things.update(world.tick / TICK_RATE);
+      things.update(world);
 
       const since = (r.tick - r.crashTick) / TICK_RATE;
       boom.visible = r.state === "crashed" && since < 1;

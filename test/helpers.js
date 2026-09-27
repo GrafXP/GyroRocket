@@ -4,7 +4,7 @@ import { buildOutline } from "../src/sim/outline.js";
 export const level = (map, name = "test") => parseLevel({ name, map });
 
 // A 40×14 room: the start pad on the left, a pyramid (45° slopes), the exit pad,
-// and a column 2 tiles wide, too narrow to land on. Floors are at y = 2 m.
+// a column 2 tiles wide, too narrow to land on, and a fuel pad. Floors are at y = 2 m.
 export const ROOM = `
   ########################################
   #......................................#
@@ -18,7 +18,7 @@ export const ROOM = `
   #..................#...........##......#
   #.................###..........##......#
   #................#####.........##......#
-  #...SSS.........#######...EEE..##......#
+  #...SSS.........#######...EEE..##.FFF..#
   ########################################
 `;
 

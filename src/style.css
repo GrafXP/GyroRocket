@@ -282,29 +282,63 @@ body.playing nav {
   color: var(--good);
 }
 
-.hull {
+/* A labelled bar: fuel or hull. */
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.gauge small {
+  width: 2.4em;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.bar {
   display: block;
-  width: 110px;
-  height: 6px;
-  margin: 4px 0 3px;
+  width: 96px;
+  height: 8px;
   overflow: hidden;
   background: var(--line);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
-.hull i {
+.bar i {
   display: block;
   height: 100%;
-  background: #3fbf6a;
-  transition: width 0.2s;
+  transition: width 0.15s;
 }
 
-.hull i[data-level="low"] {
+.bar i.fuel {
+  background: #3fa9f5;
+}
+
+.bar i.hull {
+  background: #3fbf6a;
+}
+
+.bar i[data-level="low"] {
   background: #e0a000;
 }
 
-.hull i[data-level="bad"] {
+.bar i[data-level="bad"] {
   background: var(--bad);
+}
+
+.bar i.fuel[data-level="bad"] {
+  animation: flash 0.5s steps(1) infinite;
+}
+
+@keyframes flash {
+  50% {
+    opacity: 0.25;
+  }
 }
 
 /* A red flash round the edges when the rocket hits rock. */

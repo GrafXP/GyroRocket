@@ -4,7 +4,7 @@
 // is rock.
 
 export const TILE = 2; // metres
-const PAD_KINDS = { S: "start", E: "exit" };
+const PAD_KINDS = { S: "start", E: "exit", F: "fuel" };
 const PAD_WIDTH = 3; // tiles, at least
 const HEADROOM = 3; // tiles of air above a pad, for the rocket to stand in
 
@@ -32,6 +32,7 @@ export function parseLevel({ name = "level", map, ...settings }) {
     }
   });
 
+  if (settings.fuel !== undefined && !(settings.fuel > 0)) throw new Error(`${name}: fuel must be a number of seconds`);
   const level = { name, width, height, solid, pads: [], ...settings };
   const letter = (c, j) => letters[(height - 1 - j) * width + c];
 
@@ -53,7 +54,7 @@ export function parseLevel({ name = "level", map, ...settings }) {
     }
   }
 
-  for (const kind of Object.values(PAD_KINDS)) {
+  for (const kind of ["start", "exit"]) {
     const n = level.pads.filter((p) => p.kind === kind).length;
     if (n !== 1) throw new Error(`${name}: needs one ${kind} pad, has ${n}`);
   }

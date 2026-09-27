@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isSolid, TILE } from "../src/sim/level.js";
+import { isSolid, parseLevel, TILE } from "../src/sim/level.js";
 import { level } from "./helpers.js";
 
 test("a map parses into rock and air, row 0 at the bottom", () => {
@@ -34,6 +34,25 @@ test("pads know where their flat floor is", () => {
   // The exit pad ends at a wall, whose corner cuts half a tile off.
   assert.equal(l.exit.x0, 6 * TILE);
   assert.equal(l.exit.x1, 8.5 * TILE);
+});
+
+test("any number of fuel pads, and a tank size", () => {
+  const l = parseLevel({
+    name: "fuel",
+    fuel: 9,
+    map: `
+      #...................#
+      #...................#
+      #.SSS.FFF.FFF.EEE...#
+      #####################
+    `,
+  });
+  assert.equal(l.fuel, 9);
+  assert.deepEqual(
+    l.pads.filter((p) => p.kind === "fuel").map((p) => p.c0),
+    [6, 10],
+  );
+  assert.throws(() => parseLevel({ name: "x", fuel: 0, map: "#.SSS.EEE#" }), /fuel must be a number of seconds/);
 });
 
 test("short rows are filled with rock and indentation is ignored", () => {

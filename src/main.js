@@ -3,7 +3,7 @@ import { createGame } from "./game.js";
 import { requestTiltPermission } from "./controls.js";
 import { SAFE_SPEED, HULL } from "./sim/rocket.js";
 import { parseLevel } from "./sim/level.js";
-import { clock } from "./sim/world.js";
+import { clock, padUnder } from "./sim/world.js";
 import testCave from "./levels/testcave.js";
 import { getThemePref, setThemePref, onThemeChange } from "./theme.js";
 import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from "./fullscreen.js";
@@ -117,10 +117,15 @@ function play(el) {
     `<div class="game" id="game">
       <div class="hud">
         <a href="/" data-link class="icon-btn" aria-label="Back">${icon("back")}</a>
-        <div class="score"><b id="time">0:00.0</b><span class="hull" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="${HULL}"><i id="hull"></i></span><span class="speed" id="speed">0.0 m/s</span></div>
+        <div class="score">
+          <b id="time">0:00.0</b>
+          <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
+          <span class="gauge"><small>Hull</small><span class="bar" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="100"><i class="hull" id="hull"></i></span></span>
+          <span class="speed" id="speed">0.0 m/s</span>
+        </div>
         <button class="icon-btn" id="fs"></button>
       </div>
-      <div class="banner" id="banner" hidden><b>Level complete</b><span id="banner-time"></span></div>
+      <div class="banner" id="banner" hidden><b>Level complete</b><span id="banner-time"></span><span id="banner-restarts"></span></div>
       <div class="message" id="message"></div>
       <div class="overlay" id="tilt-ask" hidden>
         <p>Gyro Rocket steers by tilting your phone, and needs your OK to read its motion sensors.</p>
@@ -130,6 +135,7 @@ function play(el) {
   );
   const unbindFs = bindFullscreenButton($("#fs"));
   const time = $("#time");
+  const fuel = $("#fuel");
   const hull = $("#hull");
   const speed = $("#speed");
   const banner = $("#banner");
@@ -154,9 +160,11 @@ function play(el) {
     onFrame(w, controls) {
       const r = w.rocket;
       show(time, formatTime(clock(w)));
-      hull.style.width = `${(r.hull / HULL) * 100}%`;
-      hull.parentElement.setAttribute("aria-valuenow", Math.round(r.hull));
-      hull.dataset.level = r.hull > 60 ? "ok" : r.hull > 30 ? "low" : "bad";
+      // Fuel goes amber below 30% and flashes red below 15%; the hull at 60% and 30%.
+      const f = r.fuel / r.tank;
+      setBar(fuel, f, f > 0.3 ? "ok" : f > 0.15 ? "low" : "bad");
+      const h = r.hull / HULL;
+      setBar(hull, h, h > 0.6 ? "ok" : h > 0.3 ? "low" : "bad");
       // Green while slow enough to land.
       const v = Math.hypot(r.vx, r.vy);
       show(speed, `${v.toFixed(1)} m/s`);
@@ -171,13 +179,19 @@ function play(el) {
         }
       }
       banner.hidden = !w.done;
-      if (w.done) show($("#banner-time"), formatTime(clock(w)));
+      if (w.done) {
+        show($("#banner-time"), formatTime(clock(w)));
+        show($("#banner-restarts"), w.restarts ? `${w.restarts} restart${w.restarts > 1 ? "s" : ""}` : "No restarts");
+      }
+      const back = w.checkpoint === w.level.start ? "the start" : "the last fuel pad";
       let text = "";
-      if (r.state === "crashed") text = "Crashed! Tap to try again";
+      if (r.state === "crashed") text = `Crashed! Tap to go back to ${back}`;
+      else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
       else if (w.done) text = "Tap to fly again";
+      else if (padUnder(w.level, r)?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
       else if (w.startTick < 0) {
         const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";
-        text = `Hold the screen (or ↑) to burn, ${steer}. Land on the green pad.`;
+        text = `Hold the screen (or ↑) to burn, ${steer}. Refuel on blue pads, finish on the green one.`;
       }
       show(message, text);
       message.hidden = !text;
@@ -205,6 +219,8 @@ function help(el) {
     </dl>
     <h2>Landing</h2>
     <p>Land on any flat floor: touch down slower than ${SAFE_SPEED} m/s, nearly upright, with both feet on the flat. Land on the green exit pad to finish.</p>
+    <h2>Fuel</h2>
+    <p>The engine only burns while there's fuel. Land on a blue fuel pad to fill up and mend the hull. After a crash, or when you're stuck without fuel, you start again from the last fuel pad you landed on. The clock keeps running.</p>
     <h2>Hitting rock</h2>
     <p>The rocket bounces off rock and loses hull, more the harder it hits. A slam, or losing all its hull, breaks it up. Tap to try again.</p>
     <h2>Tilt not working?</h2>
@@ -213,6 +229,13 @@ function help(el) {
   );
   const unbindFs = bindFullscreenButton($("#fs"));
   return () => unbindFs();
+}
+
+// Fills a HUD bar to `fraction` and colours it by `level` (ok, low or bad).
+function setBar(bar, fraction, level) {
+  bar.style.width = `${fraction * 100}%`;
+  bar.parentElement.setAttribute("aria-valuenow", Math.round(fraction * 100));
+  bar.dataset.level = level;
 }
 
 // Seconds → "m:ss.s".

@@ -1,40 +1,45 @@
 import * as THREE from "three";
+import { TICK_RATE } from "../sim/rocket.js";
+import { padUnder } from "../sim/world.js";
 
 const COLORS = {
   pad: 0x6b7280,
   stripe: 0xf2c94c,
   exit: 0x3fbf6a,
   beacon: 0x5be38a,
+  fuel: 0x3fa9f5,
+  pump: 0x4a4f5c,
+  screen: 0x11151c,
+  lampOff: 0x3a3f4a,
 };
 
-// The pads on the level's floors: the start pad in hazard stripes, and the exit
-// pad in green under a beam of light you can see from a distance.
+// The pads on the level's floors: the start pad in yellow hazard stripes, fuel
+// pads in blue with a pump, and the exit pad in green under a beam of light you
+// can see from a distance.
 export function createThings(level) {
   const group = new THREE.Group();
-  const stripes = stripeTexture();
   let beam = null;
+  const pumps = [];
 
   for (const pad of level.pads) {
     const width = pad.x1 - pad.x0;
-    const exit = pad.kind === "exit";
-    const map = exit ? null : stripes.clone();
-    if (map) map.repeat.set(width / 2, 1);
-    const slab = new THREE.Mesh(
-      new THREE.BoxGeometry(width, 0.35, 5),
-      [
-        new THREE.MeshLambertMaterial({ color: COLORS.pad }), // sides
-        new THREE.MeshLambertMaterial({ color: COLORS.pad }),
-        new THREE.MeshLambertMaterial({ color: exit ? COLORS.exit : COLORS.pad }), // top
-        new THREE.MeshLambertMaterial({ color: COLORS.pad }),
-        new THREE.MeshLambertMaterial({ color: exit ? COLORS.exit : 0xffffff, map }), // front
-        new THREE.MeshLambertMaterial({ color: COLORS.pad }),
-      ],
-    );
+    const mid = (pad.x0 + pad.x1) / 2;
+    const top = { start: COLORS.pad, fuel: COLORS.fuel, exit: COLORS.exit }[pad.kind];
+    const front = pad.kind === "exit" ? null : stripeTexture(pad.kind === "fuel" ? COLORS.fuel : COLORS.stripe, width / 2);
+    const side = new THREE.MeshLambertMaterial({ color: COLORS.pad });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(width, 0.35, 5), [
+      side,
+      side,
+      new THREE.MeshLambertMaterial({ color: top }),
+      side,
+      new THREE.MeshLambertMaterial({ color: front ? 0xffffff : top, map: front }),
+      side,
+    ]);
     // The top sits just above the floor, and the front sticks out past the rock's face.
-    slab.position.set((pad.x0 + pad.x1) / 2, pad.y - 0.12, -2);
+    slab.position.set(mid, pad.y - 0.12, -2);
     group.add(slab);
 
-    if (exit) {
+    if (pad.kind === "exit") {
       beam = new THREE.Mesh(
         new THREE.CylinderGeometry(width * 0.35, width * 0.45, 16, 24, 1, true),
         new THREE.MeshBasicMaterial({
@@ -46,30 +51,61 @@ export function createThings(level) {
           side: THREE.DoubleSide,
         }),
       );
-      beam.position.set((pad.x0 + pad.x1) / 2, pad.y + 8, -1);
+      beam.position.set(mid, pad.y + 8, -1);
       const light = new THREE.PointLight(COLORS.beacon, 30, 30, 1.5);
-      light.position.set((pad.x0 + pad.x1) / 2, pad.y + 3, 3);
+      light.position.set(mid, pad.y + 3, 3);
       group.add(beam, light);
     }
+    if (pad.kind === "fuel") pumps.push(createPump(pad, group));
   }
 
   return {
     group,
-    // `seconds` since the level started, for anything that pulses.
-    update(seconds) {
+    // Shows the pads' state in `world` (sim/world.js).
+    update(world) {
+      const seconds = world.tick / TICK_RATE;
       if (beam) beam.material.opacity = 0.12 + 0.06 * Math.sin(seconds * 3);
+      const r = world.rocket;
+      const at = padUnder(world.level, r);
+      for (const pump of pumps) {
+        pump.gauge.scale.y = at === pump.pad ? Math.max(0.02, r.fuel / r.tank) : 1;
+        const lit = world.checkpoint === pump.pad;
+        const pulse = at === pump.pad && world.refuelling ? 0.5 + 0.5 * Math.sin(seconds * 12) : 1;
+        pump.lamp.material.color.setHex(lit ? COLORS.fuel : COLORS.lampOff).multiplyScalar(pulse);
+      }
     },
   };
 }
 
-// Yellow and dark diagonal stripes, one pair per repeat.
-function stripeTexture() {
+// A fuel pump behind the pad's right end: a screen whose gauge fills while the
+// rocket refuels, and a lamp on top that's lit while the pad is the checkpoint.
+function createPump(pad, group) {
+  const pump = new THREE.Group();
+  pump.position.set(pad.x1 - 0.8, pad.y, -3.6);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 3.4, 1.2), new THREE.MeshLambertMaterial({ color: COLORS.pump }));
+  body.position.y = 1.7;
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 2.2), new THREE.MeshBasicMaterial({ color: COLORS.screen }));
+  screen.position.set(0, 1.8, 0.61);
+  // The gauge grows up from its bottom edge.
+  const gaugeGeo = new THREE.PlaneGeometry(0.6, 2);
+  gaugeGeo.translate(0, 1, 0);
+  const gauge = new THREE.Mesh(gaugeGeo, new THREE.MeshBasicMaterial({ color: COLORS.fuel }));
+  gauge.position.set(0, 0.8, 0.62);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: COLORS.lampOff }));
+  lamp.position.y = 3.6;
+  pump.add(body, screen, gauge, lamp);
+  group.add(pump);
+  return { pad, gauge, lamp };
+}
+
+// Diagonal stripes in `color` on dark, one pair every 2 m across `repeats` repeats.
+function stripeTexture(color, repeats) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 64;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#23262e";
   ctx.fillRect(0, 0, 64, 64);
-  ctx.fillStyle = "#" + COLORS.stripe.toString(16).padStart(6, "0");
+  ctx.fillStyle = "#" + color.toString(16).padStart(6, "0");
   for (const dx of [-64, 0, 64]) {
     ctx.beginPath();
     ctx.moveTo(dx, 64);
@@ -81,5 +117,6 @@ function stripeTexture() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.repeat.set(repeats, 1);
   return texture;
 }

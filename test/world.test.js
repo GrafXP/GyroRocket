@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, clock } from "../src/sim/world.js";
-import { TICK_RATE, CENTRE_Y } from "../src/sim/rocket.js";
+import { createWorld, step, clock, restart, padUnder, REFUEL_TIME } from "../src/sim/world.js";
+import { TICK_RATE, CENTRE_Y, HULL, TANK } from "../src/sim/rocket.js";
 import { room } from "./helpers.js";
+import { parseLevel } from "../src/sim/level.js";
 
 const run = (w, input, ticks) => {
   for (let i = 0; i < ticks; i++) step(w, input);
@@ -12,20 +13,35 @@ const run = (w, input, ticks) => {
 // Puts the rocket just above a pad's middle, falling slowly enough to land.
 const dropOnto = (w, pad) => Object.assign(w.rocket, { x: (pad.x0 + pad.x1) / 2, y: pad.y + CENTRE_Y + 1, vx: 0, vy: 0, angle: 0 });
 
-test("the rocket starts on the start pad, and the clock waits for lift-off", () => {
+const fuelPad = (level) => level.pads.find((p) => p.kind === "fuel");
+
+// A world whose rocket has lifted off and been dropped onto `pad`, with the clock running.
+const flownTo = (pad) => {
+  const { level } = room();
+  const w = run(createWorld(level), { thrust: true }, 30);
+  dropOnto(w, pad(level));
+  return w;
+};
+
+test("the rocket starts on the start pad with a full tank, and the clock waits for lift-off", () => {
   const { level } = room();
   const w = run(createWorld(level), {}, TICK_RATE);
   assert.equal(w.rocket.x, (level.start.x0 + level.start.x1) / 2);
   assert.equal(w.rocket.state, "landed");
+  assert.equal(w.rocket.fuel, TANK);
+  assert.equal(w.checkpoint, level.start);
   assert.equal(clock(w), 0);
   run(w, { thrust: true }, TICK_RATE);
   assert.equal(clock(w), 1 - 1 / TICK_RATE);
 });
 
-test("landing on the exit pad finishes and stops the clock", () => {
+test("the level sets the tank size", () => {
   const { level } = room();
-  const w = run(createWorld(level), { thrust: true }, 30);
-  dropOnto(w, level.exit);
+  assert.equal(createWorld({ ...level, fuel: 7 }).rocket.tank, 7);
+});
+
+test("landing on the exit pad finishes and stops the clock", () => {
+  const w = flownTo((l) => l.exit);
   run(w, {}, TICK_RATE);
   assert.equal(w.done, true);
   const t = clock(w);
@@ -36,20 +52,88 @@ test("landing on the exit pad finishes and stops the clock", () => {
 });
 
 test("landing back on the start pad doesn't finish", () => {
-  const { level } = room();
-  const w = run(createWorld(level), { thrust: true }, 30);
-  dropOnto(w, level.start);
+  const w = flownTo((l) => l.start);
   run(w, {}, TICK_RATE);
   assert.equal(w.rocket.state, "landed");
   assert.equal(w.done, false);
 });
 
-test("a crash stops the clock", () => {
-  const { level } = room();
-  const w = run(createWorld(level), { thrust: true }, 2 * TICK_RATE);
+test("a fuel pad fills the tank and mends the hull, and becomes the checkpoint", () => {
+  const w = flownTo(fuelPad);
+  Object.assign(w.rocket, { fuel: 0.1, hull: 10 });
+  run(w, {}, TICK_RATE / 2);
+  assert.equal(padUnder(w.level, w.rocket), fuelPad(w.level));
+  assert.equal(w.checkpoint, fuelPad(w.level));
+  assert.equal(w.refuelling, true);
+  assert.equal(w.stranded, false);
+  run(w, {}, REFUEL_TIME * TICK_RATE);
+  assert.equal(w.rocket.fuel, TANK);
+  assert.equal(w.rocket.hull, HULL);
+  assert.equal(w.refuelling, false);
+});
+
+test("after a crash, a restart goes back to the checkpoint, full, with the clock still running", () => {
+  const w = flownTo(fuelPad);
+  run(w, {}, TICK_RATE);
+  // Fly up and fall back hard: a crash.
+  run(w, { thrust: true }, 2 * TICK_RATE);
   run(w, {}, 5 * TICK_RATE);
   assert.equal(w.rocket.state, "crashed");
+  assert.ok(w.downTick > 0);
   const t = clock(w);
   run(w, {}, TICK_RATE);
-  assert.equal(clock(w), t);
+  assert.equal(clock(w), t + 1);
+  restart(w);
+  assert.equal(w.restarts, 1);
+  assert.equal(w.downTick, -1);
+  assert.equal(padUnder(w.level, w.rocket), fuelPad(w.level));
+  assert.deepEqual([w.rocket.fuel, w.rocket.hull], [TANK, HULL]);
+  run(w, {}, TICK_RATE);
+  assert.equal(clock(w), t + 2);
+});
+
+test("landed with an empty tank away from a fuel pad is stranded", () => {
+  const w = flownTo((l) => l.start);
+  w.rocket.fuel = 0;
+  run(w, {}, TICK_RATE);
+  assert.equal(w.stranded, true);
+  assert.ok(w.downTick > 0);
+  restart(w);
+  assert.equal(w.stranded, false);
+  assert.equal(w.rocket.fuel, TANK);
+  assert.equal(padUnder(w.level, w.rocket), w.level.start);
+});
+
+test("an empty tank on a fuel pad isn't stranded", () => {
+  const w = flownTo(fuelPad);
+  w.rocket.fuel = 0;
+  run(w, {}, TICK_RATE);
+  assert.equal(w.stranded, false);
+  assert.equal(w.downTick, -1);
+});
+
+test("stuck still with an empty tank, somewhere it can't land, is stranded too", () => {
+  // A V-shaped pit whose bottom is too narrow to land on.
+  const level = parseLevel({
+    name: "pit",
+    map: `
+      ####################
+      #..................#
+      #..................#
+      #..................#
+      #..................#
+      #..................#
+      #.SSS.EEE..........#
+      ##########........##
+      ###########......###
+      ############....####
+      #############..#####
+      ####################
+    `,
+  });
+  const w = run(createWorld(level), { thrust: true }, 10);
+  Object.assign(w.rocket, { x: 28, y: 14, vx: 0, vy: 0, fuel: 0 });
+  run(w, {}, 5 * TICK_RATE);
+  assert.equal(w.rocket.state, "flying");
+  assert.equal(w.stranded, true);
 });

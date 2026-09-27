@@ -89,9 +89,11 @@ export function createRocketModel() {
       group.position.set(r.x, r.y, 0);
       group.rotation.z = -r.angle;
       group.visible = r.state !== "crashed";
-      flame.visible = r.burning;
+      // Burning, a steady flame; trying to burn on an empty tank, a weak sputter.
       const flicker = 0.8 + Math.random() * 0.5;
-      if (r.burning) flame.scale.set(1, flicker, 1);
+      const sputter = r.sputtering && Math.random() < 0.3;
+      flame.visible = r.burning || sputter;
+      if (flame.visible) flame.scale.set(sputter ? 0.5 : 1, sputter ? 0.25 * flicker : flicker, sputter ? 0.5 : 1);
       glow.intensity = r.burning ? 40 * flicker : 0;
       // Glow red for a moment after hitting rock, more for a harder hit.
       const since = r.tick - r.hitTick;

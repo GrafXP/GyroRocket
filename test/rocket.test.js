@@ -9,6 +9,7 @@ import {
   MAX_LEAN,
   SAFE_SPEED,
   HULL,
+  TANK,
   CENTRE_Y,
   FOOT_X,
 } from "../src/sim/rocket.js";
@@ -41,6 +42,30 @@ test("burning lifts off and climbs", () => {
   assert.equal(r.state, "flying");
   assert.ok(r.y > FLOOR + CENTRE_Y + 3, `only ${r.y} m up`);
   assert.equal(r.hull, HULL);
+});
+
+test("burning uses a second of fuel a second, and only while burning", () => {
+  const { outline } = room();
+  const r = createRocket(11, FLOOR);
+  assert.equal(r.fuel, TANK);
+  run(r, outline, {}, TICK_RATE);
+  assert.equal(r.fuel, TANK);
+  run(r, outline, { thrust: true }, TICK_RATE);
+  assert.ok(Math.abs(r.fuel - (TANK - 1)) < 1e-9, `${r.fuel}`);
+  run(r, outline, {}, TICK_RATE);
+  assert.ok(Math.abs(r.fuel - (TANK - 1)) < 1e-9);
+});
+
+test("with an empty tank the engine only sputters", () => {
+  const { outline } = room();
+  const r = run(createRocket(11, FLOOR, 0.5), outline, { thrust: true }, TICK_RATE);
+  assert.equal(r.fuel, 0);
+  assert.equal(r.burning, false);
+  assert.equal(r.sputtering, true);
+  // Nothing holds it up: it falls back and lands.
+  for (let i = 0; i < 10 * TICK_RATE && r.state === "flying"; i++) step(r, { thrust: true }, outline);
+  assert.equal(r.state, "landed");
+  assert.equal(r.y, FLOOR + CENTRE_Y);
 });
 
 test("steering leans the rocket, no further than MAX_LEAN", () => {

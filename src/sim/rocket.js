@@ -18,6 +18,7 @@ export const TURN_RATE = 3.5; // how fast the lean follows the steer, rad/s
 export const SAFE_SPEED = 5; // m/s: a landing has to be slower than this…
 export const SAFE_LEAN = 0.35; // rad: …and more upright than this
 export const HULL = 100;
+export const TANK = 15; // seconds of full burn in a full tank, unless the level says
 export const SCRAPE_SPEED = 1.5; // m/s into rock that does no damage
 export const DAMAGE = 7; // hull lost per m/s into rock over SCRAPE_SPEED
 export const CRASH_SPEED = 13; // m/s into rock that destroys the rocket outright
@@ -46,9 +47,10 @@ export const SHAPE = [
   [0, 4.8, 0.4],
 ].map(([x, y, r, foot = false]) => ({ x, y: y - CENTRE_Y, r, foot }));
 
-// A rocket standing on the floor at height `floorY`, centred on x.
+// A rocket standing on the floor at height `floorY`, centred on x, with a full
+// tank of `tank` seconds' burn.
 // "landed": standing on flat floor; "flying"; "crashed": nothing moves until reset.
-export function createRocket(x, floorY) {
+export function createRocket(x, floorY, tank = TANK) {
   return {
     x,
     y: floorY + CENTRE_Y,
@@ -57,6 +59,9 @@ export function createRocket(x, floorY) {
     angle: 0,
     state: "landed",
     burning: false,
+    sputtering: false, // trying to burn with an empty tank
+    tank,
+    fuel: tank,
     hull: HULL,
     tick: 0,
     hitTick: -1, // when it last hit rock, and how much hull that cost
@@ -80,11 +85,15 @@ export function circlesAt(x, y, angle, out = scratch) {
 }
 
 // Advances one tick. `steer` is -1 (full left) to 1 (full right) and sets the lean
-// the rocket turns towards; `thrust` burns the engine along the rocket's axis.
+// the rocket turns towards; `thrust` burns the engine along the rocket's axis, while
+// there's fuel.
 export function step(r, { steer = 0, thrust = false } = {}, outline) {
   r.tick++;
-  r.burning = thrust && r.state !== "crashed";
+  const wants = thrust && r.state !== "crashed";
+  r.burning = wants && r.fuel > 0;
+  r.sputtering = wants && !r.burning;
   if (r.state === "crashed") return r;
+  if (r.burning) r.fuel = Math.max(0, r.fuel - DT);
   if (r.state === "landed") {
     if (!r.burning) return r;
     r.state = "flying"; // the thrust beats gravity, so any burn lifts off
@@ -155,5 +164,5 @@ function hit(r, impact) {
   r.hull = Math.max(0, r.hull - damage);
   r.hitTick = r.tick;
   r.hitDamage = damage;
-  if (r.hull === 0) Object.assign(r, { state: "crashed", crashTick: r.tick, vx: 0, vy: 0, burning: false });
+  if (r.hull === 0) Object.assign(r, { state: "crashed", crashTick: r.tick, vx: 0, vy: 0, burning: false, sputtering: false });
 }
