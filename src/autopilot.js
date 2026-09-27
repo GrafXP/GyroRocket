@@ -1,10 +1,11 @@
 import { KEY_COLORS, TILE } from "./sim/level.js";
 import { deepestContact } from "./sim/collide.js";
 import { circlesAt, CENTRE_Y, GRAVITY, THRUST, DRAG, MAX_LEAN, TICK_RATE } from "./sim/rocket.js";
-import { padUnder, RETRY_AFTER } from "./sim/world.js";
+import { padUnder, switched, RETRY_AFTER } from "./sim/world.js";
 import { flamePhase, inFlame, distanceToFlame } from "./sim/hazards/flame.js";
 import { blobAt } from "./sim/hazards/blob.js";
 import { fieldAt, moverBox } from "./sim/machines.js";
+import { laserPhase, inLaser } from "./sim/hazards/laser.js";
 
 // A cautious autopilot: given a level in play (sim/world.js), it gives the input
 // for each tick to fly the level's route. The game can hand it the controls, and
@@ -18,9 +19,10 @@ import { fieldAt, moverBox } from "./sim/machines.js";
 // (E). Doors open on the way once their key is held. Without a route, it lands on
 // the fuel pads in order of distance from the start, then the exit.
 //
-// It steers round flames that are always on, and allows for the push of fans and
-// magnets. Where its path crosses any other flame, a lava blob's column, or the
-// ground a crusher or moving block covers, it slows as it comes up to it and waits,
+// It steers round flames and laser beams that are always on, allows for the push
+// of fans and magnets, and sidesteps turrets' shots coming its way. Where its path
+// crosses any other flame or beam, a lava blob's column, or the ground a crusher or
+// moving block covers, it slows as it comes up to it and waits,
 // hovering, until the hazard's schedule shows a gap long enough to get across;
 // then it goes, and doesn't change its mind. If there's a way round the ground a
 // block covers, it takes that instead.
@@ -63,9 +65,7 @@ export function createPilot(world, { restart = true } = {}) {
     leg = null;
     refuelling = false;
   };
-  const done = (s) =>
-    (s.key && world.keys.includes(s.key.color)) ||
-    (s.pad?.kind === "switch" && world.doors[level.doors.findIndex((d) => d.gate === s.pad.opens)].open && !s.pad.time);
+  const done = (s) => (s.key && world.keys.includes(s.key.color)) || (s.pad?.kind === "switch" && switched(world, s.pad.opens).open && !s.pad.time);
   const fail = (why) => {
     pilot.failed = why;
     pilot.status = "The autopilot's lost: you have it";
@@ -169,6 +169,10 @@ function steer(world, leg) {
     const speed = Math.min(cap, Math.sqrt(2 * BRAKE * (left + 1)), d * 2);
     [vx, vy] = [((tx - r.x) / d) * speed, ((ty - r.y) / d) * speed];
   }
+  // Out of the way of any shot coming at it.
+  const dodge = incoming(world, 1.5);
+  if (dodge) [vx, vy] = [vx + dodge[0] * 6, vy + dodge[1] * 6];
+
   // The push it needs: towards that velocity, plus holding up against gravity,
   // drag, fans and magnets; the engine's on/off, so it burns for that share of the
   // ticks.
@@ -249,6 +253,7 @@ const blocking = (world) => world.level.doors.filter((d, i) => !world.doors[i].o
 export function findPath(world, [x0, y0], [x1, y1], boxes) {
   const { level, outline } = world;
   const walls = level.flames.filter((f) => f.mode === "always");
+  const beams = level.lasers.filter((l, i) => l.mode === "always" && !world.lasers[i].open);
   const gales = level.fans.filter(tooStrong);
   const [gx0, gy0] = [-Math.floor(x0), -Math.floor(y0)];
   const cols = Math.floor(level.width * TILE - x0) - gx0 + 1;
@@ -262,6 +267,7 @@ export function findPath(world, [x0, y0], [x1, y1], boxes) {
     return (
       !deepestContact(outline, circles, boxes) &&
       !walls.some((f) => inFlame(f, circles, HAZARD_MARGIN)) &&
+      !beams.some((l) => inLaser(l, circles, HAZARD_MARGIN)) &&
       !gales.some((f) => x > f.x0 && x < f.x1 && y > f.y0 && y < f.y1)
     );
   };
@@ -319,13 +325,20 @@ function hazardZones(world, path) {
     ...flames.map((flame, i) => ({ flame, state: world.flames[i] })).filter((h) => h.flame.mode !== "always"),
     ...blobs.map((blob) => ({ blob })),
     ...movers.map((mover) => ({ mover, swept: sweep(mover) })),
+    ...world.level.lasers.map((laser, i) => ({ laser, state: world.lasers[i] })).filter((h) => h.laser.mode === "cycle"),
   ];
   const zones = [];
   for (const h of hazards) {
     let from = -1;
     path.forEach(([x, y], i) => {
       const circles = circlesAt(x, y, 0);
-      const inside = h.flame ? inFlame(h.flame, circles, HAZARD_MARGIN) : h.blob ? inColumn(h.blob, circles) : inBox(h.swept, circles);
+      const inside = h.flame
+        ? inFlame(h.flame, circles, HAZARD_MARGIN)
+        : h.laser
+          ? inLaser(h.laser, circles, HAZARD_MARGIN)
+          : h.blob
+            ? inColumn(h.blob, circles)
+            : inBox(h.swept, circles);
       if (inside && from < 0) from = i;
       if ((!inside || i === path.length - 1) && from >= 0) {
         const to = inside ? i : i - 1;
@@ -391,13 +404,33 @@ function dangerSoon(world) {
       return soon((t) => burningAt({ flame, state }, t));
     }) ||
     world.level.blobs.some((blob) => inColumn(blob, circles) && soon((t) => blobAt(blob, t).up)) ||
-    world.level.movers.some((m) => soon((t) => inBox(moverBox(m, t), circles)))
+    world.level.movers.some((m) => soon((t) => inBox(moverBox(m, t), circles))) ||
+    world.level.lasers.some((l, i) => inLaser(l, circles, HAZARD_MARGIN) && soon((t) => laserPhase(l, world.lasers[i], t) !== "off")) ||
+    incoming(world, 1) !== null
   );
 }
 
+// Which way to move to get out of the way of a turret's shot that'll pass within
+// 3 m of the rocket in the next `seconds`, as a unit [x, y], or null if none will.
+function incoming(world, seconds) {
+  const r = world.rocket;
+  for (const s of world.shots) {
+    const [px, py, vx, vy] = [s.x - r.x, s.y - r.y, s.vx - r.vx, s.vy - r.vy];
+    const t = -(px * vx + py * vy) / (vx * vx + vy * vy || 1);
+    if (t <= 0 || t > seconds) continue;
+    const [cx, cy] = [px + vx * t, py + vy * t]; // where it'll be, from the rocket, closest
+    const d = Math.hypot(cx, cy);
+    if (d > 3) continue;
+    // Away from where it passes; straight across its path if it's coming dead on.
+    return d > 0.3 ? [-cx / d, -cy / d] : [-vy / Math.hypot(vx, vy), vx / Math.hypot(vx, vy)];
+  }
+  return null;
+}
+
 // Whether a zone's hazard could hurt at `tick`, as far as can be told now.
-function burningAt({ flame, state, blob, mover, points }, tick) {
+function burningAt({ flame, laser, state, blob, mover, points }, tick) {
   if (blob) return blobAt(blob, tick).up;
+  if (laser) return laserPhase(laser, state, tick) === "on";
   if (mover) {
     // The block where it'll be then, against the rocket anywhere along the stretch.
     const box = moverBox(mover, tick);

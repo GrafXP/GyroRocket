@@ -8,11 +8,12 @@ import { circlesAt, canStand, CENTRE_Y } from "../src/sim/rocket.js";
 import { touches } from "../src/sim/world.js";
 import { flyLevel } from "../scripts/autopilot.js";
 import { inFlame } from "../src/sim/hazards/flame.js";
+import { inLaser } from "../src/sim/hazards/laser.js";
 
 // Everywhere an upright rocket can get to from the start pad, moving in 1 m steps
-// without touching rock, the shut doors and gates in `boxes`, or a flame that's
-// always on. Returns a list of reachable [x, y] centres.
-function flood(level, outline, boxes) {
+// without touching rock, the shut doors and gates in `boxes`, a flame that's always
+// on, or a laser beam in `beams`. Returns a list of reachable [x, y] centres.
+function flood(level, outline, boxes, beams) {
   const walls = level.flames.filter((f) => f.mode === "always");
   const { start } = level;
   const [sx, sy] = [(start.x0 + start.x1) / 2, start.y + CENTRE_Y + 0.05];
@@ -20,7 +21,10 @@ function flood(level, outline, boxes) {
   const cols = Math.ceil(level.width * 2 - sx) - gx0 + 1;
   const rows = Math.ceil(level.height * 2 - sy) - gy0 + 1;
   const seen = new Uint8Array(cols * rows); // 1 seen and fits, 2 seen and doesn't
-  const fits = (x, y) => !deepestContact(outline, circlesAt(x, y, 0), boxes) && !walls.some((f) => inFlame(f, circlesAt(x, y, 0)));
+  const fits = (x, y) => {
+    const circles = circlesAt(x, y, 0);
+    return !deepestContact(outline, circles, boxes) && !walls.some((f) => inFlame(f, circles)) && !beams.some((l) => inLaser(l, circles));
+  };
   const found = [];
   const queue = [[0, 0]];
   seen[(0 - gy0) * cols + (0 - gx0)] = 1;
@@ -51,20 +55,25 @@ const onPad = (spots, pad) => {
 };
 
 // Everywhere the rocket can get to, opening each door once its key has been
-// reached and each gate once its switch has.
+// reached, and each gate (or laser that's always on) once its switch has.
+// Cycling lasers are no bar: they go off.
 function reachable(level, outline) {
   const open = new Set();
+  const off = new Set();
   for (;;) {
     const spots = flood(
       level,
       outline,
       level.doors.filter((d, i) => !open.has(i)),
+      level.lasers.filter((l, i) => l.mode === "always" && !off.has(i)),
     );
     const keys = level.keys.filter((k) => spots.some(([x, y]) => touches({ x, y, angle: 0 }, k))).map((k) => k.color);
     const switches = level.pads.filter((p) => p.kind === "switch" && onPad(spots, p)).map((p) => p.opens);
-    const more = level.doors.filter((d, i) => !open.has(i) && (keys.includes(d.key) || switches.includes(d.gate)));
-    if (!more.length) return spots;
-    for (const d of more) open.add(level.doors.indexOf(d));
+    const doors = level.doors.filter((d, i) => !open.has(i) && (keys.includes(d.key) || switches.includes(d.gate)));
+    const lasers = level.lasers.filter((l, i) => !off.has(i) && switches.includes(l.label));
+    if (!doors.length && !lasers.length) return spots;
+    for (const d of doors) open.add(level.doors.indexOf(d));
+    for (const l of lasers) off.add(level.lasers.indexOf(l));
   }
 }
 

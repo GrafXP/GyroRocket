@@ -7,6 +7,7 @@ import { createThings } from "./things.js";
 import { createDoors } from "./doors.js";
 import { createHazards } from "./hazards.js";
 import { createMachines } from "./machines.js";
+import { createDefences } from "./defences.js";
 
 const FOV = 50; // degrees, vertical
 const VIEW = 36; // m across the screen's short side, at least
@@ -25,21 +26,26 @@ export function createView(container, level, outline) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x08090d);
-  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a2e24, 1.3));
-  const sun = new THREE.DirectionalLight(0xfff4e6, 1.4);
+  // A dark level has next to no light of its own: the rocket's headlight, and
+  // what glows.
+  const dark = !!level.dark;
+  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a2e24, dark ? 0.06 : 1.3));
+  const sun = new THREE.DirectionalLight(0xfff4e6, dark ? 0 : 1.4);
   sun.position.set(-0.3, 0.5, 1);
   scene.add(sun);
 
   scene.add(createCave(outline, level.colors));
-  const things = createThings(level);
+  const things = createThings(level, dark);
   scene.add(things.group);
-  const doors = createDoors(level);
+  const doors = createDoors(level, dark);
   scene.add(doors.group);
   const hazards = createHazards(level);
   scene.add(hazards.group);
   const machines = createMachines(level);
   scene.add(machines.group);
-  const rocket = createRocketModel();
+  const defences = createDefences(level);
+  scene.add(defences.group);
+  const rocket = createRocketModel(dark);
   scene.add(rocket.group);
 
   const boom = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true }));
@@ -76,6 +82,7 @@ export function createView(container, level, outline) {
       doors.update(world);
       hazards.update(world);
       machines.update(world, dt);
+      defences.update(world);
 
       const since = (r.tick - r.crashTick) / TICK_RATE;
       boom.visible = r.state === "crashed" && since < 1;

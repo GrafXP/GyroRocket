@@ -87,6 +87,7 @@ src/
     doors.js       keys, doors, gates and switch posts
     hazards.js     flamethrowers, lava and blobs
     machines.js    fans, magnets, movers and crushers
+    defences.js    laser gates, turrets and their shots
   ui/
     dom.js         shared page bits: icons, stars, theme picker, fullscreen button
     play.js        the play page: HUD, pause menu, level complete sheet, dev overlay
@@ -139,7 +140,7 @@ export default {
 | `R Y G B`   | door: a rectangle of its letter, opened by its key         |
 | `< > ^ v`   | flamethrower facing that way, with the default cycle       |
 | `~`         | lava: rock that destroys the rocket                        |
-| `1`–`9`, other letters | a thing set up in `things` by that character: a switch (a pad), a gate, mover or crusher (rectangles), a flamethrower, a lava blob, a fan or a magnet |
+| `1`–`9`, other letters | a thing set up in `things` by that character: a switch (a pad), a gate, mover or crusher (rectangles), a flamethrower, a lava blob, a fan, a magnet, a laser or a turret |
 
 A pad is a run of at least 3 of its letter on the air row just above a flat floor;
 so is a switch. Door and gate tiles are air to the rock outline, and block as
@@ -455,7 +456,7 @@ doors, 4-5 Lodestone (magnets over lava), 4-6 Repulsor, 4-7 The press, 4-8 The
 works. Tanks are about 1.3× the longest stretch between fuel pads. Crushers rest
 2.5 s, which the autopilot needs to get under one; players will find that roomy.
 
-### Phase 7: Deep dark and defences
+### Phase 7: Deep dark and defences ✅ (done)
 Dark levels have no light but the rocket's headlight, which points where the nose
 points, and whatever glows: crystals, pads, lava and fire. Laser gates are beams
 between two emitters, switched by a cycle or a switch, and touching one is a crash.
@@ -464,6 +465,29 @@ and each shot costs hull. Then world 5, *Deep dark*: 8 levels.
 - [ ] In the dark you can see enough to fly carefully, but not far.
 - [ ] A turret shot can always be dodged if you're paying attention.
 - [ ] You can always tell whether a laser is on or off.
+
+What was built: `dark: true` turns a level's own light down to almost nothing;
+the rocket gets a headlight, a spotlight from in front of its nose onto the rock
+ahead, and pads and door faces glow a little in the dark (keys, crystals, lava,
+fire, fan dust and magnet rings glow anyway). A laser (`things` kind "laser")
+shoots a beam from its emitter to the first rock, "always" or on a "cycle" that
+flickers for `warn` before it comes on; touching a lit beam is "Zapped!". A switch
+can name a laser in `opens` to turn it off, for good or for a time that won't end
+with the rocket in the beam. A turret sees the rocket within `range` (40 m) if no
+rock's in the way, winds up for a second (a growing glow at its muzzle, the barrel
+following the rocket), and fires a slow shot (10 m/s) at where the rocket is then,
+unless it's ducked out of sight; a hit costs 30 hull ("Shot down!"), and shots
+fly until they hit rock. Checkpoints keep lasers switched off for good; a restart
+clears the shots in the air.
+
+The autopilot treats lasers that are always on as walls until switched off, waits
+for cycling ones like flames (counting only lit beams, not the flicker), and steps
+aside from a shot that'll pass within 3 m in the next second and a half.
+
+World 5, *Deep dark*: 5-1 Lights out, 5-2 Tripwire, 5-3 Blackout, 5-4 Sentry, 5-5
+Crossfire, 5-6 Blind maze, 5-7 Laser grid, 5-8 The deep dark; 5-1, 5-3, 5-6, 5-7 and
+5-8 are dark. Tanks are about 1.25× the longest stretch between fuel pads. Lasers on
+a cycle are off 2.5 s at a time.
 
 ### Phase 8: The core
 Stalactites shake, then drop, when the rocket passes under them. Crumbling rock

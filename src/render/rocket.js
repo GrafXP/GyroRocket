@@ -16,8 +16,9 @@ const COLORS = {
 // The rocket, about 5 m tall, standing on three fins that end in feet, with its
 // origin at the centre of mass the sim turns it about (sim/rocket.js, whose
 // collision circles it matches). It carries a light, so the cave around it is lit,
-// and another under the engine for when it burns.
-export function createRocketModel() {
+// and another under the engine for when it burns; in a `dark` level, the light
+// round it is dim and a headlight shines ahead of its nose.
+export function createRocketModel(dark = false) {
   const group = new THREE.Group();
   const model = new THREE.Group();
   model.position.y = -CENTRE_Y; // model coordinates have the feet on y = 0
@@ -76,11 +77,17 @@ export function createRocketModel() {
   model.add(flame);
 
   // Lights: one in front of the rocket for the cave, one under the engine.
-  const lamp = new THREE.PointLight(0xfff0dd, 60, 60, 1.5);
+  const lamp = new THREE.PointLight(0xfff0dd, dark ? 10 : 60, 60, 1.5);
   lamp.position.set(0, 0, 8);
   const glow = new THREE.PointLight(0xff9a3c, 0, 30, 1.5);
   glow.position.set(0, -2.5, 1.5);
+  // The headlight: from in front of the nose, down the way it points, onto the
+  // rock's face and walls ahead.
+  const headlight = new THREE.SpotLight(0xf2f6ff, dark ? 500 : 0, 70, 0.5, 0.5, 1.2);
+  headlight.position.set(0, 2.6, 3);
+  headlight.target.position.set(0, 30, -3);
   group.add(lamp, glow);
+  if (dark) group.add(headlight, headlight.target); // a light costs every material, so only where it's needed
 
   return {
     group,

@@ -19,7 +19,10 @@ const COLORS = {
 // pads in blue with a pump, switches in orange (their posts are in doors.js), and
 // the exit pad in green under a beam of light you can see from a distance. And the
 // crystals, glowing, turning and bobbing.
-export function createThings(level) {
+export function createThings(level, dark = false) {
+  // In the dark, pads glow a little, to be found by.
+  const glowing = (color, map = null) =>
+    new THREE.MeshLambertMaterial({ color, map, emissive: dark ? color : 0, emissiveMap: dark ? map : null, emissiveIntensity: dark ? 0.35 : 0 });
   const group = new THREE.Group();
   let beam = null;
   const pumps = [];
@@ -35,9 +38,9 @@ export function createThings(level) {
     const slab = new THREE.Mesh(new THREE.BoxGeometry(width, 0.35, 5), [
       side,
       side,
-      new THREE.MeshLambertMaterial({ color: top }),
+      glowing(top),
       side,
-      new THREE.MeshLambertMaterial({ color: front ? 0xffffff : top, map: front }),
+      glowing(front ? 0xffffff : top, front),
       side,
     ]);
     // The top sits just above the floor, and the front sticks out past the rock's face.

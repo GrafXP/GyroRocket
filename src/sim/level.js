@@ -29,6 +29,12 @@ export const MAGNET = { strength: 16, range: 16, push: false, mode: "always", on
 // slams out by `to` in `slam` seconds, holds, and goes `back`.
 export const MOVER = { to: [0, 0], period: 6, offset: 0 };
 export const CRUSHER = { to: [0, 0], rest: 2, warn: 0.6, slam: 0.15, hold: 0.6, back: 1, offset: 0 };
+// A laser shoots a beam from its emitter to the first rock, "always" or on a
+// "cycle" (flickering for `warn` before it comes on); a switch can turn it off. A
+// turret fires a shot at `speed` m/s at the rocket when it can see it within
+// `range` m, after winding up for `windup` s, then reloads; a shot costs `damage`.
+export const LASER = { mode: "always", on: 2, off: 2, warn: 0.5, offset: 0 };
+export const TURRET = { range: 40, windup: 1, reload: 2.5, speed: 10, damage: 30, offset: 0 };
 const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything
@@ -48,7 +54,11 @@ const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
 // - { kind: "mover", to: [dx, dy], ...MOVER settings } is a sliding block, a
 //   rectangle of its character where it starts;
 // - { kind: "crusher", to: [dx, dy], ...CRUSHER settings } is a piston's head, a
-//   rectangle of its character where it rests.
+//   rectangle of its character where it rests;
+// - { kind: "laser", facing: "up", ...LASER settings } is a laser gate's emitter;
+//   a switch can name it in `opens`, to turn it off;
+// - { kind: "turret", ...TURRET settings } is a gun turret.
+// `dark: true` makes a level dark but for the rocket's headlight and what glows.
 // Door, gate, mover and crusher tiles are air to the rock outline; they block as
 // rectangles (level.doors, level.movers). Flamethrowers, fans, magnets and lava are
 // rock.
@@ -72,6 +82,8 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const blobs = [];
   const fans = [];
   const magnets = [];
+  const emitters = [];
+  const turrets = [];
   rows.forEach((row, r) => {
     const j = height - 1 - r;
     for (let c = 0; c < width; c++) {
@@ -90,13 +102,19 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
       } else if (kindOf(ch) === "magnet") {
         solid[j * width + c] = 1;
         magnets.push({ ...MAGNET, ...things[ch], ...at });
+      } else if (kindOf(ch) === "laser") {
+        solid[j * width + c] = 1;
+        emitters.push({ c, j, label: ch, ...LASER, ...things[ch] });
+      } else if (kindOf(ch) === "turret") {
+        solid[j * width + c] = 1;
+        turrets.push({ c, j, ...TURRET, ...things[ch], ...at });
       } else if (ch === "*") crystals.push(at);
       else if (KEY_COLORS[ch]) {
         if (keys.some((k) => k.color === KEY_COLORS[ch])) throw new Error(`${where(c, j)}: a second ${KEY_COLORS[ch]} key`);
         keys.push({ color: KEY_COLORS[ch], ...at });
       } else if (!RESERVED.has(ch) && !kindOf(ch)) {
         if (!/[0-9A-Za-z]/.test(ch)) throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
-        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame, blob, fan, magnet, mover or crusher`);
+        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame, blob, fan, magnet, mover, crusher, laser or turret`);
       } else if (kindOf(ch) && !["switch", "gate", "mover", "crusher"].includes(kindOf(ch))) {
         throw new Error(`${where(c, j)}: "${ch}" is set up as a "${kindOf(ch)}", which isn't a kind of thing`);
       }
@@ -120,6 +138,8 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     fans: [],
     magnets,
     movers: [],
+    lasers: [],
+    turrets,
     things,
     ...settings,
   };
@@ -209,6 +229,19 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     level.flames.push({ c, j, facing, on, off, warn, offset, mode, reach, x0, y0, x1: x0 + dir[0] * tiles * TILE, y1: y0 + dir[1] * tiles * TILE });
   }
 
+  // Lasers: from the emitter's face to the first rock.
+  for (const e of emitters) {
+    const dir = FACINGS[e.facing];
+    if (!dir) throw new Error(`${where(e.c, e.j)}: a laser faces left, right, up or down, not "${e.facing}"`);
+    if (!["always", "cycle"].includes(e.mode)) throw new Error(`${where(e.c, e.j)}: a laser's mode is always or cycle`);
+    let tiles = 0;
+    while (tiles < 60 && !isSolid(level, e.c + dir[0] * (tiles + 1), e.j + dir[1] * (tiles + 1))) tiles++;
+    if (!tiles) throw new Error(`${where(e.c, e.j)}: this laser points into rock`);
+    const [x0, y0] = [(e.c + 0.5 + dir[0] / 2) * TILE, (e.j + 0.5 + dir[1] / 2) * TILE];
+    const { c, j, label, facing, mode, on, off, warn, offset } = e;
+    level.lasers.push({ c, j, label, facing, mode, on, off, warn, offset, x0, y0, x1: x0 + dir[0] * tiles * TILE, y1: y0 + dir[1] * tiles * TILE });
+  }
+
   // Fans: their column of air, from the housing's face as far as `length` tiles
   // or the first rock, `width` tiles wide.
   for (const f of fans) {
@@ -247,10 +280,10 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   for (const door of level.doors) {
     if (door.key && !keys.some((k) => k.color === door.key)) throw new Error(`${where(door.c0, door.j0)}: no ${door.key} key for this door`);
   }
-  // Each switch names the gate it opens; each gate has a switch.
+  // Each switch names the gate it opens, or the laser it turns off; each gate has a switch.
   for (const pad of level.pads.filter((p) => p.kind === "switch")) {
-    const gate = level.doors.find((d) => d.gate === pad.opens);
-    if (!gate) throw new Error(`${name}: switch ${pad.label} opens "${pad.opens}", which isn't a gate on the map`);
+    const gate = level.doors.find((d) => d.gate === pad.opens) ?? level.lasers.find((l) => l.label === pad.opens);
+    if (!gate) throw new Error(`${name}: switch ${pad.label} opens "${pad.opens}", which isn't a gate or laser on the map`);
     if (!(pad.time >= 0)) throw new Error(`${name}: switch ${pad.label}'s time must be a number of seconds`);
     gate.switch = pad.label;
     gate.time = pad.time;

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { TICK_RATE } from "../sim/rocket.js";
-import { padUnder } from "../sim/world.js";
+import { padUnder, switched } from "../sim/world.js";
 import { KEY_LOOKS, GATE_COLOR, css, shapePoints, drawShape } from "../looks.js";
 import { DEPTH } from "./cave.js";
 
@@ -13,10 +13,10 @@ const LAMP = { open: 0x3fbf6a, shut: 0xd63a3f };
 // shape; doors are steel slabs with their key's shape on, and gates are striped
 // with their switch's number, both sliding into the rock as they open; a switch
 // has a post with its number and a lamp, green while its gate is open.
-export function createDoors(level) {
+export function createDoors(level, dark = false) {
   const group = new THREE.Group();
   const keys = level.keys.map((k) => createKey(k, group));
-  const doors = level.doors.map((d) => createDoor(d, group));
+  const doors = level.doors.map((d) => createDoor(d, group, dark));
   const posts = level.pads.filter((p) => p.kind === "switch").map((p) => createPost(p, group));
 
   return {
@@ -43,8 +43,7 @@ export function createDoors(level) {
 
       const on = padUnder(world.level, world.rocket);
       for (const post of posts) {
-        const i = world.level.doors.findIndex((d) => d.gate === post.pad.opens);
-        const { open, until } = world.doors[i];
+        const { open, until } = switched(world, post.pad.opens);
         const left = (until - world.tick) / TICK_RATE;
         // A timed gate's lamp blinks for its last three seconds.
         const blink = open && until >= 0 && left < 3 && on !== post.pad && Math.sin(seconds * 20) < 0;
@@ -80,12 +79,14 @@ function createKey({ x, y, color }, group) {
 
 // A door or gate: a slab filling its rectangle, its face just behind the rock's
 // face, so it slides out of sight into the rock: up if it's tall, sideways if wide.
-function createDoor(d, group) {
+function createDoor(d, group, dark) {
   const [w, h] = [d.x1 - d.x0, d.y1 - d.y0];
   const face = d.key ? doorFace(KEY_LOOKS[d.key]) : gateFace(d.switch);
   face.repeat.set(w / 2, h / 2);
   const steel = new THREE.MeshLambertMaterial({ color: STEEL });
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, h, DEPTH), [steel, steel, steel, steel, new THREE.MeshLambertMaterial({ map: face }), steel]);
+  // In the dark its face glows a little, to be found by.
+  const front = new THREE.MeshLambertMaterial({ map: face, emissive: dark ? 0xffffff : 0, emissiveMap: dark ? face : null, emissiveIntensity: dark ? 0.35 : 0 });
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, h, DEPTH), [steel, steel, steel, steel, front, steel]);
   const home = new THREE.Vector3((d.x0 + d.x1) / 2, (d.y0 + d.y1) / 2, -0.05 - DEPTH / 2);
   slab.position.copy(home);
   group.add(slab);

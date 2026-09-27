@@ -185,14 +185,17 @@ export function play(el, id) {
       const on = padUnder(level, r);
       const timer = gateTimers(w)[0];
       let text = "";
-      const how = { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!" }[r.cause] ?? "Crashed!";
+      const how = { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!", laser: "Zapped!", shot: "Shot down!" }[r.cause] ?? "Crashed!";
       if (w.done) text = "";
       else if (game?.pilot) text = game.pilot.status;
       else if (performance.now() < lostUntil) text = game.lastPilot.status;
       else if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
       else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
-      else if (on?.kind === "switch") text = `Gate ${on.label} is open${on.time ? `. You have ${on.time} s from lift-off` : ""}`;
-      else if (timer) text = `Gate ${timer.gate.switch} shuts in ${Math.ceil(timer.seconds)}`;
+      else if (on?.kind === "switch") {
+        const laser = level.lasers.some((l) => l.label === on.opens);
+        text = `${laser ? `Laser ${on.label} is off` : `Gate ${on.label} is open`}${on.time ? `. You have ${on.time} s from lift-off` : ""}`;
+      }
+      else if (timer) text = `${timer.laser ? "Laser" : "Gate"} ${timer.gate.switch} ${timer.laser ? "comes back on" : "shuts"} in ${Math.ceil(timer.seconds)}`;
       else if (on?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
       else if (w.startTick < 0) {
         const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";

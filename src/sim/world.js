@@ -5,6 +5,8 @@ import { createRocket, step as stepRocket, circlesAt, hurt, TICK_RATE, CENTRE_Y,
 import { flamePhase, armFlame, inFlame, FLAME_DAMAGE } from "./hazards/flame.js";
 import { inBlob } from "./hazards/blob.js";
 import { fieldAt, moverBox } from "./machines.js";
+import { laserPhase, inLaser } from "./hazards/laser.js";
+import { stepTurrets } from "./hazards/turret.js";
 
 export const REFUEL_TIME = 1.5; // seconds on a fuel pad to fill an empty tank, or mend a wrecked hull
 export const RETRY_AFTER = TICK_RATE; // ticks after a crash, getting stranded or the finish before a tap goes on
@@ -19,20 +21,21 @@ const SEEN_RADIUS = 12; // tiles round the rocket that count as seen, for the ma
 // the finish.
 //
 // Flying through a key picks it up, for good, and its doors open as the rocket
-// comes near. Landing on a switch opens its gate, for good or for the switch's
-// time from when the rocket lifts off again; a timed gate shuts when its time is up,
-// but not on the rocket.
+// comes near. Landing on a switch opens its gate (or turns its laser off), for good
+// or for the switch's time from when the rocket lifts off again; a timed gate shuts
+// when its time is up, but not on the rocket.
 //
-// Flamethrowers burn the hull while the rocket is in their flame; lava, and the
-// blobs it throws up, destroy it. Fans and magnets push it about, and moving blocks
+// Flamethrowers burn the hull while the rocket is in their flame; lava, the blobs
+// it throws up, and laser beams destroy it; turrets' shots cost hull. Fans and magnets push it about, and moving blocks
 // shove it, carry it when it's landed on them, and crush it against rock. They all
 // keep to the level clock (world.tick).
 //
 // Landing on a fuel pad fills the tank, mends the hull and saves a checkpoint: the
-// pad, and the level as it is (crystals, keys, doors and gates open for good).
-// After a crash, or when the rocket is stranded (out of fuel away from a fuel pad),
-// `restart` puts a fresh rocket on the checkpoint's pad and the level back as it
-// was, with timed gates shut. Until the first fuel pad, the checkpoint is the start.
+// pad, and the level as it is (crystals, keys, doors, gates open and lasers off for
+// good). After a crash, or when the rocket is stranded (out of fuel away from a
+// fuel pad), `restart` puts a fresh rocket on the checkpoint's pad and the level
+// back as it was, with timed gates shut, timed lasers on, and no shots in the air.
+// Until the first fuel pad, the checkpoint is the start.
 export function createWorld(level, outline = buildOutline(level)) {
   const world = {
     level,
@@ -48,6 +51,9 @@ export function createWorld(level, outline = buildOutline(level)) {
     // Per door and gate: whether it's open, since when (or when it shut), and for a
     // timed gate, the tick it shuts (else -1).
     doors: level.doors.map(() => ({ open: false, changed: -1, until: -1 })),
+    lasers: level.lasers.map(() => ({ open: false, changed: -1, until: -1 })), // `open`: switched off
+    turrets: level.turrets.map((t) => ({ charge: -1, ready: Math.round(t.offset * TICK_RATE) })),
+    shots: [], // { x, y, vx, vy, damage, born }
     flames: level.flames.map(() => ({ fired: -1 })), // when each "near" flamethrower was set off
     seen: new Uint8Array(level.width * level.height), // tiles the rocket has been near
     seenFrom: -1,
@@ -72,6 +78,7 @@ function save(world, pad) {
     keys: [...world.keys],
     keyTicks: [...world.keyTicks],
     open: world.doors.map((d) => d.open && d.until < 0),
+    off: world.lasers.map((l) => l.open && l.until < 0),
   };
 }
 
@@ -88,6 +95,9 @@ export function restart(world) {
   world.keys = [...saved.keys];
   world.keyTicks = [...saved.keyTicks];
   world.doors = saved.open.map((open) => ({ open, changed: open ? -Infinity : -1, until: -1 }));
+  world.lasers = saved.off.map((open) => ({ open, changed: open ? -Infinity : -1, until: -1 }));
+  world.turrets = world.level.turrets.map(() => ({ charge: -1, ready: world.tick + TICK_RATE }));
+  world.shots = [];
   world.restarts++;
   world.stranded = false;
   world.downTick = -1;
@@ -130,9 +140,9 @@ export function step(world, input) {
     return world;
   }
   if (pad?.kind === "switch") {
-    // Open the gate; a timed one's time starts over while the rocket sits here.
-    const i = world.level.doors.findIndex((d) => d.gate === pad.opens);
-    const door = world.doors[i];
+    // Open the gate (or switch off the laser); a timed one's time starts over while
+    // the rocket sits here.
+    const door = switched(world, pad.opens);
     if (!door.open) Object.assign(door, { open: true, changed: world.tick });
     door.until = pad.time ? world.tick + pad.time * TICK_RATE : -1;
   }
@@ -173,7 +183,8 @@ function collect(world) {
   }
 }
 
-// Burns the rocket in any flame that's on, and destroys it in a lava blob.
+// Burns the rocket in any flame that's on, destroys it in a lava blob or a laser
+// beam, and steps the turrets and their shots.
 function hazards(world) {
   const r = world.rocket;
   const circles = circlesAt(r.x, r.y, r.angle);
@@ -182,6 +193,15 @@ function hazards(world) {
     if (flamePhase(f, world.flames[i], world.tick) === "on" && inFlame(f, circles)) hurt(r, FLAME_DAMAGE / TICK_RATE, "flame");
   });
   if (world.level.blobs.some((b) => inBlob(b, circles, world.tick))) hurt(r, r.hull, "lava");
+  if (world.level.lasers.some((l, i) => laserPhase(l, world.lasers[i], world.tick) === "on" && inLaser(l, circles))) hurt(r, r.hull, "laser");
+  const shot = stepTurrets(world, circles);
+  if (shot) hurt(r, shot, "shot");
+}
+
+// The state of the gate, or laser, that switch `label` works: { open, changed, until }.
+export function switched(world, label) {
+  const i = world.level.doors.findIndex((d) => d.gate === label);
+  return i >= 0 ? world.doors[i] : world.lasers[world.level.lasers.findIndex((l) => l.label === label)];
 }
 
 // Moves a landed rocket along with the block it's standing on, if it is.
@@ -208,15 +228,18 @@ function openDoors(world) {
   });
 }
 
-// Shuts timed gates whose time is up, unless the rocket is in the way.
+// Shuts timed gates, and turns timed lasers back on, when their time is up,
+// unless the rocket is in the way.
 function shutGates(world) {
   const r = world.rocket;
-  world.level.doors.forEach((d, i) => {
-    const state = world.doors[i];
+  const circles = () => circlesAt(r.x, r.y, r.angle);
+  const back = (state, inTheWay) => {
     if (state.until < 0 || world.tick < state.until) return;
-    if (r.state !== "crashed" && deepestContact(world.outline, circlesAt(r.x, r.y, r.angle), [d])) return;
+    if (r.state !== "crashed" && inTheWay()) return;
     Object.assign(state, { open: false, changed: world.tick, until: -1 });
-  });
+  };
+  world.level.doors.forEach((d, i) => back(world.doors[i], () => deepestContact(world.outline, circles(), [d])));
+  world.level.lasers.forEach((l, i) => back(world.lasers[i], () => inLaser(l, circles(), 0.5)));
 }
 
 // The doors and gates that are shut, as rectangles that block the rocket.
@@ -236,11 +259,15 @@ function see(world) {
   }
 }
 
-// Seconds until each timed gate shuts, for those open on a timer.
+// Seconds until each timed gate shuts, or timed laser comes back on, for those on
+// a timer: { gate, laser (true for one), seconds }.
 export const gateTimers = (world) =>
-  world.level.doors
-    .map((d, i) => ({ gate: d, seconds: (world.doors[i].until - world.tick) / TICK_RATE }))
-    .filter((t, i) => world.doors[i].until >= 0);
+  [
+    ...world.level.doors.map((d, i) => ({ gate: d, laser: false, until: world.doors[i].until })),
+    ...world.level.lasers.map((l, i) => ({ gate: l, laser: true, until: world.lasers[i].until })),
+  ]
+    .filter((t) => t.until >= 0)
+    .map(({ gate, laser, until }) => ({ gate, laser, seconds: (until - world.tick) / TICK_RATE }));
 
 // Whether the rocket's shape comes within CRYSTAL_REACH of point p.
 export function touches(r, p) {
