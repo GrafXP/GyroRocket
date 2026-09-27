@@ -1,0 +1,64 @@
+import { getThemePref, setThemePref, onThemeChange } from "../theme.js";
+import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from "../fullscreen.js";
+
+// Fills `el` with `markup` and returns a querySelector for it.
+export function html(el, markup) {
+  el.innerHTML = markup;
+  return (sel) => el.querySelector(sel);
+}
+
+const PATHS = {
+  back: "M15 5l-7 7 7 7",
+  expand: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  shrink: "M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5",
+  pause: "M8 5v14M16 5v14",
+  lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
+};
+export const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;
+
+// Seconds → "m:ss.s".
+export function formatTime(s) {
+  const tenths = Math.floor(s * 10);
+  return `${Math.floor(tenths / 600)}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
+}
+
+// Three stars, lit for each true in `earned`.
+export const starsHtml = (earned) =>
+  `<span class="stars" aria-label="${earned.filter(Boolean).length} of 3 stars">${earned
+    .map((on) => `<span class="${on ? "on" : ""}">★</span>`)
+    .join("")}</span>`;
+
+// Keeps a fullscreen button's label (or icon, on an .icon-btn) in sync.
+export function bindFullscreenButton(btn) {
+  if (!fullscreenSupported) {
+    btn.hidden = true;
+    return () => {};
+  }
+  const sync = () => {
+    const on = isFullscreen();
+    btn.setAttribute("aria-label", on ? "Exit fullscreen" : "Go fullscreen");
+    if (btn.classList.contains("icon-btn")) btn.innerHTML = icon(on ? "shrink" : "expand");
+    else btn.textContent = on ? "Exit fullscreen" : "Go fullscreen";
+  };
+  btn.addEventListener("click", toggleFullscreen);
+  sync();
+  return onFullscreenChange(sync);
+}
+
+export const THEME_PICKER = `<div class="segmented theme" role="group" aria-label="Theme">
+  <button data-pref="auto">Auto</button><button data-pref="light">☀ Light</button><button data-pref="dark">☾ Dark</button>
+</div>`;
+
+// Auto / Light / Dark picker; the choice is saved and shared by every page.
+export function bindThemePicker(group) {
+  const sync = () => {
+    const pref = getThemePref();
+    for (const b of group.querySelectorAll("[data-pref]")) b.setAttribute("aria-pressed", b.dataset.pref === pref);
+  };
+  group.addEventListener("click", (e) => {
+    const pref = e.target.closest("[data-pref]")?.dataset.pref;
+    if (pref) setThemePref(pref);
+  });
+  sync();
+  return onThemeChange(sync);
+}

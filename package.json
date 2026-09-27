@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test"
+    "test": "node --test",
+    "fly": "node scripts/fly.js"
   },
   "devDependencies": {
     "vite": "^8.3.0"

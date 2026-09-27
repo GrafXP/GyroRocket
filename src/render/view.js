@@ -89,6 +89,14 @@ export function createView(container, level, outline) {
 
       renderer.render(scene, camera);
     },
+    // Where a point on the screen (client pixels) is on the plane of flight.
+    screenToWorld(clientX, clientY) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const p = new THREE.Vector3(((clientX - rect.left) / rect.width) * 2 - 1, 1 - ((clientY - rect.top) / rect.height) * 2, 0.5);
+      const dir = p.unproject(camera).sub(camera.position).normalize();
+      const t = -camera.position.z / dir.z;
+      return { x: camera.position.x + dir.x * t, y: camera.position.y + dir.y * t };
+    },
     dispose() {
       ro.disconnect();
       scene.traverse((obj) => {

@@ -1,7 +1,7 @@
 // Player input: tilt the phone (or ←/→, A/D) to steer; hold a finger or the mouse
 // on the screen (or ↑, W, Space) to burn. Keys win over the tilt while held.
 
-export const FULL_TILT = 35; // degrees of tilt that steer all the way
+export const FULL_TILT = 35; // degrees of tilt that steer all the way, unless set
 
 // How far the phone is rolled to the right, in degrees, from a deviceorientation
 // event's beta and gamma and the screen's rotation (screen.orientation.angle).
@@ -20,8 +20,8 @@ export function tiltAngle(beta, gamma, screenAngle = 0) {
   return (Math.asin(Math.max(-1, Math.min(1, -across))) * 180) / Math.PI;
 }
 
-// Tilt in degrees → steer from -1 to 1.
-export const steerOf = (tilt) => Math.max(-1, Math.min(1, tilt / FULL_TILT));
+// Tilt in degrees → steer from -1 to 1, all the way at `full` degrees.
+export const steerOf = (tilt, full = FULL_TILT) => Math.max(-1, Math.min(1, tilt / full));
 
 // iOS only sends orientation events after asking, from a tap. Elsewhere this is a
 // no-op. Resolves to whether we may listen.
@@ -39,8 +39,9 @@ const screenAngle = () => screen.orientation?.angle ?? window.orientation ?? 0;
 
 // Listens on `canvas` for presses and on the window for keys and tilt. `input()`
 // gives { steer, thrust } for the sim; `hasTilt` turns true once the phone has
-// sent a real reading (desktops send none, or nulls).
-export function createControls(canvas) {
+// sent a real reading (desktops send none, or nulls). `fullTilt` is how many
+// degrees of tilt steer all the way.
+export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
   const pointers = new Set();
   const keys = new Set();
   let tilt = 0;
@@ -58,6 +59,8 @@ export function createControls(canvas) {
   const onUp = (e) => pointers.delete(e.pointerId);
   const onKey = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    // Keys pressed on a menu's buttons and sliders are theirs.
+    if (e.type === "keydown" && e.target.closest?.("button, input, select, textarea, a")) return;
     const code = e.code;
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "KeyA", "KeyD", "KeyW", "Space"].includes(code)) return;
     e.preventDefault();
@@ -79,10 +82,13 @@ export function createControls(canvas) {
     get hasTilt() {
       return hasTilt;
     },
+    setFullTilt(degrees) {
+      fullTilt = degrees;
+    },
     input() {
       const left = keys.has("ArrowLeft") || keys.has("KeyA");
       const right = keys.has("ArrowRight") || keys.has("KeyD");
-      const steer = left || right ? right - left : steerOf(tilt);
+      const steer = left || right ? right - left : steerOf(tilt, fullTilt);
       const thrust = pointers.size > 0 || keys.has("ArrowUp") || keys.has("KeyW") || keys.has("Space");
       return { steer, thrust };
     },

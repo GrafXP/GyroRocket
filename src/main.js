@@ -1,36 +1,45 @@
 import "./style.css";
-import { createGame } from "./game.js";
-import { requestTiltPermission } from "./controls.js";
-import { SAFE_SPEED, HULL } from "./sim/rocket.js";
-import { parseLevel } from "./sim/level.js";
-import { clock, padUnder } from "./sim/world.js";
-import testCave from "./levels/testcave.js";
-import { getThemePref, setThemePref, onThemeChange } from "./theme.js";
-import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from "./fullscreen.js";
+import { SAFE_SPEED } from "./sim/rocket.js";
+import { WORLDS, LEVELS } from "./levels/index.js";
+import { loadProgress, nextToPlay, isUnlocked, starsOf, starCount } from "./progress.js";
+import { html, icon, formatTime, starsHtml, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./ui/dom.js";
+import { play } from "./ui/play.js";
 
 const view = document.getElementById("view");
 let cleanup = null;
 
 const routes = {
   "/": home,
-  "/play": play,
+  "/levels": levels,
   "/help": help,
 };
 
 function navigate(path) {
-  if (path !== location.pathname) history.pushState(null, "", path);
+  if (path !== location.pathname + location.search) history.pushState(null, "", path);
   render();
+}
+
+// The page for the current URL. /play/1-3 plays a level; /play alone plays the
+// next one to do.
+function pageFor(path) {
+  if (path === "/play") {
+    history.replaceState(null, "", `/play/${nextToPlay(loadProgress()).id}${location.search}`);
+    return pageFor(location.pathname);
+  }
+  const level = path.match(/^\/play\/([\w-]+)$/)?.[1];
+  if (level) return (el) => play(el, level);
+  return routes[path] || notFound;
 }
 
 function render() {
   cleanup?.();
   cleanup = null;
-  const page = routes[location.pathname] || notFound;
-  document.body.classList.toggle("playing", page === play);
+  document.body.classList.remove("playing"); // the play page puts it back
   view.innerHTML = "";
-  cleanup = page(view) || null;
+  cleanup = pageFor(location.pathname)(view) || null;
+  const section = location.pathname.startsWith("/play") ? "/levels" : location.pathname;
   for (const a of document.querySelectorAll("#nav a")) {
-    a.classList.toggle("active", a.getAttribute("href") === location.pathname);
+    a.classList.toggle("active", a.getAttribute("href") === section);
   }
 }
 
@@ -42,68 +51,29 @@ document.addEventListener("click", (e) => {
 });
 window.addEventListener("popstate", render);
 
-function html(el, markup) {
-  el.innerHTML = markup;
-  return (sel) => el.querySelector(sel);
-}
-
-const PATHS = {
-  back: "M15 5l-7 7 7 7",
-  expand: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
-  shrink: "M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5",
-};
-const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;
-
-// Keeps a fullscreen button's label (or icon, on an .icon-btn) in sync.
-function bindFullscreenButton(btn) {
-  if (!fullscreenSupported) {
-    btn.hidden = true;
-    return () => {};
-  }
-  const sync = () => {
-    const on = isFullscreen();
-    btn.setAttribute("aria-label", on ? "Exit fullscreen" : "Go fullscreen");
-    if (btn.classList.contains("icon-btn")) btn.innerHTML = icon(on ? "shrink" : "expand");
-    else btn.textContent = on ? "Exit fullscreen" : "Go fullscreen";
-  };
-  btn.addEventListener("click", toggleFullscreen);
-  sync();
-  return onFullscreenChange(sync);
-}
-
-const THEME_PICKER = `<div class="segmented" id="theme" role="group" aria-label="Theme">
-  <button data-pref="auto">Auto</button><button data-pref="light">☀ Light</button><button data-pref="dark">☾ Dark</button>
-</div>`;
-
-// Auto / Light / Dark picker; the choice is saved and shared by every page.
-function bindThemePicker(group) {
-  const sync = () => {
-    const pref = getThemePref();
-    for (const b of group.querySelectorAll("[data-pref]")) b.setAttribute("aria-pressed", b.dataset.pref === pref);
-  };
-  group.addEventListener("click", (e) => {
-    const pref = e.target.closest("[data-pref]")?.dataset.pref;
-    if (pref) setThemePref(pref);
-  });
-  sync();
-  return onThemeChange(sync);
-}
-
 function home(el) {
+  const progress = loadProgress();
+  const next = nextToPlay(progress);
+  const started = Object.keys(progress.levels).length > 0;
+  const stars = LEVELS.reduce((n, l) => n + starCount(l, progress.levels[l.id]), 0);
   const $ = html(
     el,
     `<h1>Gyro Rocket</h1>
-    <p>Tilt your phone to steer a little rocket through a cave, and land it on the exit pad in one piece.</p>
+    <p>Tilt your phone to steer a little rocket through caves. Refuel on the way, and land it on the exit pad in one piece.</p>
     <div class="cards">
-      <a class="card" href="/play" data-link><b>Fly</b><span>The test cave: tilt to steer, hold the screen to burn</span></a>
-      <a class="card" href="/help" data-link><b>Help</b><span>Controls and tips</span></a>
+      <a class="card primary" href="/play/${next.id}" data-link>
+        <b>${started ? "Continue" : "Start"}: ${next.id} ${next.name}</b>
+        <span>${progress.levels[next.id] ? "Play it again" : "Tilt to steer, hold the screen to burn"}</span>
+      </a>
+      <a class="card" href="/levels" data-link><b>Levels</b><span>${stars} of ${LEVELS.length * 3} stars</span></a>
+      <a class="card" href="/help" data-link><b>Help</b><span>Controls, fuel and stars</span></a>
     </div>
     <h2>Theme</h2>
     ${THEME_PICKER}
     <button id="fs" class="wide"></button>
     <p class="hint">Tip: <i>Add to Home screen</i> launches the game fullscreen every time.</p>`,
   );
-  const unbindTheme = bindThemePicker($("#theme"));
+  const unbindTheme = bindThemePicker($(".theme"));
   const unbindFs = bindFullscreenButton($("#fs"));
   return () => {
     unbindTheme();
@@ -111,101 +81,35 @@ function home(el) {
   };
 }
 
-function play(el) {
-  const $ = html(
+// Every world's levels, with the stars earned and best times; locked levels greyed out.
+function levels(el) {
+  const progress = loadProgress();
+  html(
     el,
-    `<div class="game" id="game">
-      <div class="hud">
-        <a href="/" data-link class="icon-btn" aria-label="Back">${icon("back")}</a>
-        <div class="score">
-          <b id="time">0:00.0</b>
-          <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
-          <span class="gauge"><small>Hull</small><span class="bar" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="100"><i class="hull" id="hull"></i></span></span>
-          <span class="speed" id="speed">0.0 m/s</span>
+    `<h1>Levels</h1>
+    ${WORLDS.map((world) => {
+      const stars = world.levels.reduce((n, l) => n + starCount(l, progress.levels[l.id]), 0);
+      return `<section class="world">
+        <h2>${world.number} · ${world.name} <small>★ ${stars}/${world.levels.length * 3}</small></h2>
+        <p class="hint">${world.about}</p>
+        <div class="level-grid">
+          ${world.levels
+            .map((l) => {
+              const record = progress.levels[l.id];
+              if (!isUnlocked(progress, l.id)) {
+                return `<div class="level locked" aria-label="${l.id} ${l.name}, locked"><b>${l.id}</b>${icon("lock")}<small>${l.name}</small></div>`;
+              }
+              return `<a class="level${record ? " done" : ""}" href="/play/${l.id}" data-link>
+                <b>${l.id}</b>${starsHtml(starsOf(l, record))}<small>${l.name}</small>
+                <small class="best">${record ? formatTime(record.best) : "&nbsp;"}</small>
+              </a>`;
+            })
+            .join("")}
         </div>
-        <button class="icon-btn" id="fs"></button>
-      </div>
-      <div class="banner" id="banner" hidden><b>Level complete</b><span id="banner-time"></span><span id="banner-restarts"></span></div>
-      <div class="message" id="message"></div>
-      <div class="overlay" id="tilt-ask" hidden>
-        <p>Gyro Rocket steers by tilting your phone, and needs your OK to read its motion sensors.</p>
-        <button class="big" id="tilt-ok">Enable tilt steering</button>
-      </div>
-    </div>`,
+      </section>`;
+    }).join("")}
+    <p class="hint">More worlds are on the way. There's also the <a href="/play/test" data-link>test cave</a>.</p>`,
   );
-  const unbindFs = bindFullscreenButton($("#fs"));
-  const time = $("#time");
-  const fuel = $("#fuel");
-  const hull = $("#hull");
-  const speed = $("#speed");
-  const banner = $("#banner");
-  const message = $("#message");
-  const gameEl = $("#game");
-
-  // iOS asks before it sends orientation events, and only from a tap.
-  if (typeof globalThis.DeviceOrientationEvent?.requestPermission === "function") {
-    const ask = $("#tilt-ask");
-    ask.hidden = false;
-    $("#tilt-ok").addEventListener("click", async () => {
-      await requestTiltPermission();
-      ask.hidden = true;
-    });
-  }
-
-  const started = performance.now();
-  const show = (el, text) => el.textContent !== text && (el.textContent = text);
-  let lastHit = -1;
-  const game = createGame(gameEl, {
-    level: parseLevel(testCave),
-    onFrame(w, controls) {
-      const r = w.rocket;
-      show(time, formatTime(clock(w)));
-      // Fuel goes amber below 30% and flashes red below 15%; the hull at 60% and 30%.
-      const f = r.fuel / r.tank;
-      setBar(fuel, f, f > 0.3 ? "ok" : f > 0.15 ? "low" : "bad");
-      const h = r.hull / HULL;
-      setBar(hull, h, h > 0.6 ? "ok" : h > 0.3 ? "low" : "bad");
-      // Green while slow enough to land.
-      const v = Math.hypot(r.vx, r.vy);
-      show(speed, `${v.toFixed(1)} m/s`);
-      speed.dataset.safe = r.state === "flying" && v <= SAFE_SPEED;
-      // A red flash round the edges when the rocket hits rock.
-      if (r.hitTick !== lastHit) {
-        lastHit = r.hitTick;
-        if (r.hitTick >= 0) {
-          gameEl.classList.remove("hit");
-          void gameEl.offsetWidth; // restart the animation
-          gameEl.classList.add("hit");
-        }
-      }
-      banner.hidden = !w.done;
-      if (w.done) {
-        show($("#banner-time"), formatTime(clock(w)));
-        show($("#banner-restarts"), w.restarts ? `${w.restarts} restart${w.restarts > 1 ? "s" : ""}` : "No restarts");
-      }
-      const back = w.checkpoint === w.level.start ? "the start" : "the last fuel pad";
-      let text = "";
-      if (r.state === "crashed") text = `Crashed! Tap to go back to ${back}`;
-      else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
-      else if (w.done) text = "Tap to fly again";
-      else if (padUnder(w.level, r)?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
-      else if (w.startTick < 0) {
-        const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";
-        text = `Hold the screen (or ↑) to burn, ${steer}. Refuel on blue pads, finish on the green one.`;
-      }
-      show(message, text);
-      message.hidden = !text;
-    },
-  });
-
-  const onHidden = () => (document.hidden ? game.pause() : game.resume());
-  document.addEventListener("visibilitychange", onHidden);
-
-  return () => {
-    document.removeEventListener("visibilitychange", onHidden);
-    unbindFs();
-    game.dispose();
-  };
 }
 
 function help(el) {
@@ -216,32 +120,22 @@ function help(el) {
     <dl>
       <dt>Steer</dt><dd>Tilt the phone left or right, held flat or upright. Or ← → / A D.</dd>
       <dt>Burn</dt><dd>Hold a finger anywhere on the screen. Or ↑ / W / Space, or hold the mouse.</dd>
+      <dt>Pause</dt><dd>The ❚❚ button, or P / Esc. The pause menu has restarts and tilt sensitivity.</dd>
     </dl>
     <h2>Landing</h2>
-    <p>Land on any flat floor: touch down slower than ${SAFE_SPEED} m/s, nearly upright, with both feet on the flat. Land on the green exit pad to finish.</p>
+    <p>Land on any flat floor: touch down slower than ${SAFE_SPEED} m/s (the speed turns green), nearly upright, with both feet on the flat. Land on the green exit pad to finish.</p>
     <h2>Fuel</h2>
     <p>The engine only burns while there's fuel. Land on a blue fuel pad to fill up and mend the hull. After a crash, or when you're stuck without fuel, you start again from the last fuel pad you landed on. The clock keeps running.</p>
     <h2>Hitting rock</h2>
     <p>The rocket bounces off rock and loses hull, more the harder it hits. A slam, or losing all its hull, breaks it up. Tap to try again.</p>
+    <h2>Stars</h2>
+    <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
     <h2>Tilt not working?</h2>
     <p class="hint">Browsers only share the motion sensors over HTTPS (or on localhost). On iPhone, allow motion access when asked.</p>
     <button id="fs" class="wide"></button>`,
   );
   const unbindFs = bindFullscreenButton($("#fs"));
   return () => unbindFs();
-}
-
-// Fills a HUD bar to `fraction` and colours it by `level` (ok, low or bad).
-function setBar(bar, fraction, level) {
-  bar.style.width = `${fraction * 100}%`;
-  bar.parentElement.setAttribute("aria-valuenow", Math.round(fraction * 100));
-  bar.dataset.level = level;
-}
-
-// Seconds → "m:ss.s".
-function formatTime(s) {
-  const tenths = Math.floor(s * 10);
-  return `${Math.floor(tenths / 600)}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
 }
 
 function notFound(el) {

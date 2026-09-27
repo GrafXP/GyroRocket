@@ -22,18 +22,20 @@ export function parseLevel({ name = "level", map, ...settings }) {
 
   const solid = new Uint8Array(width * height);
   const letters = [];
+  const crystals = [];
   rows.forEach((row, r) => {
     const j = height - 1 - r;
     for (let c = 0; c < width; c++) {
       const ch = row[c] ?? "#"; // short rows are filled with rock
       if (ch === "#") solid[j * width + c] = 1;
+      else if (ch === "*") crystals.push({ x: (c + 0.5) * TILE, y: (j + 0.5) * TILE });
       else if (ch !== "." && !PAD_KINDS[ch]) throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
       letters.push(ch);
     }
   });
 
   if (settings.fuel !== undefined && !(settings.fuel > 0)) throw new Error(`${name}: fuel must be a number of seconds`);
-  const level = { name, width, height, solid, pads: [], ...settings };
+  const level = { name, width, height, solid, pads: [], crystals, ...settings };
   const letter = (c, j) => letters[(height - 1 - j) * width + c];
 
   // A pad is a run of its letter in a row, standing on rock with air above.

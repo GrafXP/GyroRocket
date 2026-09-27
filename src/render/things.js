@@ -8,6 +8,7 @@ const COLORS = {
   exit: 0x3fbf6a,
   beacon: 0x5be38a,
   fuel: 0x3fa9f5,
+  crystal: 0xd86bff,
   pump: 0x4a4f5c,
   screen: 0x11151c,
   lampOff: 0x3a3f4a,
@@ -15,11 +16,12 @@ const COLORS = {
 
 // The pads on the level's floors: the start pad in yellow hazard stripes, fuel
 // pads in blue with a pump, and the exit pad in green under a beam of light you
-// can see from a distance.
+// can see from a distance. And the crystals, glowing, turning and bobbing.
 export function createThings(level) {
   const group = new THREE.Group();
   let beam = null;
   const pumps = [];
+  const crystals = level.crystals.map((c) => createCrystal(c, group));
 
   for (const pad of level.pads) {
     const width = pad.x1 - pad.x0;
@@ -65,16 +67,48 @@ export function createThings(level) {
     update(world) {
       const seconds = world.tick / TICK_RATE;
       if (beam) beam.material.opacity = 0.12 + 0.06 * Math.sin(seconds * 3);
+      // A collected crystal swells and fades, then it's gone.
+      crystals.forEach((gem, i) => {
+        const since = world.got[i] < 0 ? -1 : (world.tick - world.got[i]) / TICK_RATE;
+        gem.visible = since < 0.35;
+        if (!gem.visible) return;
+        gem.rotation.y = seconds * 1.5 + i;
+        gem.position.y = gem.userData.y + Math.sin(seconds * 2 + i) * 0.3;
+        gem.scale.setScalar(since < 0 ? 1 : 1 + since * 4);
+        for (const m of gem.children) m.material.opacity = since < 0 ? m.userData.opacity : m.userData.opacity * (1 - since / 0.35);
+      });
+
       const r = world.rocket;
       const at = padUnder(world.level, r);
       for (const pump of pumps) {
         pump.gauge.scale.y = at === pump.pad ? Math.max(0.02, r.fuel / r.tank) : 1;
-        const lit = world.checkpoint === pump.pad;
+        const lit = world.checkpoint.pad === pump.pad;
         const pulse = at === pump.pad && world.refuelling ? 0.5 + 0.5 * Math.sin(seconds * 12) : 1;
         pump.lamp.material.color.setHex(lit ? COLORS.fuel : COLORS.lampOff).multiplyScalar(pulse);
       }
     },
   };
+}
+
+// A crystal: a gem in a soft glow.
+function createCrystal({ x, y }, group) {
+  const gem = new THREE.Group();
+  gem.position.set(x, y, 0);
+  gem.userData.y = y;
+  const solid = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.75),
+    new THREE.MeshLambertMaterial({ color: COLORS.crystal, emissive: COLORS.crystal, emissiveIntensity: 0.5, transparent: true }),
+  );
+  solid.scale.y = 1.4;
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(1.6, 16, 12),
+    new THREE.MeshBasicMaterial({ color: COLORS.crystal, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  solid.userData.opacity = 1;
+  glow.userData.opacity = 0.18;
+  gem.add(solid, glow);
+  group.add(gem);
+  return gem;
 }
 
 // A fuel pump behind the pad's right end: a screen whose gauge fills while the

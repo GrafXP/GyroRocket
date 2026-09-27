@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, clock, restart, padUnder, REFUEL_TIME } from "../src/sim/world.js";
+import { createWorld, step, clock, restart, padUnder, crystalCount, REFUEL_TIME } from "../src/sim/world.js";
 import { TICK_RATE, CENTRE_Y, HULL, TANK } from "../src/sim/rocket.js";
 import { room } from "./helpers.js";
 import { parseLevel } from "../src/sim/level.js";
@@ -29,7 +29,7 @@ test("the rocket starts on the start pad with a full tank, and the clock waits f
   assert.equal(w.rocket.x, (level.start.x0 + level.start.x1) / 2);
   assert.equal(w.rocket.state, "landed");
   assert.equal(w.rocket.fuel, TANK);
-  assert.equal(w.checkpoint, level.start);
+  assert.equal(w.checkpoint.pad, level.start);
   assert.equal(clock(w), 0);
   run(w, { thrust: true }, TICK_RATE);
   assert.equal(clock(w), 1 - 1 / TICK_RATE);
@@ -63,7 +63,7 @@ test("a fuel pad fills the tank and mends the hull, and becomes the checkpoint",
   Object.assign(w.rocket, { fuel: 0.1, hull: 10 });
   run(w, {}, TICK_RATE / 2);
   assert.equal(padUnder(w.level, w.rocket), fuelPad(w.level));
-  assert.equal(w.checkpoint, fuelPad(w.level));
+  assert.equal(w.checkpoint.pad, fuelPad(w.level));
   assert.equal(w.refuelling, true);
   assert.equal(w.stranded, false);
   run(w, {}, REFUEL_TIME * TICK_RATE);
@@ -136,4 +136,51 @@ test("stuck still with an empty tank, somewhere it can't land, is stranded too",
   run(w, {}, 5 * TICK_RATE);
   assert.equal(w.rocket.state, "flying");
   assert.equal(w.stranded, true);
+});
+
+test("flying through a crystal collects it, and a restart puts back any since the checkpoint", () => {
+  const level = parseLevel({
+    name: "crystals",
+    map: `
+      ##########################
+      #........................#
+      #........................#
+      #........................#
+      #...*.............*......#
+      #........................#
+      #........................#
+      #.SSS....FFF......EEE....#
+      ##########################
+    `,
+  });
+  const w = createWorld(level);
+  const [first, second] = level.crystals;
+  run(w, { thrust: true }, 5);
+  Object.assign(w.rocket, { x: first.x, y: first.y - 1 });
+  step(w, {});
+  assert.deepEqual(w.got.map((t) => t >= 0), [true, false]);
+  assert.equal(crystalCount(w), 1);
+  // Land on the fuel pad (a checkpoint with the first crystal), take the second, crash.
+  dropOnto(w, level.pads.find((p) => p.kind === "fuel"));
+  run(w, {}, TICK_RATE);
+  Object.assign(w.rocket, { x: second.x, y: second.y - 1, vx: 0, vy: 0, state: "flying" });
+  step(w, {});
+  assert.equal(crystalCount(w), 2);
+  Object.assign(w.rocket, { vy: -30 });
+  run(w, {}, TICK_RATE);
+  assert.equal(w.rocket.state, "crashed");
+  restart(w);
+  assert.deepEqual(w.got.map((t) => t >= 0), [true, false]);
+});
+
+test("the dev cheats: no damage, and a tank that never empties", () => {
+  const { level } = room();
+  const w = createWorld(level);
+  w.cheats.god = true;
+  w.cheats.fuel = true;
+  run(w, { thrust: true }, 3 * TICK_RATE);
+  run(w, {}, 5 * TICK_RATE);
+  assert.notEqual(w.rocket.state, "crashed");
+  assert.equal(w.rocket.hull, HULL);
+  assert.equal(w.rocket.fuel, TANK);
 });

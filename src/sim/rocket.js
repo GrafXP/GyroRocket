@@ -67,6 +67,7 @@ export function createRocket(x, floorY, tank = TANK) {
     hitTick: -1, // when it last hit rock, and how much hull that cost
     hitDamage: 0,
     crashTick: -1,
+    god: false, // a dev cheat: hits cost nothing
   };
 }
 
@@ -160,7 +161,7 @@ export function canStand(outline, x, floorY) {
 }
 
 function hit(r, impact) {
-  const damage = impact >= CRASH_SPEED ? r.hull : (impact - SCRAPE_SPEED) * DAMAGE;
+  const damage = r.god ? 0 : impact >= CRASH_SPEED ? r.hull : (impact - SCRAPE_SPEED) * DAMAGE;
   r.hull = Math.max(0, r.hull - damage);
   r.hitTick = r.tick;
   r.hitDamage = damage;

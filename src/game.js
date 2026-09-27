@@ -10,13 +10,15 @@ const MAX_TICKS_PER_FRAME = 10; // after a long stall, drop time instead of free
 // Plays a parsed level: owns the world, the view and the controls, and runs the
 // sim at a fixed tick rate whatever the display's frame rate. onFrame(world,
 // controls) runs after every frame, for the HUD. After a crash or getting stranded,
-// the next press restarts from the checkpoint; after the finish, it plays the level
-// again from the top.
-export function createGame(container, { level, onFrame } = {}) {
+// the next press restarts from the checkpoint. After the finish, the rocket sits on
+// the exit until the page moves on (restartLevel, or another page).
+export function createGame(container, { level, onFrame, fullTilt } = {}) {
   const outline = buildOutline(level);
   const view = createView(container, level, outline);
-  const controls = createControls(view.canvas);
-  let world = createWorld(level, outline);
+  const controls = createControls(view.canvas, { fullTilt });
+  const cheats = { god: false, fuel: false }; // the dev overlay's, kept across restarts
+  const fresh = () => Object.assign(createWorld(level, outline), { cheats });
+  let world = fresh();
   let wasThrust = false;
 
   let running = true;
@@ -34,11 +36,8 @@ export function createGame(container, { level, onFrame } = {}) {
         const input = controls.input();
         const pressed = input.thrust && !wasThrust;
         wasThrust = input.thrust;
-        if (world.done || world.downTick >= 0) {
-          if (pressed && world.tick - (world.done ? world.endTick : world.downTick) >= RETRY_AFTER) {
-            if (world.done) world = createWorld(level, outline);
-            else restart(world);
-          }
+        if (world.downTick >= 0 || world.done) {
+          if (world.downTick >= 0 && pressed && world.tick - world.downTick >= RETRY_AFTER) restart(world);
           input.thrust = false;
         }
         step(world, input);
@@ -66,6 +65,17 @@ export function createGame(container, { level, onFrame } = {}) {
     resume() {
       running = true;
     },
+    cheats,
+    // Back to the last fuel pad, with the clock running on.
+    restartFromPad() {
+      if (!world.done) restart(world);
+    },
+    // The level from the top, clock and all.
+    restartLevel() {
+      world = fresh();
+    },
+    setFullTilt: controls.setFullTilt,
+    screenToWorld: view.screenToWorld,
     dispose() {
       cancelAnimationFrame(raf);
       controls.dispose();

@@ -93,6 +93,14 @@ a {
   border-color: var(--accent);
 }
 
+.card.primary {
+  border: 2px solid var(--accent);
+}
+
+.card.primary b {
+  font-size: 1.1rem;
+}
+
 button {
   font: inherit;
   color: var(--text);
@@ -102,11 +110,26 @@ button {
   padding: 10px 18px;
 }
 
-button:active {
+/* Links that act like buttons look like them. */
+a.button {
+  display: block;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 18px;
+}
+
+button:active,
+a.button:active {
   border-color: var(--accent);
   transform: scale(0.97);
 }
 
+a.button.big,
 button.big {
   width: 100%;
   padding: 22px;
@@ -235,7 +258,7 @@ body.playing nav {
   touch-action: none;
 }
 
-/* Back, the pill with the clock, hull and speed, and fullscreen along the top. */
+/* Pause, the pill with the clock, fuel, hull, crystals and speed, and fullscreen along the top. */
 .hud {
   position: absolute;
   top: 0;
@@ -269,6 +292,22 @@ body.playing nav {
 .score > b {
   font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
+}
+
+.readout {
+  display: flex;
+  gap: 10px;
+}
+
+.crystals {
+  color: #b44fe0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+:root:not([data-theme="light"]) .crystals {
+  color: #d86bff;
 }
 
 .speed {
@@ -361,30 +400,6 @@ body.playing nav {
   }
 }
 
-.banner {
-  position: absolute;
-  left: 50%;
-  top: 38%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 14px 28px;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  border: 2px solid #3fbf6a;
-  border-radius: 16px;
-  pointer-events: none;
-}
-
-.banner b {
-  font-size: 1.6rem;
-}
-
-.banner span {
-  font-size: 1.2rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
 
 /* What to do next, near the bottom; presses go through it to the canvas. */
 .message {
@@ -411,4 +426,200 @@ body.playing nav {
   padding: 24px max(16px, calc(50% - 240px));
   text-align: center;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+/* The pause menu and the level complete sheet: one column, or two side by side
+   on a phone held sideways. */
+.overlay.menu {
+  overflow-y: auto;
+  gap: 16px;
+}
+
+.menu section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu h2 {
+  margin: 0;
+}
+
+.menu .hint {
+  margin: -6px 0 4px;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .overlay.menu {
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+    padding: 16px max(16px, calc(50% - 360px));
+  }
+
+  .menu section {
+    flex: 1;
+  }
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.buttons > * {
+  flex: 1;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.setting input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.setting small {
+  font-weight: normal;
+}
+
+/* Stars: gold when earned. */
+.stars span {
+  color: var(--line);
+}
+
+.stars span.on,
+.award.on span {
+  color: #f2b90c;
+}
+
+.awards {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.award {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 84px;
+}
+
+.award span {
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--line);
+}
+
+.award small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.award.new span {
+  animation: pop 0.5s ease-out both;
+  animation-delay: calc(0.25s + var(--i) * 0.25s);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.2) rotate(-40deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.35);
+  }
+}
+
+.results {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: center;
+  gap: 4px 16px;
+  margin: 0;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.results b {
+  color: var(--accent);
+}
+
+.results small {
+  color: var(--muted);
+}
+
+/* The levels page. */
+.world h2 small {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text);
+  text-decoration: none;
+  text-align: center;
+}
+
+.level:active {
+  border-color: var(--accent);
+}
+
+.level b {
+  font-size: 1.15rem;
+}
+
+.level small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.level .best {
+  font-variant-numeric: tabular-nums;
+}
+
+.level.locked {
+  opacity: 0.45;
+}
+
+.level.locked .icon {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0;
+}
+
+/* The ?dev overlay. */
+.dev {
+  position: absolute;
+  left: calc(8px + env(safe-area-inset-left, 0px));
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  padding: 6px 8px;
+  font: 11px/1.4 ui-monospace, monospace;
+  color: #e6e8ee;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 8px;
+  pointer-events: none;
 }

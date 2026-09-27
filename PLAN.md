@@ -83,9 +83,14 @@ src/
     cave.js        the rock mesh, built once per level from the outline
     rocket.js      rocket model, flame, legs, light
     things.js      pads, keys, doors, crystals, hazards
-  ui/              HUD, pause menu, level complete sheet, icons
+  ui/
+    dom.js         shared page bits: icons, stars, theme picker, fullscreen button
+    play.js        the play page: HUD, pause menu, level complete sheet, dev overlay
   theme.js, fullscreen.js, style.css
-test/              node:test specs for sim/, and a check of every level
+scripts/
+  autopilot.js     flies a level pad to pad, for tuning and for the level tests
+  fly.js           npm run fly: each level's legs, with time and fuel
+test/              node:test specs for sim/, progress, and a check of every level
 ```
 
 ## The level format
@@ -143,14 +148,18 @@ hard level. Levels get harder in these ways:
 
 | World | Name           | Brings in                                   | Narrowest gap | Tank vs route |
 | ----- | -------------- | ------------------------------------------- | ------------- | ------------- |
-| 1     | Training caves | flying, landing, fuel pads                  | 16 m          | 2×            |
+| 1     | Training caves | flying, landing, fuel pads                  | 16 m          | 2×, 1.4×      |
 | 2     | Old mine       | keys, doors, switches                       | 12 m          | 1.6×          |
 | 3     | Furnace        | flamethrowers, lava                         | 10 m          | 1.4×          |
 | 4     | Works          | fans, crushers, moving blocks               | 10 m          | 1.3×          |
 | 5     | Deep dark      | darkness, lasers, turrets                   | 8 m           | 1.25×         |
 | 6     | Core           | falling rock, crumbling floors, rising lava | 7 m           | 1.2×          |
 
-These figures are starting points, to be tuned by playing. Each world has its own
+These figures are starting points, to be tuned by playing. "Tank vs route" is the
+tank against the fuel the autopilot (`npm run fly`) burns on the longest leg
+between pads. Where a level needs its pads, the tank must also be less than two
+legs together, so it can't be much over 1.4× (world 1 is 2× on its levels without
+fuel pads, 1.4× on those with them). Each world has its own
 rock colour, lighting and background, so you can see yourself getting deeper.
 
 Level design rules:
@@ -161,13 +170,15 @@ Level design rules:
   pads (less in the early worlds).
 - Crystals are off the main route and never needed to finish.
 - Everything dangerous reads at a glance on a small screen, and not by colour alone.
-- Par times come from real runs, not guesses (the dev overlay times them).
+- Par times come from real runs, not guesses. The autopilot's time, rounded up to
+  5 s, is the first guess (it's careful, at most 9 m/s); then the dev overlay's
+  timings from real flights.
 
 ## How each phase works
 
 - It ends with a build you can play on the phone and a short checklist to try by hand.
 - New sim logic gets `npm test` coverage, and from phase 3 every level is checked
-  by `test/levels.test.js`.
+  by `test/levels.test.js`, which includes the autopilot finishing it within its tank.
 - A new hazard gets a sim file in `sim/hazards/`, a model in `render/things.js`, a
   letter or a `things` kind, and its first level teaches it.
 - Commit when tests and build pass.
@@ -233,7 +244,7 @@ bottom of the drop, and a 12 s tank.
 - [ ] Landing on a fuel pad fills up and repairs, and a later crash puts you back on it.
 - [ ] The clock keeps running across restarts.
 
-### Phase 3: Levels, worlds and progress
+### Phase 3: Levels, worlds and progress ✅ (done)
 The game becomes a series of levels. `levels/index.js` lists the worlds and their
 levels. A new page, `/levels`, shows each world as a grid of its levels with the
 stars earned; locked levels are greyed out. Levels play at `/play/1-3`. Crystals
@@ -255,6 +266,35 @@ build and tune levels.
 Then world 1, *Training caves*: 8 levels that teach flying up, across and down,
 landing on small ledges, and fuel and pads, ending with a long level that needs
 every pad.
+
+What was built: crystals are picked up within 1 m of the rocket's shape, and a
+checkpoint now saves the crystals too, so a restart puts back any taken since.
+Stars are worked out from a level's record (`{ best, crystals }`), so changing a
+par time moves them. `/play` alone plays the next level to do, and locked levels
+say so (`?dev` opens them all). The pause menu and the results sheet go two
+columns on a phone held sideways. The flood fill in `test/levels.test.js` moves an
+upright rocket in 1 m steps; doors join it in phase 4. The dev overlay also shows
+the frame rate and puts the game on `window.game`.
+
+`scripts/autopilot.js` flies a level pad to pad along a path that keeps clear of
+rock, steering for a point 5 m ahead at up to 9 m/s. `npm run fly` prints each
+leg's length, time and fuel; `test/levels.test.js` checks it finishes every level
+within its tank.
+
+World 1 was laid out with a carving script (tunnels and shafts with ragged
+walls), and its tanks and pars are set from the autopilot:
+
+| Level | Name       | Autopilot | Par  | Tank | Fuel per leg          |
+| ----- | ---------- | --------- | ---- | ---- | --------------------- |
+| 1-1   | Lift-off   | 8.2 s     | 10 s | 12 s | 4.5                   |
+| 1-2   | The gap    | 14.6 s    | 15 s | 16 s | 7.7                   |
+| 1-3   | Chimney    | 14.4 s    | 15 s | 18 s | 9.1                   |
+| 1-4   | The well   | 14.7 s    | 15 s | 13 s | 6.5                   |
+| 1-5   | Ledges     | 13.2 s    | 15 s | 15 s | 7.6                   |
+| 1-6   | Pit stop   | 21.4 s    | 25 s | 9 s  | 4.9, 6.0              |
+| 1-7   | Switchback | 39.4 s    | 45 s | 12 s | 6.7, 6.4, 8.7         |
+| 1-8   | Grand tour | 54.3 s    | 60 s | 11 s | 8.3, 7.1, 6.6, 7.5    |
+
 - [ ] A new player can tell where to go in 1-1 without reading anything.
 - [ ] Finishing a level unlocks the next, and stars and best times survive a reload.
 - [ ] Pause and restart work from the keyboard and with one thumb.
