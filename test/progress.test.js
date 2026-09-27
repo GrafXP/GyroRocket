@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { starsOf, starCount, recordRun, isUnlocked, nextToPlay, loadProgress, loadSettings, DEFAULT_SETTINGS } from "../src/progress.js";
+import {
+  starsOf,
+  starCount,
+  recordRun,
+  isUnlocked,
+  nextToPlay,
+  loadProgress,
+  loadSettings,
+  allUnlocked,
+  setAllUnlocked,
+  DEFAULT_SETTINGS,
+} from "../src/progress.js";
 
 const LEVELS = [
   { id: "1-1", par: 20 },
@@ -49,4 +60,19 @@ test("levels unlock one at a time, and Continue picks the first unfinished", () 
 test("with no storage, there's no progress and the default settings", () => {
   assert.deepEqual(loadProgress(), { levels: {} });
   assert.deepEqual(loadSettings(), DEFAULT_SETTINGS);
+});
+
+test("the unlock flag is off until set, and remembered", () => {
+  assert.equal(allUnlocked(), false);
+  const stored = new Map();
+  globalThis.localStorage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, v) };
+  try {
+    assert.equal(allUnlocked(), false);
+    setAllUnlocked(true);
+    assert.equal(allUnlocked(), true);
+    setAllUnlocked(false);
+    assert.equal(allUnlocked(), false);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });

@@ -9,6 +9,7 @@ import { LEVELS } from "./levels/index.js";
 
 const PROGRESS_KEY = "gyrorocket:progress";
 const SETTINGS_KEY = "gyrorocket:settings";
+const UNLOCK_KEY = "gyrorocket:unlock";
 
 export const DEFAULT_SETTINGS = { fullTilt: 35 }; // degrees of tilt that steer all the way
 
@@ -52,6 +53,11 @@ export function loadSettings() {
 }
 
 export const saveSettings = (settings) => write(SETTINGS_KEY, settings);
+
+// A debug flag, for a device that hasn't got the progress: ?unlock in the URL
+// opens every level on this device, and ?unlock=off locks them again.
+export const allUnlocked = () => read(UNLOCK_KEY) === true;
+export const setAllUnlocked = (on) => write(UNLOCK_KEY, on);
 
 // localStorage can be missing, full or blocked (private windows, node); then
 // nothing is remembered, and nothing breaks.

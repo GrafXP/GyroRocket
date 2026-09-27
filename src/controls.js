@@ -1,7 +1,9 @@
 // Player input: tilt the phone (or ←/→, A/D) to steer; hold a finger or the mouse
-// on the screen (or ↑, W, Space) to burn. Keys win over the tilt while held.
+// on the screen (or ↑, W, Space) to burn. Keys win over the tilt, until it moves.
 
 export const FULL_TILT = 35; // degrees of tilt that steer all the way, unless set
+const TILT_TAKEOVER = 5; // degrees the tilt has to move after the keys to steer again
+const KEY_TURN_RATE = 2.5; // rad/s: the keys turn slower than the tilt can, for small corrections
 
 // How far the phone is rolled to the right, in degrees, from a deviceorientation
 // event's beta and gamma and the screen's rotation (screen.orientation.angle).
@@ -46,6 +48,7 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
   const keys = new Set();
   let tilt = 0;
   let hasTilt = false;
+  let keyTilt = null; // the tilt when the keys last steered, while they still hold the lean
 
   const onOrientation = (e) => {
     if (e.beta == null || e.gamma == null) return;
@@ -88,9 +91,20 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
     input() {
       const left = keys.has("ArrowLeft") || keys.has("KeyA");
       const right = keys.has("ArrowRight") || keys.has("KeyD");
-      const steer = left || right ? right - left : steerOf(tilt, fullTilt);
+      // A key turns the rocket while it's held; letting go (or holding both) keeps
+      // the lean it's got, which is a null steer, until the tilt moves again.
+      let steer = null;
+      let turnRate; // the rocket's own, unless the keys steer
+      if (left || right) keyTilt = tilt;
+      if (left !== right) {
+        steer = right - left;
+        turnRate = KEY_TURN_RATE;
+      } else if (!left && hasTilt && (keyTilt === null || Math.abs(tilt - keyTilt) > TILT_TAKEOVER)) {
+        keyTilt = null;
+        steer = steerOf(tilt, fullTilt);
+      }
       const thrust = pointers.size > 0 || keys.has("ArrowUp") || keys.has("KeyW") || keys.has("Space");
-      return { steer, thrust };
+      return { steer, turnRate, thrust };
     },
     dispose() {
       window.removeEventListener("deviceorientation", onOrientation);

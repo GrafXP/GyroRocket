@@ -28,6 +28,9 @@ export function createDefences(level) {
 
   const shots = new THREE.InstancedMesh(new THREE.SphereGeometry(SHOT_RADIUS, 12, 8), new THREE.MeshBasicMaterial({ color: COLORS.shot }), MAX_SHOTS);
   const halos = new THREE.InstancedMesh(new THREE.SphereGeometry(SHOT_RADIUS * 2.4, 12, 8), glowing(COLORS.shot, 0.3), MAX_SHOTS);
+  // three.js works out where instances are only once, when there are no shots yet:
+  // without this it would cull every shot from then on.
+  shots.frustumCulled = halos.frustumCulled = false;
   group.add(shots, halos);
   const m = new THREE.Matrix4();
 

@@ -34,7 +34,7 @@ export const CRUSHER = { to: [0, 0], rest: 2, warn: 0.6, slam: 0.15, hold: 0.6, 
 // turret fires a shot at `speed` m/s at the rocket when it can see it within
 // `range` m, after winding up for `windup` s, then reloads; a shot costs `damage`.
 export const LASER = { mode: "always", on: 2, off: 2, warn: 0.5, offset: 0 };
-export const TURRET = { range: 40, windup: 1, reload: 2.5, speed: 10, damage: 30, offset: 0 };
+export const TURRET = { range: 40, windup: 0.5, reload: 0.7, speed: 6, damage: 30, offset: 0 };
 const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything

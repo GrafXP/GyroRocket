@@ -3,7 +3,7 @@ import { solidAt } from "../outline.js";
 
 export const SHOT_RADIUS = 0.45; // m
 const MUZZLE = 1.3; // m from a turret's middle that its shots start
-const SHOT_LIFE = 8 * TICK_RATE;
+const SHOT_LIFE = 10 * TICK_RATE; // long enough to cross a turret's range, slow as shots are
 
 // Whether a turret (level.turrets) can see the point (x, y): within its range,
 // with no rock in between.

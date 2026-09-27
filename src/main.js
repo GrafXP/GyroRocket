@@ -1,12 +1,16 @@
 import "./style.css";
 import { SAFE_SPEED } from "./sim/rocket.js";
 import { WORLDS, LEVELS } from "./levels/index.js";
-import { loadProgress, nextToPlay, isUnlocked, starsOf, starCount } from "./progress.js";
+import { loadProgress, nextToPlay, isUnlocked, allUnlocked, setAllUnlocked, starsOf, starCount } from "./progress.js";
 import { html, icon, formatTime, starsHtml, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./ui/dom.js";
 import { play } from "./ui/play.js";
 
 const view = document.getElementById("view");
 let cleanup = null;
+
+// The ?unlock debug flag (progress.js), remembered on this device.
+const unlock = new URLSearchParams(location.search).get("unlock");
+if (unlock !== null) setAllUnlocked(unlock !== "off");
 
 const routes = {
   "/": home,
@@ -84,6 +88,7 @@ function home(el) {
 // Every world's levels, with the stars earned and best times; locked levels greyed out.
 function levels(el) {
   const progress = loadProgress();
+  const all = allUnlocked();
   html(
     el,
     `<h1>Levels</h1>
@@ -96,7 +101,7 @@ function levels(el) {
           ${world.levels
             .map((l) => {
               const record = progress.levels[l.id];
-              if (!isUnlocked(progress, l.id)) {
+              if (!all && !isUnlocked(progress, l.id)) {
                 return `<div class="level locked" aria-label="${l.id} ${l.name}, locked"><b>${l.id}</b>${icon("lock")}<small>${l.name}</small></div>`;
               }
               return `<a class="level${record ? " done" : ""}" href="/play/${l.id}" data-link>
@@ -108,7 +113,8 @@ function levels(el) {
         </div>
       </section>`;
     }).join("")}
-    <p class="hint">More worlds are on the way. There's also the <a href="/play/test" data-link>test cave</a>.</p>`,
+    <p class="hint">More worlds are on the way. There's also the <a href="/play/test" data-link>test cave</a>.</p>
+    ${all ? `<p class="hint">Every level is open (the ?unlock debug flag). <a href="/levels?unlock=off">Lock them again</a></p>` : ""}`,
   );
 }
 

@@ -7,6 +7,7 @@ import {
   canStand,
   TICK_RATE,
   MAX_LEAN,
+  TURN_RATE,
   SAFE_SPEED,
   HULL,
   TANK,
@@ -74,6 +75,25 @@ test("steering leans the rocket, no further than MAX_LEAN", () => {
   run(r, outline, { thrust: true, steer: 5 }, TICK_RATE / 2);
   assert.equal(r.angle, MAX_LEAN);
   assert.ok(r.vx > 0);
+});
+
+test("with no steer, the rocket holds its lean", () => {
+  const { outline } = room();
+  const r = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
+  run(r, outline, { thrust: true, steer: 1 }, 5);
+  const lean = r.angle;
+  assert.ok(lean > 0 && lean < MAX_LEAN);
+  run(r, outline, { thrust: true, steer: null }, TICK_RATE / 2);
+  assert.equal(r.angle, lean);
+});
+
+test("a lower turnRate turns the rocket slower", () => {
+  const { outline } = room();
+  const fast = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
+  const slow = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
+  run(fast, outline, { thrust: true, steer: 1 }, 5);
+  run(slow, outline, { thrust: true, steer: 1, turnRate: TURN_RATE / 2 }, 5);
+  assert.ok(Math.abs(slow.angle - fast.angle / 2) < 1e-9);
 });
 
 test("a gentle touchdown lands, upright", () => {

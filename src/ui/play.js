@@ -6,7 +6,7 @@ import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
 import { levelById, nextLevel, TEST_CAVE } from "../levels/index.js";
-import { loadProgress, saveProgress, recordRun, isUnlocked, loadSettings, saveSettings } from "../progress.js";
+import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
 import { html, icon, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
@@ -20,7 +20,7 @@ export function play(el, id) {
   const def = levelById(id);
   const dev = new URLSearchParams(location.search).has("dev");
   const progress = loadProgress();
-  if (!def || (def !== TEST_CAVE && !dev && !isUnlocked(progress, id))) {
+  if (!def || (def !== TEST_CAVE && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
     html(
       el,
       `<h1>${def ? `${id} is locked` : "No such level"}</h1>

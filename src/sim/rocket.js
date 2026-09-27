@@ -91,13 +91,14 @@ export function circlesAt(x, y, angle, out = scratch) {
 }
 
 // Advances one tick. `steer` is -1 (full left) to 1 (full right) and sets the lean
-// the rocket turns towards; `thrust` burns the engine along the rocket's axis, while
+// the rocket turns towards, or null to hold the lean it has, and `turnRate` how
+// fast it turns (rad/s); `thrust` burns the engine along the rocket's axis, while
 // there's fuel. It flies in `outline`'s rock, and `env` has the rest: `boxes`, the
 // rectangles that block it (shut doors and gates, and moving blocks with their
 // velocity), as a list or as a function of how far through the tick it is (0 to 1);
 // `boxSpeed`, the fastest any of them moves (m/s); and `field`, the push of fans
 // and magnets, { ax, ay } in m/s².
-export function step(r, { steer = 0, thrust = false } = {}, outline, env = {}) {
+export function step(r, { steer = 0, turnRate = TURN_RATE, thrust = false } = {}, outline, env = {}) {
   const { field = NO_FIELD, boxSpeed = 0 } = env;
   const boxesAt = typeof env.boxes === "function" ? env.boxes : () => env.boxes ?? NONE;
   r.tick++;
@@ -112,9 +113,9 @@ export function step(r, { steer = 0, thrust = false } = {}, outline, env = {}) {
     // thrust beats gravity, so any burn lifts off.
     if (canStand(outline, r.x, r.y - CENTRE_Y, boxesAt(1)) && !r.burning) return r;
     r.state = "flying";
-  } else {
+  } else if (steer != null) {
     const target = Math.max(-1, Math.min(1, steer)) * MAX_LEAN;
-    const turn = TURN_RATE * DT;
+    const turn = turnRate * DT;
     r.angle += Math.max(-turn, Math.min(turn, target - r.angle));
   }
 

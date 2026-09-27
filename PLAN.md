@@ -474,9 +474,10 @@ shoots a beam from its emitter to the first rock, "always" or on a "cycle" that
 flickers for `warn` before it comes on; touching a lit beam is "Zapped!". A switch
 can name a laser in `opens` to turn it off, for good or for a time that won't end
 with the rocket in the beam. A turret sees the rocket within `range` (40 m) if no
-rock's in the way, winds up for a second (a growing glow at its muzzle, the barrel
-following the rocket), and fires a slow shot (10 m/s) at where the rocket is then,
-unless it's ducked out of sight; a hit costs 30 hull ("Shot down!"), and shots
+rock's in the way, winds up for half a second (a growing glow at its muzzle, the
+barrel following the rocket), and fires a slow ball (6 m/s) at where the rocket is
+then, unless it's ducked out of sight, then reloads for 0.7 s, so the balls come
+thick and fast; a hit costs 30 hull ("Shot down!"), and shots
 fly until they hit rock. Checkpoints keep lasers switched off for good; a restart
 clears the shots in the air.
 

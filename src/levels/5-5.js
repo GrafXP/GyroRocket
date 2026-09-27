@@ -6,7 +6,7 @@ export default {
   route: "F E",
   things: {
     t: { kind: "turret", range: 50 },
-    u: { kind: "turret", range: 50, offset: 1.2 },
+    u: { kind: "turret", range: 50, offset: 0.6 },
     a: { kind: "laser", facing: "down", mode: "cycle", on: 1.5, off: 2.5, offset: 0 },
   },
   map: `
