@@ -55,6 +55,7 @@ export function createWorld(level, outline = buildOutline(level)) {
     refuelling: false, // on a fuel pad, and not full yet
     stillTicks: 0,
     cheats: { god: false, fuel: false }, // for the dev overlay
+    assisted: false, // the autopilot flew some of it, so it doesn't count
   };
   save(world, level.start);
   place(world);

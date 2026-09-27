@@ -41,6 +41,7 @@ export function play(el, id) {
       <div class="hud">
         <button class="icon-btn" id="pause-btn" aria-label="Pause">${icon("pause")}</button>
         <button class="icon-btn" id="map-btn" aria-label="Map">${icon("map")}</button>
+        <button class="icon-btn" id="auto-btn" aria-label="Autopilot" aria-pressed="false">${icon("auto")}</button>
         <div class="score">
           <b id="time">0:00.0</b>
           <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
@@ -64,6 +65,7 @@ export function play(el, id) {
           <a class="button" href="/levels" data-link>Levels</a>
         </section>
         <section>
+          <button id="auto-menu" aria-pressed="false">Autopilot: off</button>
           <label class="setting">
             <span>Tilt sensitivity</span>
             <input type="range" id="tilt" min="${TILT_MIN}" max="${TILT_MAX}" step="5">
@@ -128,6 +130,8 @@ export function play(el, id) {
     message: $("#message"),
   };
   let keysShown = "";
+  let autoShown = null;
+  let lostUntil = 0; // when to stop saying the autopilot gave up
   const show = (el, text) => el.textContent !== text && (el.textContent = text);
   const started = performance.now();
   const hasFuelPads = level.pads.some((p) => p.kind === "fuel");
@@ -168,14 +172,25 @@ export function play(el, id) {
         }
       }
 
+      // The autopilot button, and a word when it gives up.
+      const auto = !!game?.pilot;
+      if (auto !== autoShown) {
+        autoShown = auto;
+        for (const b of [$("#auto-btn"), $("#auto-menu")]) b.setAttribute("aria-pressed", auto);
+        show($("#auto-menu"), `Autopilot: ${auto ? "on" : "off"}`);
+        if (!auto && game?.lastPilot?.failed) lostUntil = performance.now() + 3000;
+      }
+
       const back = w.checkpoint.pad === level.start ? "the start" : "the last fuel pad";
       const on = padUnder(level, r);
       const timer = gateTimers(w)[0];
       let text = "";
       const how = { flame: "Burned up!", lava: "Into the lava!" }[r.cause] ?? "Crashed!";
-      if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
+      if (w.done) text = "";
+      else if (game?.pilot) text = game.pilot.status;
+      else if (performance.now() < lostUntil) text = game.lastPilot.status;
+      else if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
       else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
-      else if (w.done) text = "";
       else if (on?.kind === "switch") text = `Gate ${on.label} is open${on.time ? `. You have ${on.time} s from lift-off` : ""}`;
       else if (timer) text = `Gate ${timer.gate.switch} shuts in ${Math.ceil(timer.seconds)}`;
       else if (on?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
@@ -198,12 +213,14 @@ export function play(el, id) {
     const got = crystalCount(w);
     const all = got === level.crystals.length;
     let result = null;
-    if (def !== TEST_CAVE) {
+    if (def !== TEST_CAVE && !w.assisted) {
       result = recordRun(progress, def, { time, crystals: all });
       saveProgress(progress);
     }
     const best = progress.levels[def.id]?.best;
-    $("#awards").innerHTML = result
+    $("#awards").innerHTML = w.assisted
+      ? `<p class="hint">Flown with the autopilot, so no stars</p>`
+      : result
       ? [
           "Finished",
           `Par ${formatTime(def.par)}`,
@@ -220,15 +237,24 @@ export function play(el, id) {
       ${level.crystals.length ? `<dt>Crystals</dt><dd>${got} of ${level.crystals.length}</dd>` : ""}
       <dt>Restarts</dt><dd>${w.restarts}</dd>`;
     $("#done").hidden = false;
-    $("#pause-btn").hidden = $("#map-btn").hidden = true;
+    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = true;
     $("#next").focus();
   }
+
+  const toggleAutopilot = () => {
+    if (!finished) game.setAutopilot(!game.pilot);
+  };
+  $("#auto-btn").addEventListener("click", () => {
+    toggleAutopilot();
+    document.activeElement?.blur();
+  });
+  $("#auto-menu").addEventListener("click", toggleAutopilot);
 
   $("#retry").addEventListener("click", () => {
     game.restartLevel();
     finished = false;
     $("#done").hidden = true;
-    $("#pause-btn").hidden = $("#map-btn").hidden = false;
+    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = false;
     document.activeElement?.blur();
   });
 
@@ -275,7 +301,8 @@ export function play(el, id) {
   });
   const onKey = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "KeyM") {
+    if (e.code === "KeyO" && pauseMenu.hidden && mapEl.hidden) toggleAutopilot();
+    else if (e.code === "KeyM") {
       if (mapEl.hidden) openMap();
       else closeMap();
     } else if (e.code === "Escape" && !mapEl.hidden) closeMap();

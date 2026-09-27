@@ -90,8 +90,9 @@ src/
     map.js         the map of what's been seen
   looks.js         key colours and shapes, for the scene, the HUD and the map
   theme.js, fullscreen.js, style.css
+  autopilot.js     flies the level's route, a tick at a time: in the game, and headless
 scripts/
-  autopilot.js     flies a level pad to pad, for tuning and for the level tests
+  autopilot.js     flies a level with it headless, for tuning and for the level tests
   fly.js           npm run fly: each level's legs, with time and fuel
 test/              node:test specs for sim/, progress, and a check of every level
 ```
@@ -393,6 +394,22 @@ pads, pars the autopilot's time with refuelling, rounded up to 5 s.
 - [ ] The flame hurts exactly where it's drawn.
 - [ ] A row of offset flamethrowers makes a wave you can read and time.
 - [ ] 20 flamethrowers on screen still run at 60 fps.
+
+### Autopilot you can switch on ✅ (done, between phases 5 and 6)
+The autopilot that tunes and checks the levels is now in the game too
+(`src/autopilot.js`; `scripts/autopilot.js` just runs it headless). It gives the
+input for each tick, so the game can hand it the controls: the arrow button on the
+HUD, O on a keyboard, or the pause menu switches it on and off, and while it flies
+the message line says where it's heading. It picks the route up from wherever the
+level is: after the checkpoint's pad, skipping keys already held and switches whose
+gate is open for good. After a crash it taps to go again; if it gets lost it says
+so and hands back. A run it flies any of is marked assisted: the results say "Flown
+with the autopilot, so no stars", and nothing's recorded or unlocked. Routes are
+now worked out into pads when it starts (an F becomes the fuel pad it would pick),
+and its path search uses typed arrays, so planning takes at most about a quarter of
+a second on a phone (2-3, with several fuel pads to weigh), and less per leg.
+- [ ] It flies every level without help, from the start and when switched on halfway.
+- [ ] You can always tell it's flying, and take back the controls at once.
 
 ### Phase 6: Game feel
 Sound made in code with Web Audio (no files): an engine roar that follows the

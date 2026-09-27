@@ -3,6 +3,7 @@ import { buildOutline } from "./sim/outline.js";
 import { TICK_RATE } from "./sim/rocket.js";
 import { createView } from "./render/view.js";
 import { createControls } from "./controls.js";
+import { createPilot } from "./autopilot.js";
 
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_TICKS_PER_FRAME = 10; // after a long stall, drop time instead of freezing to catch up
@@ -11,7 +12,9 @@ const MAX_TICKS_PER_FRAME = 10; // after a long stall, drop time instead of free
 // sim at a fixed tick rate whatever the display's frame rate. onFrame(world,
 // controls) runs after every frame, for the HUD. After a crash or getting stranded,
 // the next press restarts from the checkpoint. After the finish, the rocket sits on
-// the exit until the page moves on (restartLevel, or another page).
+// the exit until the page moves on (restartLevel, or another page). With the
+// autopilot on (setAutopilot), it flies instead of the controls, and the run is
+// marked assisted.
 export function createGame(container, { level, onFrame, fullTilt } = {}) {
   const outline = buildOutline(level);
   const view = createView(container, level, outline);
@@ -19,6 +22,7 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
   const cheats = { god: false, fuel: false }; // the dev overlay's, kept across restarts
   const fresh = () => Object.assign(createWorld(level, outline), { cheats });
   let world = fresh();
+  let pilot = null;
   let wasThrust = false;
 
   let running = true;
@@ -33,7 +37,8 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
       acc += now - last;
       let n = 0;
       while (acc >= TICK_MS && n < MAX_TICKS_PER_FRAME) {
-        const input = controls.input();
+        const flying = pilot && !pilot.failed;
+        const input = flying ? pilot.input() : controls.input();
         const pressed = input.thrust && !wasThrust;
         wasThrust = input.thrust;
         if (world.downTick >= 0 || world.done) {
@@ -73,6 +78,19 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
     // The level from the top, clock and all.
     restartLevel() {
       world = fresh();
+      if (pilot) this.setAutopilot(true);
+    },
+    // The autopilot, while it's flying (it gives up if it gets lost), or null.
+    get pilot() {
+      return pilot && !pilot.failed ? pilot : null;
+    },
+    // The last autopilot, flying or not: its `failed` says if it got lost.
+    get lastPilot() {
+      return pilot;
+    },
+    setAutopilot(on) {
+      pilot = on ? createPilot(world) : null;
+      if (on) world.assisted = true;
     },
     setFullTilt: controls.setFullTilt,
     screenToWorld: view.screenToWorld,

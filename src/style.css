@@ -220,6 +220,12 @@ nav a.active {
   stroke-linejoin: round;
 }
 
+.icon-btn[aria-pressed="true"] {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .icon-btn {
   display: grid;
   place-items: center;

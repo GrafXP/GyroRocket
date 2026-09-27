@@ -14,6 +14,7 @@ const PATHS = {
   pause: "M8 5v14M16 5v14",
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   map: "M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15",
+  auto: "M12 3l7 18-7-4-7 4z",
 };
 export const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;
 
