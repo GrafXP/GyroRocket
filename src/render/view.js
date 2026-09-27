@@ -4,6 +4,7 @@ import { TICK_RATE } from "../sim/rocket.js";
 import { createCave } from "./cave.js";
 import { createRocketModel } from "./rocket.js";
 import { createThings } from "./things.js";
+import { createDoors } from "./doors.js";
 
 const FOV = 50; // degrees, vertical
 const VIEW = 36; // m across the screen's short side, at least
@@ -30,6 +31,8 @@ export function createView(container, level, outline) {
   scene.add(createCave(outline));
   const things = createThings(level);
   scene.add(things.group);
+  const doors = createDoors(level);
+  scene.add(doors.group);
   const rocket = createRocketModel();
   scene.add(rocket.group);
 
@@ -64,6 +67,7 @@ export function createView(container, level, outline) {
       const r = world.rocket;
       rocket.update(r);
       things.update(world);
+      doors.update(world);
 
       const since = (r.tick - r.crashTick) / TICK_RATE;
       boom.visible = r.state === "crashed" && since < 1;

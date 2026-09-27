@@ -87,8 +87,8 @@ export function circlesAt(x, y, angle, out = scratch) {
 
 // Advances one tick. `steer` is -1 (full left) to 1 (full right) and sets the lean
 // the rocket turns towards; `thrust` burns the engine along the rocket's axis, while
-// there's fuel.
-export function step(r, { steer = 0, thrust = false } = {}, outline) {
+// there's fuel. It flies in `outline`'s rock, and `boxes` are shut doors and gates.
+export function step(r, { steer = 0, thrust = false } = {}, outline, boxes = []) {
   r.tick++;
   const wants = thrust && r.state !== "crashed";
   r.burning = wants && r.fuel > 0;
@@ -116,7 +116,7 @@ export function step(r, { steer = 0, thrust = false } = {}, outline) {
     r.vy += (ay - r.vy * DRAG) * dt;
     r.x += r.vx * dt;
     r.y += r.vy * dt;
-    impact = Math.max(impact, collide(r, outline));
+    impact = Math.max(impact, collide(r, outline, boxes));
   }
   if (impact > SCRAPE_SPEED) hit(r, impact);
   return r;
@@ -124,15 +124,15 @@ export function step(r, { steer = 0, thrust = false } = {}, outline) {
 
 // Pushes the rocket out of rock and bounces it off, or lands it. Returns the
 // fastest speed it hit rock at.
-function collide(r, outline) {
+function collide(r, outline, boxes) {
   let impact = 0;
   for (let k = 0; k < 4; k++) {
-    const c = deepestContact(outline, circlesAt(r.x, r.y, r.angle));
+    const c = deepestContact(outline, circlesAt(r.x, r.y, r.angle), boxes);
     if (!c) break;
     r.x += c.nx * c.depth;
     r.y += c.ny * c.depth;
     const vn = r.vx * c.nx + r.vy * c.ny; // negative: moving into the rock
-    if (c.foot && c.ny > 0.99 && vn <= 0 && tryLand(r, outline, c.py)) return impact;
+    if (c.foot && c.ny > 0.99 && vn <= 0 && tryLand(r, outline, boxes, c.py)) return impact;
     if (vn >= 0) continue;
     impact = Math.max(impact, -vn);
     const [tx, ty] = [-c.ny, c.nx];
@@ -145,18 +145,18 @@ function collide(r, outline) {
   return impact;
 }
 
-function tryLand(r, outline, floorY) {
+function tryLand(r, outline, boxes, floorY) {
   if (Math.hypot(r.vx, r.vy) > SAFE_SPEED || Math.abs(r.angle) > SAFE_LEAN) return false;
-  if (!canStand(outline, r.x, floorY)) return false;
+  if (!canStand(outline, r.x, floorY, boxes)) return false;
   Object.assign(r, { state: "landed", angle: 0, vx: 0, vy: 0, y: floorY + CENTRE_Y });
   return true;
 }
 
 // Whether the rocket could stand upright at x on the floor at height floorY: flat
 // floor under both feet, and room for the rest of it.
-export function canStand(outline, x, floorY) {
-  if (!floorAt(outline, x - FOOT_X, floorY) || !floorAt(outline, x + FOOT_X, floorY)) return false;
-  const c = deepestContact(outline, circlesAt(x, floorY + CENTRE_Y + 0.01, 0));
+export function canStand(outline, x, floorY, boxes = []) {
+  if (!floorAt(outline, x - FOOT_X, floorY, 0.05, boxes) || !floorAt(outline, x + FOOT_X, floorY, 0.05, boxes)) return false;
+  const c = deepestContact(outline, circlesAt(x, floorY + CENTRE_Y + 0.01, 0), boxes);
   return !c || c.depth < 0.02;
 }
 

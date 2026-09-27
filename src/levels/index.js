@@ -6,6 +6,14 @@ import l1_5 from "./1-5.js";
 import l1_6 from "./1-6.js";
 import l1_7 from "./1-7.js";
 import l1_8 from "./1-8.js";
+import l2_1 from "./2-1.js";
+import l2_2 from "./2-2.js";
+import l2_3 from "./2-3.js";
+import l2_4 from "./2-4.js";
+import l2_5 from "./2-5.js";
+import l2_6 from "./2-6.js";
+import l2_7 from "./2-7.js";
+import l2_8 from "./2-8.js";
 import testCave from "./testcave.js";
 
 // The worlds in order, each with its levels in order. A level's id is
@@ -15,6 +23,11 @@ export const WORLDS = [
     name: "Training caves",
     about: "Learn to fly: up, across and down, landing on ledges, and refuelling.",
     levels: [l1_1, l1_2, l1_3, l1_4, l1_5, l1_6, l1_7, l1_8],
+  },
+  {
+    name: "Old mine",
+    about: "Keys open the doors of their colour; switches open gates, some only for a while.",
+    levels: [l2_1, l2_2, l2_3, l2_4, l2_5, l2_6, l2_7, l2_8],
   },
 ].map((world, w) => ({
   ...world,

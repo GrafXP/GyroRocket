@@ -73,7 +73,7 @@ src/
     level.js       parses a level's text into tiles, pads, keys, doors and hazards
     outline.js     marching squares: tiles → rock outline segments, looked up by tile
     collide.js     the rocket against the outline and closed doors; landing
-    world.js       a level in play: rocket, pickups, doors, hazards, checkpoint, clock
+    world.js       a level in play: rocket, pickups, doors and gates, checkpoint, clock
     hazards/       one file per kind: its state, step(), and what it hits
   levels/
     index.js       the worlds in order, each with its levels and colours
@@ -82,10 +82,13 @@ src/
     view.js        scene, camera, lights
     cave.js        the rock mesh, built once per level from the outline
     rocket.js      rocket model, flame, legs, light
-    things.js      pads, keys, doors, crystals, hazards
+    things.js      pads, crystals, hazards
+    doors.js       keys, doors, gates and switch posts
   ui/
     dom.js         shared page bits: icons, stars, theme picker, fullscreen button
     play.js        the play page: HUD, pause menu, level complete sheet, dev overlay
+    map.js         the map of what's been seen
+  looks.js         key colours and shapes, for the scene, the HUD and the map
   theme.js, fullscreen.js, style.css
 scripts/
   autopilot.js     flies a level pad to pad, for tuning and for the level tests
@@ -96,23 +99,27 @@ test/              node:test specs for sim/, progress, and a check of every leve
 ## The level format
 
 ```js
-// src/levels/2-3.js
+// src/levels/2-5.js
 export default {
-  name: "Key under the falls",
-  fuel: 12, // seconds of full burn in a full tank
-  par: 45, // seconds, for the time star
-  map: `
-    ##############################
-    #.........#####..........#####
-    #.........#####.....*....#####
-    #..SSS....#####..........R...#
-    ###########......1.......R.E.#
-    …
-  `,
+  name: "The switch",
+  fuel: 16, // seconds of full burn in a full tank
+  par: 20, // seconds, for the time star
+  route: "1 3 E", // the autopilot's stops (scripts/autopilot.js)
   // Things that need more than a letter, by the digit that marks them.
   things: {
-    1: { kind: "flame", facing: "left", on: 1.5, off: 2, offset: 0 },
+    1: { kind: "switch", opens: 2 }, // opens gate 2 for good
+    2: { kind: "gate" },
+    3: { kind: "switch", opens: 4, time: 10 }, // for 10 s from lift-off
+    4: { kind: "gate" },
   },
+  map: `
+    ##########################
+    #......2..........4......#
+    #......2...*......4......#
+    #......2..........4......#
+    #.SSS..2...333....4..EEE.#
+    ##########################
+  `,
 };
 ```
 
@@ -125,13 +132,20 @@ export default {
 | `F`         | fuel pad (a checkpoint)                                    |
 | `*`         | crystal                                                    |
 | `r y g b`   | key                                                        |
-| `R Y G B`   | door; a run of door tiles is one door                      |
+| `R Y G B`   | door: a rectangle of its letter, opened by its key         |
 | `< > ^ v`   | flamethrower facing that way, with the default cycle       |
 | `~`         | lava                                                       |
-| `1`–`9`     | a thing set up in `things`                                 |
+| `1`–`9`     | a thing set up in `things`: a switch (a pad) or a gate (a rectangle) |
 
-A pad is a run of at least 3 of its letter on the air row just above a flat floor.
-Later hazards get letters as they arrive.
+A pad is a run of at least 3 of its letter on the air row just above a flat floor;
+so is a switch. Door and gate tiles are air to the rock outline, and block as
+rectangles while shut. A level has at most one key of each colour, every door's key
+is on the map, every switch opens a gate and every gate has a switch. Later hazards
+get letters as they arrive.
+
+`route` lists the autopilot's stops: keys by letter, `F` for the nearest other fuel
+pad or `F@45` for the one at map column 45, switches by digit, and `E`. Without
+one, it flies the fuel pads in order of distance from the start, then the exit.
 
 ## Worlds and difficulty
 
@@ -301,7 +315,7 @@ walls), and its tanks and pars are set from the autopilot:
 - [ ] The eight levels get harder smoothly: none is a wall, and 1-8 is a real test.
 - [ ] A change of tilt sensitivity is noticeable straight away.
 
-### Phase 4: Keys, doors and switches
+### Phase 4: Keys, doors and switches ✅ (done)
 Keys (`r y g b`) float and spin, and flying through one picks it up and shows it on
 the HUD. Doors (`R Y G B`) are solid rock-like slabs with their key's colour and
 shape on them; they slide open, and stay open, when you come near with the key.
@@ -310,6 +324,28 @@ for a set time, with a countdown on the gate: the first time you have to hurry. 
 map (button or M) shows the parts of the cave you've seen, with pads, keys and
 doors marked, since levels now branch. Then world 2, *Old mine*: 8 levels of keys,
 branches and backtracking, with timed gates in the second half.
+What was built: keys are tokens in their colour and shape (red circle, yellow
+triangle, green square, blue cross; `looks.js`), rocking in a glow, and doors are
+steel slabs framed in that colour with the shape on each tile. A door opens when
+the rocket's centre comes within 10 m of it with the key, and slides up (or aside,
+if it's wide) into the rock. Gates are striped orange and black with their switch's
+number, and a switch has a numbered post with a lamp: green while its gate is open,
+blinking for a timed gate's last three seconds. A timed gate's time restarts while
+the rocket sits on the switch, so it runs from lift-off; the HUD counts it down
+("Gate 3 shuts in 6"), and it never shuts on the rocket. A shut door or gate is a
+rectangle in the collision (`deepestContact`'s `boxes`), and its top is floor you
+can land on. Checkpoints save keys, open doors and gates open for good; timed gates
+come back shut. The map (button or M, pausing the game) draws the tiles within 24 m
+of anywhere the rocket has been, with pads, shut doors and gates, and the keys and
+crystals still there. The level tests' flood fill opens doors and gates as their
+keys and switches come within reach, and the autopilot follows each level's
+`route`; its paths now really keep clear of rock (a bug had them hugging it).
+
+World 2, *Old mine*: 2-1 The red door, 2-2 Two keys, 2-3 Crossroads, 2-4 Backtrack,
+2-5 The switch, 2-6 Against the clock, 2-7 Mine shafts, 2-8 The deep mine. Tanks
+are 1.6× the longest stretch between fuel pads (1.3× in 2-8, the world's test),
+and gate times 1.2–1.5× the autopilot's.
+
 - [ ] Keys stand out from a distance, and you can tell which door each one opens.
 - [ ] A door opens as you arrive with its key; without it, it's clearly locked.
 - [ ] A timed gate's countdown can be seen from its switch, or the route makes it obvious.

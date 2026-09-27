@@ -310,6 +310,16 @@ body.playing nav {
   color: #d86bff;
 }
 
+.keys {
+  display: flex;
+  gap: 2px;
+}
+
+.keys svg {
+  width: 16px;
+  height: 16px;
+}
+
 .speed {
   color: var(--muted);
   font-size: 0.85rem;
@@ -622,4 +632,21 @@ body.playing nav {
   background: rgb(0 0 0 / 0.55);
   border-radius: 8px;
   pointer-events: none;
+}
+
+/* The map: the level scaled to fit, on its own dark panel. */
+.overlay.map {
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 8px;
+  background: rgb(8 9 13 / 0.94);
+}
+
+.overlay.map canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.overlay.map .hint {
+  margin: 0;
+  color: #8b90a0;
 }

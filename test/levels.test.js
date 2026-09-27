@@ -9,15 +9,16 @@ import { touches } from "../src/sim/world.js";
 import { flyLevel } from "../scripts/autopilot.js";
 
 // Everywhere an upright rocket can get to from the start pad, moving in 1 m steps
-// without touching rock. Returns a list of reachable [x, y] centres.
-function reachable(level, outline) {
+// without touching rock or the shut doors and gates in `boxes`. Returns a list of
+// reachable [x, y] centres.
+function flood(level, outline, boxes) {
   const { start } = level;
   const [sx, sy] = [(start.x0 + start.x1) / 2, start.y + CENTRE_Y + 0.05];
   const [gx0, gy0] = [Math.floor(-sx), Math.floor(-sy)];
   const cols = Math.ceil(level.width * 2 - sx) - gx0 + 1;
   const rows = Math.ceil(level.height * 2 - sy) - gy0 + 1;
   const seen = new Uint8Array(cols * rows); // 1 seen and fits, 2 seen and doesn't
-  const fits = (x, y) => !deepestContact(outline, circlesAt(x, y, 0));
+  const fits = (x, y) => !deepestContact(outline, circlesAt(x, y, 0), boxes);
   const found = [];
   const queue = [[0, 0]];
   seen[(0 - gy0) * cols + (0 - gx0)] = 1;
@@ -39,6 +40,30 @@ function reachable(level, outline) {
     }
   }
   return found;
+}
+
+// Whether any of `spots` is where the rocket stands over a pad's middle.
+const onPad = (spots, pad) => {
+  const [x, y] = [(pad.x0 + pad.x1) / 2, pad.y + CENTRE_Y];
+  return spots.some(([sx, sy]) => Math.abs(sx - x) <= 0.5 && sy - y >= 0 && sy - y <= 1.5);
+};
+
+// Everywhere the rocket can get to, opening each door once its key has been
+// reached and each gate once its switch has.
+function reachable(level, outline) {
+  const open = new Set();
+  for (;;) {
+    const spots = flood(
+      level,
+      outline,
+      level.doors.filter((d, i) => !open.has(i)),
+    );
+    const keys = level.keys.filter((k) => spots.some(([x, y]) => touches({ x, y, angle: 0 }, k))).map((k) => k.color);
+    const switches = level.pads.filter((p) => p.kind === "switch" && onPad(spots, p)).map((p) => p.opens);
+    const more = level.doors.filter((d, i) => !open.has(i) && (keys.includes(d.key) || switches.includes(d.gate)));
+    if (!more.length) return spots;
+    for (const d of more) open.add(level.doors.indexOf(d));
+  }
 }
 
 test("levels have ids in order, and know what comes next", () => {
@@ -66,12 +91,14 @@ for (const def of LEVELS) {
     }
     const spots = reachable(level, outline);
     for (const pad of level.pads) {
-      const [x, y] = [(pad.x0 + pad.x1) / 2, pad.y + CENTRE_Y];
-      assert.ok(
-        spots.some(([sx, sy]) => Math.abs(sx - x) <= 0.5 && sy - y >= 0 && sy - y <= 1.5),
-        `can't get to the ${pad.kind} pad at column ${pad.c0 + 1}`,
-      );
+      assert.ok(onPad(spots, pad), `can't get to the ${pad.kind} pad at column ${pad.c0 + 1}`);
     }
+    level.keys.forEach((k) => {
+      assert.ok(
+        spots.some(([x, y]) => touches({ x, y, angle: 0 }, k)),
+        `can't get to the ${k.color} key`,
+      );
+    });
     level.crystals.forEach((c, i) => {
       assert.ok(
         spots.some(([x, y]) => touches({ x, y, angle: 0 }, c)),

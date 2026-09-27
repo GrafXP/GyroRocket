@@ -2,7 +2,9 @@ import { createGame } from "../game.js";
 import { requestTiltPermission } from "../controls.js";
 import { SAFE_SPEED, HULL, TICK_RATE } from "../sim/rocket.js";
 import { parseLevel, TILE } from "../sim/level.js";
-import { clock, padUnder, crystalCount } from "../sim/world.js";
+import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
+import { KEY_LOOKS, css, shapePath } from "../looks.js";
+import { drawMap } from "./map.js";
 import { levelById, nextLevel, TEST_CAVE } from "../levels/index.js";
 import { loadProgress, saveProgress, recordRun, isUnlocked, loadSettings, saveSettings } from "../progress.js";
 import { html, icon, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
@@ -38,11 +40,12 @@ export function play(el, id) {
     `<div class="game" id="game">
       <div class="hud">
         <button class="icon-btn" id="pause-btn" aria-label="Pause">${icon("pause")}</button>
+        <button class="icon-btn" id="map-btn" aria-label="Map">${icon("map")}</button>
         <div class="score">
           <b id="time">0:00.0</b>
           <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
           <span class="gauge"><small>Hull</small><span class="bar" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="100"><i class="hull" id="hull"></i></span></span>
-          <span class="readout"><span class="crystals" id="crystals"></span><span class="speed" id="speed">0.0 m/s</span></span>
+          <span class="readout"><span class="crystals" id="crystals"></span><span class="keys" id="keys"></span><span class="speed" id="speed">0.0 m/s</span></span>
         </div>
         <button class="icon-btn" id="fs"></button>
       </div>
@@ -69,6 +72,11 @@ export function play(el, id) {
           ${THEME_PICKER}
           <button id="fs-menu"></button>
         </section>
+      </div>
+
+      <div class="overlay map" id="map" hidden>
+        <canvas id="map-canvas"></canvas>
+        <p class="hint">Tap to close</p>
       </div>
 
       <div class="overlay menu" id="done" hidden>
@@ -110,7 +118,16 @@ export function play(el, id) {
     });
   }
 
-  const hud = { time: $("#time"), fuel: $("#fuel"), hull: $("#hull"), speed: $("#speed"), crystals: $("#crystals"), message: $("#message") };
+  const hud = {
+    time: $("#time"),
+    fuel: $("#fuel"),
+    hull: $("#hull"),
+    speed: $("#speed"),
+    crystals: $("#crystals"),
+    keys: $("#keys"),
+    message: $("#message"),
+  };
+  let keysShown = "";
   const show = (el, text) => el.textContent !== text && (el.textContent = text);
   const started = performance.now();
   const hasFuelPads = level.pads.some((p) => p.kind === "fuel");
@@ -134,6 +151,12 @@ export function play(el, id) {
       show(hud.speed, `${v.toFixed(1)} m/s`);
       hud.speed.dataset.safe = r.state === "flying" && v <= SAFE_SPEED;
       show(hud.crystals, level.crystals.length ? `◆ ${crystalCount(w)}/${level.crystals.length}` : "");
+      if (w.keys.join() !== keysShown) {
+        keysShown = w.keys.join();
+        hud.keys.innerHTML = w.keys
+          .map((k) => `<svg viewBox="0 0 24 24" role="img" aria-label="${k} key"><path d="${shapePath(KEY_LOOKS[k].shape)}" fill="${css(KEY_LOOKS[k].color)}"/></svg>`)
+          .join("");
+      }
 
       // A red flash round the edges when the rocket hits rock.
       if (r.hitTick !== lastHit) {
@@ -146,11 +169,15 @@ export function play(el, id) {
       }
 
       const back = w.checkpoint.pad === level.start ? "the start" : "the last fuel pad";
+      const on = padUnder(level, r);
+      const timer = gateTimers(w)[0];
       let text = "";
       if (r.state === "crashed") text = `Crashed! Tap to go back to ${back}`;
       else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
       else if (w.done) text = "";
-      else if (padUnder(level, r)?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
+      else if (on?.kind === "switch") text = `Gate ${on.label} is open${on.time ? `. You have ${on.time} s from lift-off` : ""}`;
+      else if (timer) text = `Gate ${timer.gate.switch} shuts in ${Math.ceil(timer.seconds)}`;
+      else if (on?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
       else if (w.startTick < 0) {
         const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";
         text = `${title}. Hold the screen (or ↑) to burn, ${steer}. ${hasFuelPads ? "Refuel on blue pads, finish" : "Finish"} on the green one.`;
@@ -192,7 +219,7 @@ export function play(el, id) {
       ${level.crystals.length ? `<dt>Crystals</dt><dd>${got} of ${level.crystals.length}</dd>` : ""}
       <dt>Restarts</dt><dd>${w.restarts}</dd>`;
     $("#done").hidden = false;
-    $("#pause-btn").hidden = true;
+    $("#pause-btn").hidden = $("#map-btn").hidden = true;
     $("#next").focus();
   }
 
@@ -200,14 +227,16 @@ export function play(el, id) {
     game.restartLevel();
     finished = false;
     $("#done").hidden = true;
-    $("#pause-btn").hidden = false;
+    $("#pause-btn").hidden = $("#map-btn").hidden = false;
     document.activeElement?.blur();
   });
 
   // Pausing.
   const pauseMenu = $("#pause");
+  const mapEl = $("#map");
   const openPause = () => {
     if (finished || !pauseMenu.hidden) return;
+    closeMap();
     game.pause();
     pauseMenu.hidden = false;
     $("#resume").focus();
@@ -218,6 +247,22 @@ export function play(el, id) {
     document.activeElement?.blur(); // so keys fly the rocket again
   };
   $("#pause-btn").addEventListener("click", openPause);
+
+  // The map: the parts of the cave seen so far. The game waits while it's open.
+  const openMap = () => {
+    if (finished || !pauseMenu.hidden || !mapEl.hidden) return;
+    game.pause();
+    mapEl.hidden = false;
+    drawMap($("#map-canvas"), game.world);
+  };
+  function closeMap() {
+    if (mapEl.hidden) return;
+    mapEl.hidden = true;
+    game.resume();
+    document.activeElement?.blur();
+  }
+  $("#map-btn").addEventListener("click", openMap);
+  mapEl.addEventListener("click", closeMap);
   $("#resume").addEventListener("click", closePause);
   $("#restart-pad").addEventListener("click", () => {
     game.restartFromPad();
@@ -229,7 +274,11 @@ export function play(el, id) {
   });
   const onKey = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "KeyP" || e.code === "Escape") {
+    if (e.code === "KeyM") {
+      if (mapEl.hidden) openMap();
+      else closeMap();
+    } else if (e.code === "Escape" && !mapEl.hidden) closeMap();
+    else if (e.code === "KeyP" || e.code === "Escape") {
       e.preventDefault();
       if (pauseMenu.hidden) openPause();
       else closePause();

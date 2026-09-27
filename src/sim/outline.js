@@ -96,8 +96,10 @@ export function solidAt(outline, x, y) {
   return true;
 }
 
-// Whether there's flat floor (rock below, air above) at height y under x.
-export function floorAt(outline, x, y, tolerance = 0.05) {
+// Whether there's flat floor (rock below, air above) at height y under x: rock, or
+// the top of one of `boxes` (shut doors and gates).
+export function floorAt(outline, x, y, tolerance = 0.05, boxes = []) {
+  if (boxes.some((b) => Math.abs(b.y1 - y) <= tolerance && x >= b.x0 && x <= b.x1)) return true;
   const e = 0.01; // so a point on a cell's edge sees both cells
   for (const s of segmentsNear(outline, x - e, y - e, x + e, y + e)) {
     if (s.ny > 0.99 && Math.abs(s.ay - y) <= tolerance && x >= Math.min(s.ax, s.bx) && x <= Math.max(s.ax, s.bx)) return true;

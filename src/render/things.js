@@ -8,6 +8,7 @@ const COLORS = {
   exit: 0x3fbf6a,
   beacon: 0x5be38a,
   fuel: 0x3fa9f5,
+  switch: 0xf08a24,
   crystal: 0xd86bff,
   pump: 0x4a4f5c,
   screen: 0x11151c,
@@ -15,8 +16,9 @@ const COLORS = {
 };
 
 // The pads on the level's floors: the start pad in yellow hazard stripes, fuel
-// pads in blue with a pump, and the exit pad in green under a beam of light you
-// can see from a distance. And the crystals, glowing, turning and bobbing.
+// pads in blue with a pump, switches in orange (their posts are in doors.js), and
+// the exit pad in green under a beam of light you can see from a distance. And the
+// crystals, glowing, turning and bobbing.
 export function createThings(level) {
   const group = new THREE.Group();
   let beam = null;
@@ -26,8 +28,9 @@ export function createThings(level) {
   for (const pad of level.pads) {
     const width = pad.x1 - pad.x0;
     const mid = (pad.x0 + pad.x1) / 2;
-    const top = { start: COLORS.pad, fuel: COLORS.fuel, exit: COLORS.exit }[pad.kind];
-    const front = pad.kind === "exit" ? null : stripeTexture(pad.kind === "fuel" ? COLORS.fuel : COLORS.stripe, width / 2);
+    const top = { start: COLORS.pad, fuel: COLORS.fuel, exit: COLORS.exit, switch: COLORS.switch }[pad.kind];
+    const stripe = { start: COLORS.stripe, fuel: COLORS.fuel, switch: COLORS.switch }[pad.kind];
+    const front = stripe ? stripeTexture(stripe, width / 2) : null;
     const side = new THREE.MeshLambertMaterial({ color: COLORS.pad });
     const slab = new THREE.Mesh(new THREE.BoxGeometry(width, 0.35, 5), [
       side,
