@@ -117,7 +117,7 @@ function play(el) {
     `<div class="game" id="game">
       <div class="hud">
         <a href="/" data-link class="icon-btn" aria-label="Back">${icon("back")}</a>
-        <div class="score"><b id="time">0:00.0</b><span class="hull" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="${HULL}"><i id="hull"></i></span></div>
+        <div class="score"><b id="time">0:00.0</b><span class="hull" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="${HULL}"><i id="hull"></i></span><span class="speed" id="speed">0.0 m/s</span></div>
         <button class="icon-btn" id="fs"></button>
       </div>
       <div class="banner" id="banner" hidden><b>Level complete</b><span id="banner-time"></span></div>
@@ -131,6 +131,7 @@ function play(el) {
   const unbindFs = bindFullscreenButton($("#fs"));
   const time = $("#time");
   const hull = $("#hull");
+  const speed = $("#speed");
   const banner = $("#banner");
   const message = $("#message");
   const gameEl = $("#game");
@@ -156,6 +157,10 @@ function play(el) {
       hull.style.width = `${(r.hull / HULL) * 100}%`;
       hull.parentElement.setAttribute("aria-valuenow", Math.round(r.hull));
       hull.dataset.level = r.hull > 60 ? "ok" : r.hull > 30 ? "low" : "bad";
+      // Green while slow enough to land.
+      const v = Math.hypot(r.vx, r.vy);
+      show(speed, `${v.toFixed(1)} m/s`);
+      speed.dataset.safe = r.state === "flying" && v <= SAFE_SPEED;
       // A red flash round the edges when the rocket hits rock.
       if (r.hitTick !== lastHit) {
         lastHit = r.hitTick;

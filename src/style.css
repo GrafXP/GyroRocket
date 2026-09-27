@@ -7,6 +7,7 @@
   --accent: #ffb347;
   --on-accent: #1a1005;
   --bad: #d63a3f;
+  --good: #3fbf6a;
   --nav-h: 60px;
   color-scheme: dark;
 }
@@ -20,6 +21,7 @@
   --muted: #4a4f5c;
   --accent: #b4520a;
   --on-accent: #ffffff;
+  --good: #1d7a3c;
   color-scheme: light;
 }
 
@@ -233,7 +235,7 @@ body.playing nav {
   touch-action: none;
 }
 
-/* Back, the clock and hull pill, and fullscreen along the top. */
+/* Back, the pill with the clock, hull and speed, and fullscreen along the top. */
 .hud {
   position: absolute;
   top: 0;
@@ -267,6 +269,17 @@ body.playing nav {
 .score > b {
   font-size: 1.5rem;
   font-variant-numeric: tabular-nums;
+}
+
+.speed {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed[data-safe="true"] {
+  color: var(--good);
 }
 
 .hull {
