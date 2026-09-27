@@ -172,7 +172,8 @@ export function play(el, id) {
       const on = padUnder(level, r);
       const timer = gateTimers(w)[0];
       let text = "";
-      if (r.state === "crashed") text = `Crashed! Tap to go back to ${back}`;
+      const how = { flame: "Burned up!", lava: "Into the lava!" }[r.cause] ?? "Crashed!";
+      if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
       else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
       else if (w.done) text = "";
       else if (on?.kind === "switch") text = `Gate ${on.label} is open${on.time ? `. You have ${on.time} s from lift-off` : ""}`;

@@ -9,16 +9,29 @@ const PAD_WIDTH = 3; // tiles, at least
 const HEADROOM = 3; // tiles of air above a pad, for the rocket to stand in
 export const KEY_COLORS = { r: "red", y: "yellow", g: "green", b: "blue" };
 const DOOR_COLORS = { R: "red", Y: "yellow", G: "green", B: "blue" };
+const FACINGS = { right: [1, 0], left: [-1, 0], up: [0, 1], down: [0, -1] };
+const FLAME_LETTERS = { ">": "right", "<": "left", "^": "up", v: "down" };
+// A flamethrower's settings, unless `things` says otherwise: `length` in tiles,
+// times in seconds. `mode` is "cycle" (off, then on, over and over, the last `warn`
+// seconds of off flickering), "always" (on), or "near" (fires as the rocket comes
+// within `reach` metres of the flame, then rests for `off`).
+export const FLAME = { length: 5, on: 1.5, off: 2, warn: 0.5, offset: 0, mode: "cycle", reach: 4 };
+// A lava blob: thrown `height` tiles up every `period` seconds, bubbling for `warn` first.
+export const BLOB = { height: 6, period: 3, warn: 0.6, offset: 0 };
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything
 // wrong with it, naming the row and column as written.
 //
 // Besides rock, air and pads, a map has crystals (*), keys (r y g b) and the doors
-// they open (R Y G B: a rectangle of its letter), and digits for the things set up
-// in `things` by digit: { kind: "switch", opens: "2", time: 8 } is a small pad that
-// opens gate 2 when landed on (for `time` seconds, or for good), and { kind: "gate" }
-// is a rectangle that stays shut until then. Door and gate tiles are air to the
-// rock outline; they block as rectangles while shut (level.doors).
+// they open (R Y G B: a rectangle of its letter), flamethrowers (> < ^ v, facing
+// that way), lava (~), and digits for the things set up in `things` by digit:
+// - { kind: "switch", opens: "2", time: 8 } is a small pad that opens gate 2 when
+//   landed on (for `time` seconds, or for good);
+// - { kind: "gate" } is a rectangle that stays shut until then;
+// - { kind: "flame", facing: "left", ...FLAME settings } is a flamethrower;
+// - { kind: "blob", ...BLOB settings } is lava that throws up blobs.
+// Door and gate tiles are air to the rock outline; they block as rectangles while
+// shut (level.doors). Flamethrowers and lava are rock.
 export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const lines = map.split("\n");
   while (lines.length && !lines[0].trim()) lines.shift();
@@ -31,21 +44,30 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const kindOf = (ch) => (/[1-9]/.test(ch) ? things[ch]?.kind : null);
 
   const solid = new Uint8Array(width * height);
+  const lava = new Uint8Array(width * height);
   const letters = [];
   const crystals = [];
   const keys = [];
+  const nozzles = [];
+  const blobs = [];
   rows.forEach((row, r) => {
     const j = height - 1 - r;
     for (let c = 0; c < width; c++) {
       const ch = row[c] ?? "#"; // short rows are filled with rock
       const at = { x: (c + 0.5) * TILE, y: (j + 0.5) * TILE };
       if (ch === "#") solid[j * width + c] = 1;
-      else if (ch === "*") crystals.push(at);
+      else if (FLAME_LETTERS[ch] || kindOf(ch) === "flame") {
+        solid[j * width + c] = 1;
+        nozzles.push({ c, j, ...FLAME, facing: FLAME_LETTERS[ch], ...(FLAME_LETTERS[ch] ? {} : things[ch]) });
+      } else if (ch === "~" || kindOf(ch) === "blob") {
+        solid[j * width + c] = lava[j * width + c] = 1;
+        if (kindOf(ch) === "blob") blobs.push({ ...BLOB, ...things[ch], x: at.x, y: (j + 1) * TILE });
+      } else if (ch === "*") crystals.push(at);
       else if (KEY_COLORS[ch]) {
         if (keys.some((k) => k.color === KEY_COLORS[ch])) throw new Error(`${where(c, j)}: a second ${KEY_COLORS[ch]} key`);
         keys.push({ color: KEY_COLORS[ch], ...at });
-      } else if (/[1-9]/.test(ch) && kindOf(ch) !== "switch" && kindOf(ch) !== "gate") {
-        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch or a gate`);
+      } else if (/[1-9]/.test(ch) && !["switch", "gate", "flame", "blob"].includes(kindOf(ch))) {
+        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame or blob`);
       } else if (ch !== "." && !PAD_KINDS[ch] && !DOOR_COLORS[ch] && !kindOf(ch)) {
         throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
       }
@@ -54,7 +76,7 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   });
 
   if (settings.fuel !== undefined && !(settings.fuel > 0)) throw new Error(`${name}: fuel must be a number of seconds`);
-  const level = { name, width, height, solid, pads: [], crystals, keys, doors: [], things, ...settings };
+  const level = { name, width, height, solid, lava, pads: [], crystals, keys, doors: [], flames: [], blobs, things, ...settings };
   const letter = (c, j) => (c < 0 || j < 0 || c >= width || j >= height ? "#" : letters[(height - 1 - j) * width + c]);
 
   // A pad is a run of its letter in a row, standing on rock with air above. So is
@@ -122,6 +144,19 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     }
   }
 
+  // Flames: from the nozzle's face, as far as `length` tiles or the first rock.
+  for (const n of nozzles) {
+    const dir = FACINGS[n.facing];
+    if (!dir) throw new Error(`${where(n.c, n.j)}: a flamethrower faces left, right, up or down, not "${n.facing}"`);
+    if (!["cycle", "always", "near"].includes(n.mode)) throw new Error(`${where(n.c, n.j)}: a flamethrower's mode is cycle, always or near`);
+    let tiles = 0;
+    while (tiles < n.length && !isSolid(level, n.c + dir[0] * (tiles + 1), n.j + dir[1] * (tiles + 1))) tiles++;
+    if (!tiles) throw new Error(`${where(n.c, n.j)}: this flamethrower points into rock`);
+    const [x0, y0] = [(n.c + 0.5 + dir[0] / 2) * TILE, (n.j + 0.5 + dir[1] / 2) * TILE];
+    const { c, j, facing, on, off, warn, offset, mode, reach } = n;
+    level.flames.push({ c, j, facing, on, off, warn, offset, mode, reach, x0, y0, x1: x0 + dir[0] * tiles * TILE, y1: y0 + dir[1] * tiles * TILE });
+  }
+
   for (const kind of ["start", "exit"]) {
     const n = level.pads.filter((p) => p.kind === kind).length;
     if (n !== 1) throw new Error(`${name}: needs one ${kind} pad, has ${n}`);
@@ -143,6 +178,12 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   level.start = level.pads.find((p) => p.kind === "start");
   level.exit = level.pads.find((p) => p.kind === "exit");
   return level;
+}
+
+// Whether the point (x, y) is in a lava tile.
+export function lavaAt(level, x, y) {
+  const [c, j] = [Math.floor(x / TILE), Math.floor(y / TILE)];
+  return c >= 0 && j >= 0 && c < level.width && j < level.height && level.lava[j * level.width + c] === 1;
 }
 
 export function isSolid(level, c, j) {

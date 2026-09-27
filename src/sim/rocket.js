@@ -1,5 +1,6 @@
 import { deepestContact } from "./collide.js";
 import { floorAt } from "./outline.js";
+import { lavaAt } from "./level.js";
 
 // The rocket's flight, stepped at a fixed TICK_RATE against a level's rock outline
 // (outline.js). Pure state, no DOM or three.js, so the tests run it in node. Units
@@ -67,6 +68,7 @@ export function createRocket(x, floorY, tank = TANK) {
     hitTick: -1, // when it last hit rock, and how much hull that cost
     hitDamage: 0,
     crashTick: -1,
+    cause: null, // what destroyed it: "impact", "lava" or "flame"
     god: false, // a dev cheat: hits cost nothing
   };
 }
@@ -131,6 +133,10 @@ function collide(r, outline, boxes) {
     if (!c) break;
     r.x += c.nx * c.depth;
     r.y += c.ny * c.depth;
+    if (!r.god && lavaAt(outline.level, c.px - c.nx * 0.1, c.py - c.ny * 0.1)) {
+      crash(r, "lava");
+      return impact;
+    }
     const vn = r.vx * c.nx + r.vy * c.ny; // negative: moving into the rock
     if (c.foot && c.ny > 0.99 && vn <= 0 && tryLand(r, outline, boxes, c.py)) return impact;
     if (vn >= 0) continue;
@@ -161,9 +167,20 @@ export function canStand(outline, x, floorY, boxes = []) {
 }
 
 function hit(r, impact) {
-  const damage = r.god ? 0 : impact >= CRASH_SPEED ? r.hull : (impact - SCRAPE_SPEED) * DAMAGE;
+  hurt(r, impact >= CRASH_SPEED ? r.hull : (impact - SCRAPE_SPEED) * DAMAGE, "impact");
+}
+
+// Takes `damage` off the hull (none with the god cheat); at none left, the rocket
+// is destroyed by `cause`.
+export function hurt(r, damage, cause) {
+  if (r.state === "crashed") return;
+  if (r.god) damage = 0;
   r.hull = Math.max(0, r.hull - damage);
   r.hitTick = r.tick;
   r.hitDamage = damage;
-  if (r.hull === 0) Object.assign(r, { state: "crashed", crashTick: r.tick, vx: 0, vy: 0, burning: false, sputtering: false });
+  if (r.hull === 0) crash(r, cause);
+}
+
+function crash(r, cause) {
+  Object.assign(r, { state: "crashed", crashTick: r.tick, cause, vx: 0, vy: 0, burning: false, sputtering: false });
 }

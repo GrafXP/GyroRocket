@@ -5,6 +5,7 @@ import { createCave } from "./cave.js";
 import { createRocketModel } from "./rocket.js";
 import { createThings } from "./things.js";
 import { createDoors } from "./doors.js";
+import { createHazards } from "./hazards.js";
 
 const FOV = 50; // degrees, vertical
 const VIEW = 36; // m across the screen's short side, at least
@@ -28,11 +29,13 @@ export function createView(container, level, outline) {
   sun.position.set(-0.3, 0.5, 1);
   scene.add(sun);
 
-  scene.add(createCave(outline));
+  scene.add(createCave(outline, level.colors));
   const things = createThings(level);
   scene.add(things.group);
   const doors = createDoors(level);
   scene.add(doors.group);
+  const hazards = createHazards(level);
+  scene.add(hazards.group);
   const rocket = createRocketModel();
   scene.add(rocket.group);
 
@@ -68,6 +71,7 @@ export function createView(container, level, outline) {
       rocket.update(r);
       things.update(world);
       doors.update(world);
+      hazards.update(world);
 
       const since = (r.tick - r.crashTick) / TICK_RATE;
       boom.visible = r.state === "crashed" && since < 1;

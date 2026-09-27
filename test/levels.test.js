@@ -7,18 +7,20 @@ import { deepestContact } from "../src/sim/collide.js";
 import { circlesAt, canStand, CENTRE_Y } from "../src/sim/rocket.js";
 import { touches } from "../src/sim/world.js";
 import { flyLevel } from "../scripts/autopilot.js";
+import { inFlame } from "../src/sim/hazards/flame.js";
 
 // Everywhere an upright rocket can get to from the start pad, moving in 1 m steps
-// without touching rock or the shut doors and gates in `boxes`. Returns a list of
-// reachable [x, y] centres.
+// without touching rock, the shut doors and gates in `boxes`, or a flame that's
+// always on. Returns a list of reachable [x, y] centres.
 function flood(level, outline, boxes) {
+  const walls = level.flames.filter((f) => f.mode === "always");
   const { start } = level;
   const [sx, sy] = [(start.x0 + start.x1) / 2, start.y + CENTRE_Y + 0.05];
   const [gx0, gy0] = [Math.floor(-sx), Math.floor(-sy)];
   const cols = Math.ceil(level.width * 2 - sx) - gx0 + 1;
   const rows = Math.ceil(level.height * 2 - sy) - gy0 + 1;
   const seen = new Uint8Array(cols * rows); // 1 seen and fits, 2 seen and doesn't
-  const fits = (x, y) => !deepestContact(outline, circlesAt(x, y, 0), boxes);
+  const fits = (x, y) => !deepestContact(outline, circlesAt(x, y, 0), boxes) && !walls.some((f) => inFlame(f, circlesAt(x, y, 0)));
   const found = [];
   const queue = [[0, 0]];
   seen[(0 - gy0) * cols + (0 - gx0)] = 1;

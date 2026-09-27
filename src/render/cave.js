@@ -19,6 +19,7 @@ export const CAVE_COLORS = {
 };
 
 export function createCave(outline, colors = CAVE_COLORS) {
+  colors = { ...CAVE_COLORS, ...colors };
   const { level, cols, rows, cases, segs } = outline;
   const texture = rockTexture();
   const group = new THREE.Group();

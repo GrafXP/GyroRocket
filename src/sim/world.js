@@ -1,7 +1,9 @@
 import { buildOutline } from "./outline.js";
 import { deepestContact } from "./collide.js";
 import { TILE } from "./level.js";
-import { createRocket, step as stepRocket, circlesAt, TICK_RATE, CENTRE_Y, HULL, TANK } from "./rocket.js";
+import { createRocket, step as stepRocket, circlesAt, hurt, TICK_RATE, CENTRE_Y, HULL, TANK } from "./rocket.js";
+import { flamePhase, armFlame, inFlame, FLAME_DAMAGE } from "./hazards/flame.js";
+import { inBlob } from "./hazards/blob.js";
 
 export const REFUEL_TIME = 1.5; // seconds on a fuel pad to fill an empty tank, or mend a wrecked hull
 export const RETRY_AFTER = TICK_RATE; // ticks after a crash, getting stranded or the finish before a tap goes on
@@ -19,6 +21,9 @@ const SEEN_RADIUS = 12; // tiles round the rocket that count as seen, for the ma
 // comes near. Landing on a switch opens its gate, for good or for the switch's
 // time from when the rocket lifts off again; a timed gate shuts when its time is up,
 // but not on the rocket.
+//
+// Flamethrowers burn the hull while the rocket is in their flame; lava, and the
+// blobs it throws up, destroy it. They all keep to the level clock (world.tick).
 //
 // Landing on a fuel pad fills the tank, mends the hull and saves a checkpoint: the
 // pad, and the level as it is (crystals, keys, doors and gates open for good).
@@ -40,6 +45,7 @@ export function createWorld(level, outline = buildOutline(level)) {
     // Per door and gate: whether it's open, since when (or when it shut), and for a
     // timed gate, the tick it shuts (else -1).
     doors: level.doors.map(() => ({ open: false, changed: -1, until: -1 })),
+    flames: level.flames.map(() => ({ fired: -1 })), // when each "near" flamethrower was set off
     seen: new Uint8Array(level.width * level.height), // tiles the rocket has been near
     seenFrom: -1,
     checkpoint: null,
@@ -99,6 +105,7 @@ export function step(world, input) {
     collect(world);
     openDoors(world);
     see(world);
+    hazards(world);
   }
 
   const pad = padUnder(world.level, r);
@@ -150,6 +157,17 @@ function collect(world) {
       world.keys.push(keys[i].color);
     }
   }
+}
+
+// Burns the rocket in any flame that's on, and destroys it in a lava blob.
+function hazards(world) {
+  const r = world.rocket;
+  const circles = circlesAt(r.x, r.y, r.angle);
+  world.level.flames.forEach((f, i) => {
+    armFlame(f, world.flames[i], world.tick, r);
+    if (flamePhase(f, world.flames[i], world.tick) === "on" && inFlame(f, circles)) hurt(r, FLAME_DAMAGE / TICK_RATE, "flame");
+  });
+  if (world.level.blobs.some((b) => inBlob(b, circles, world.tick))) hurt(r, r.hull, "lava");
 }
 
 // Opens any shut door whose key the rocket holds, once it's near.

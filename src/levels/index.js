@@ -14,10 +14,19 @@ import l2_5 from "./2-5.js";
 import l2_6 from "./2-6.js";
 import l2_7 from "./2-7.js";
 import l2_8 from "./2-8.js";
+import l3_1 from "./3-1.js";
+import l3_2 from "./3-2.js";
+import l3_3 from "./3-3.js";
+import l3_4 from "./3-4.js";
+import l3_5 from "./3-5.js";
+import l3_6 from "./3-6.js";
+import l3_7 from "./3-7.js";
+import l3_8 from "./3-8.js";
 import testCave from "./testcave.js";
 
 // The worlds in order, each with its levels in order. A level's id is
-// "world-level", like "1-3", which is also its URL: /play/1-3.
+// "world-level", like "1-3", which is also its URL: /play/1-3. A world's `colors`
+// are its rock's (render/cave.js), the world 1 ones if not given.
 export const WORLDS = [
   {
     name: "Training caves",
@@ -27,12 +36,19 @@ export const WORLDS = [
   {
     name: "Old mine",
     about: "Keys open the doors of their colour; switches open gates, some only for a while.",
+    colors: { face: 0x7a6650, wall: 0x8c7458, rim: 0xc7a577, back: 0x241a12 },
     levels: [l2_1, l2_2, l2_3, l2_4, l2_5, l2_6, l2_7, l2_8],
+  },
+  {
+    name: "Furnace",
+    about: "Flamethrowers fire on the clock or when you come near, and lava destroys whatever touches it.",
+    colors: { face: 0x6e3b2e, wall: 0x8a4a36, rim: 0xe0875a, back: 0x2a0d08 },
+    levels: [l3_1, l3_2, l3_3, l3_4, l3_5, l3_6, l3_7, l3_8],
   },
 ].map((world, w) => ({
   ...world,
   number: w + 1,
-  levels: world.levels.map((level, i) => ({ ...level, id: `${w + 1}-${i + 1}`, world: w + 1 })),
+  levels: world.levels.map((level, i) => ({ ...level, id: `${w + 1}-${i + 1}`, world: w + 1, colors: world.colors })),
 }));
 
 export const LEVELS = WORLDS.flatMap((w) => w.levels);

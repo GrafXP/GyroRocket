@@ -128,6 +128,10 @@ function help(el) {
     <p>The engine only burns while there's fuel. Land on a blue fuel pad to fill up and mend the hull. After a crash, or when you're stuck without fuel, you start again from the last fuel pad you landed on. The clock keeps running.</p>
     <h2>Hitting rock</h2>
     <p>The rocket bounces off rock and loses hull, more the harder it hits. A slam, or losing all its hull, breaks it up. Tap to try again.</p>
+    <h2>Keys, doors and switches</h2>
+    <p>Fly through a key to pick it up; the doors of its colour and shape open as you come near. Land on an orange switch to open the gate with its number. Some gates shut again: the countdown starts as you lift off. The map (▦ or M) shows where you've been.</p>
+    <h2>Flames and lava</h2>
+    <p>Flamethrowers flicker before they fire, and burn the hull fast: a quick pass hurts, lingering kills. Some fire on a beat, some when you come near, and some never stop. Lava, and the blobs it throws up, destroy the rocket at a touch.</p>
     <h2>Stars</h2>
     <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
     <h2>Tilt not working?</h2>

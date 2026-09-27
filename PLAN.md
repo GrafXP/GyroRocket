@@ -74,7 +74,7 @@ src/
     outline.js     marching squares: tiles → rock outline segments, looked up by tile
     collide.js     the rocket against the outline and closed doors; landing
     world.js       a level in play: rocket, pickups, doors and gates, checkpoint, clock
-    hazards/       one file per kind: its state, step(), and what it hits
+    hazards/       one file per kind: its schedule, and what it hits
   levels/
     index.js       the worlds in order, each with its levels and colours
     1-1.js …       one level per file
@@ -134,8 +134,8 @@ export default {
 | `r y g b`   | key                                                        |
 | `R Y G B`   | door: a rectangle of its letter, opened by its key         |
 | `< > ^ v`   | flamethrower facing that way, with the default cycle       |
-| `~`         | lava                                                       |
-| `1`–`9`     | a thing set up in `things`: a switch (a pad) or a gate (a rectangle) |
+| `~`         | lava: rock that destroys the rocket                        |
+| `1`–`9`     | a thing set up in `things`: a switch (a pad), a gate (a rectangle), a flamethrower, or a lava blob |
 
 A pad is a run of at least 3 of its letter on the air row just above a flat floor;
 so is a switch. Door and gate tiles are air to the rock outline, and block as
@@ -193,7 +193,7 @@ Level design rules:
 - It ends with a build you can play on the phone and a short checklist to try by hand.
 - New sim logic gets `npm test` coverage, and from phase 3 every level is checked
   by `test/levels.test.js`, which includes the autopilot finishing it within its tank.
-- A new hazard gets a sim file in `sim/hazards/`, a model in `render/things.js`, a
+- A new hazard gets a sim file in `sim/hazards/`, a model in `render/hazards.js`, a
   letter or a `things` kind, and its first level teaches it.
 - Commit when tests and build pass.
 
@@ -352,7 +352,7 @@ and gate times 1.2–1.5× the autopilot's.
 - [ ] Restarting from a pad puts keys, doors and gates back as they were when you landed there.
 - [ ] The map helps you find your way back without giving the level away.
 
-### Phase 5: Flamethrowers and lava
+### Phase 5: Flamethrowers and lava ✅ (done)
 Flamethrowers (`< > ^ v`, or numbered in `things` for their own settings) are set
 in the rock and shoot a jet of flame several tiles long on a cycle: half a second
 of flicker and hiss, then on, then off. Their settings are length, on time, off
@@ -362,6 +362,33 @@ clipping the tip is survivable but sitting in it isn't. Lava (`~`) glows on cave
 floors and destroys the rocket on touch, and some pools throw up blobs on a cycle.
 Then world 3, *Furnace*: 8 levels with a hot palette, flamethrower timing and lava
 floors that make every landing count.
+What was built: a flamethrower's nozzle is rock, and its flame runs from the
+nozzle's face for `length` tiles (5 by default) or to the first rock. The defaults
+are on 1.5 s, off 2 s with its last 0.5 s flickering; `mode` can be "cycle",
+"always" or "near" (fires when the rocket's centre comes within `reach`, 4 m by
+default, then rests for `off`). The flame burns 120 hull a second, in a cone from
+0.45 m wide at the nozzle to 0.75 m at the tip with a rounded end, drawn exactly
+so. A nozzle keeps a blue pilot light; warning, its mouth glows and it spits short
+flames. Lava tiles are rock that destroys the rocket on any touch, even a gentle
+landing, and glow with a churning surface and a heat haze. A blob (`things` kind
+"blob") is thrown `height` tiles up every `period` seconds, the lava bubbling for
+0.6 s before; it destroys what it hits. All of it keeps the level clock. The HUD
+says what did it: "Burned up!", "Into the lava!" or "Crashed!". Worlds can have
+their own rock colours now (`colors` in `levels/index.js`): browner for the mine,
+dark red for the furnace; phase 6 does the rest of the palettes.
+
+The autopilot steers round flames that are always on, and where its path crosses a
+cycling flame, a "near" one or a blob's column, it holds 3 m short until the
+hazard's schedule shows a gap it can cross at 6 m/s with time to spare, then
+commits. It sets "near" flames off on purpose and crosses while they rest, and
+leaves a fuel pad early rather than sit in a flame about to fire. The level flood
+fill treats always-on flames as walls.
+
+World 3, *Furnace*: 3-1 First flame, 3-2 Lava lake, 3-3 The gauntlet (with a fuel
+pad in the middle of it), 3-4 Hot seat, 3-5 Chimney fire, 3-6 Blob pools, 3-7
+Firewalls, 3-8 The furnace. Tanks are about 1.4× the longest stretch between fuel
+pads, pars the autopilot's time with refuelling, rounded up to 5 s.
+
 - [ ] You can always see a flamethrower is about to fire before it does.
 - [ ] The flame hurts exactly where it's drawn.
 - [ ] A row of offset flamethrowers makes a wave you can read and time.
