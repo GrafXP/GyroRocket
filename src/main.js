@@ -1,7 +1,10 @@
 import "./style.css";
 import { createGame } from "./game.js";
 import { requestTiltPermission } from "./controls.js";
-import { SAFE_SPEED } from "./sim/rocket.js";
+import { SAFE_SPEED, HULL } from "./sim/rocket.js";
+import { parseLevel } from "./sim/level.js";
+import { clock } from "./sim/world.js";
+import testCave from "./levels/testcave.js";
 import { getThemePref, setThemePref, onThemeChange } from "./theme.js";
 import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from "./fullscreen.js";
 
@@ -90,9 +93,9 @@ function home(el) {
   const $ = html(
     el,
     `<h1>Gyro Rocket</h1>
-    <p>Tilt your phone to steer a little rocket. Burn, climb, and land it back on the ground in one piece.</p>
+    <p>Tilt your phone to steer a little rocket through a cave, and land it on the exit pad in one piece.</p>
     <div class="cards">
-      <a class="card" href="/play" data-link><b>Fly</b><span>Tilt to steer, hold the screen to burn</span></a>
+      <a class="card" href="/play" data-link><b>Fly</b><span>The test cave: tilt to steer, hold the screen to burn</span></a>
       <a class="card" href="/help" data-link><b>Help</b><span>Controls and tips</span></a>
     </div>
     <h2>Theme</h2>
@@ -114,9 +117,10 @@ function play(el) {
     `<div class="game" id="game">
       <div class="hud">
         <a href="/" data-link class="icon-btn" aria-label="Back">${icon("back")}</a>
-        <div class="score"><b id="alt">0 m</b><span id="speed">0 m/s</span></div>
+        <div class="score"><b id="time">0:00.0</b><span class="hull" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="${HULL}"><i id="hull"></i></span></div>
         <button class="icon-btn" id="fs"></button>
       </div>
+      <div class="banner" id="banner" hidden><b>Level complete</b><span id="banner-time"></span></div>
       <div class="message" id="message"></div>
       <div class="overlay" id="tilt-ask" hidden>
         <p>Gyro Rocket steers by tilting your phone, and needs your OK to read its motion sensors.</p>
@@ -125,9 +129,11 @@ function play(el) {
     </div>`,
   );
   const unbindFs = bindFullscreenButton($("#fs"));
-  const alt = $("#alt");
-  const speed = $("#speed");
+  const time = $("#time");
+  const hull = $("#hull");
+  const banner = $("#banner");
   const message = $("#message");
+  const gameEl = $("#game");
 
   // iOS asks before it sends orientation events, and only from a tap.
   if (typeof globalThis.DeviceOrientationEvent?.requestPermission === "function") {
@@ -140,19 +146,33 @@ function play(el) {
   }
 
   const started = performance.now();
-  let flown = false;
   const show = (el, text) => el.textContent !== text && (el.textContent = text);
-  const game = createGame($("#game"), {
-    onFrame(r, controls) {
-      show(alt, `${Math.round(r.y)} m`);
-      show(speed, `${Math.hypot(r.vx, r.vy).toFixed(1)} m/s · best ${Math.round(r.best)} m`);
-      if (r.state === "flying") flown = true;
+  let lastHit = -1;
+  const game = createGame(gameEl, {
+    level: parseLevel(testCave),
+    onFrame(w, controls) {
+      const r = w.rocket;
+      show(time, formatTime(clock(w)));
+      hull.style.width = `${(r.hull / HULL) * 100}%`;
+      hull.parentElement.setAttribute("aria-valuenow", Math.round(r.hull));
+      hull.dataset.level = r.hull > 60 ? "ok" : r.hull > 30 ? "low" : "bad";
+      // A red flash round the edges when the rocket hits rock.
+      if (r.hitTick !== lastHit) {
+        lastHit = r.hitTick;
+        if (r.hitTick >= 0) {
+          gameEl.classList.remove("hit");
+          void gameEl.offsetWidth; // restart the animation
+          gameEl.classList.add("hit");
+        }
+      }
+      banner.hidden = !w.done;
+      if (w.done) show($("#banner-time"), formatTime(clock(w)));
       let text = "";
-      if (r.state === "crashed") text = "Crashed! Tap to fly again";
-      else if (r.state === "landed" && flown) text = "Landed. Nice!";
-      else if (r.state === "landed") {
+      if (r.state === "crashed") text = "Crashed! Tap to try again";
+      else if (w.done) text = "Tap to fly again";
+      else if (w.startTick < 0) {
         const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";
-        text = `Hold the screen (or ↑) to burn, ${steer}`;
+        text = `Hold the screen (or ↑) to burn, ${steer}. Land on the green pad.`;
       }
       show(message, text);
       message.hidden = !text;
@@ -179,13 +199,21 @@ function help(el) {
       <dt>Burn</dt><dd>Hold a finger anywhere on the screen. Or ↑ / W / Space, or hold the mouse.</dd>
     </dl>
     <h2>Landing</h2>
-    <p>Touch down slower than ${SAFE_SPEED} m/s and nearly upright, or the rocket breaks up. Tap to try again.</p>
+    <p>Land on any flat floor: touch down slower than ${SAFE_SPEED} m/s, nearly upright, with both feet on the flat. Land on the green exit pad to finish.</p>
+    <h2>Hitting rock</h2>
+    <p>The rocket bounces off rock and loses hull, more the harder it hits. A slam, or losing all its hull, breaks it up. Tap to try again.</p>
     <h2>Tilt not working?</h2>
     <p class="hint">Browsers only share the motion sensors over HTTPS (or on localhost). On iPhone, allow motion access when asked.</p>
     <button id="fs" class="wide"></button>`,
   );
   const unbindFs = bindFullscreenButton($("#fs"));
   return () => unbindFs();
+}
+
+// Seconds → "m:ss.s".
+function formatTime(s) {
+  const tenths = Math.floor(s * 10);
+  return `${Math.floor(tenths / 600)}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
 }
 
 function notFound(el) {

@@ -13,8 +13,9 @@ light/dark theme, fullscreen PWA, `node --test`.
 ## Core decisions
 
 - **2D game, 3D look.** The sim is flat, like the prototype: x sideways, y up.
-  three.js draws it from the side with a perspective camera, and the rock is
-  extruded towards the camera so the cave has depth. Nothing moves in z.
+  three.js draws it from the side with a perspective camera. The rock's face is
+  flat in the plane of flight and the rock goes back from there to a back wall,
+  so the cave has depth. Nothing moves in z.
 - **Levels are tile maps written as text.** Each level is a JS module whose map is
   rows of characters (`#` rock, `.` air, `F` a fuel pad…), plus a few settings. They
   are easy to write and change by hand (or by Claude), easy to diff, and a test can
@@ -176,21 +177,34 @@ Level design rules:
 ### Phase 0: Prototype ✅ (done)
 Tilt to steer, hold to burn, over a flat field that fades into space. Land slower
 than 5 m/s and nearly upright, or crash; tap to go again. Home, Play and Help
-pages, theme and fullscreen, 13 tests.
+pages, theme and fullscreen.
 
-### Phase 1: Caves
-Levels become caves. `sim/level.js` parses a map; `sim/outline.js` makes the rock
-outline with marching squares; `render/cave.js` extrudes it into a rock mesh with a
-dark back wall behind the tunnels. For collision the rocket is a capsule along its
-body plus two feet. Both feet down on a flat floor, slowly and nearly upright, is a
-landing. Anything else is a hit: the rocket bounces off and loses hull, by how hard
-it hit. The sim takes smaller steps at speed so nothing passes through rock. The
-rocket starts landed on the `S` pad, and landing on `E` shows *Level complete* with
-the time. The HUD gets a hull bar. The camera follows with a little look-ahead in
-the direction of flight, shows at least 36 m across the short side, and stays
-inside the level. `/play` loads a test cave and the open field goes. The rocket
-gets landing legs and a small light of its own, and the flight is retuned for tight
-spaces (thrust, turn rate, drag) by flying the test cave.
+### Phase 1: Caves ✅ (done)
+Levels become caves. `sim/level.js` parses a map. Short rows are filled with rock,
+and it refuses, naming the row and column: unknown letters, pads under 3 tiles
+wide, pads not on rock or without 3 tiles of air above, and anything but one start
+and one exit. `sim/outline.js` makes the rock outline with marching squares, and
+answers `solidAt` and `floorAt`. `render/cave.js` draws the rock's face flat at
+z = 0, the plane the rocket flies in, and its surfaces going back 10 m to a dark
+back wall, with a lighter rim along the edge and a generated rock texture.
+
+For collision the rocket is 12 circles (`SHAPE` in `sim/rocket.js`: feet, fins,
+engine, body, nose), and it turns about its centre of mass. Both feet on flat
+floor, under 5 m/s and within 20° of upright, is a landing, on any floor, not just
+pads. Anything else is a hit: the rocket bounces off (30%, with friction) and loses
+7 hull per m/s it hit at over 1.5 m/s. 13 m/s or more, or an empty hull, is a
+crash. Substeps keep every move under 0.15 m, so nothing passes through rock; a
+test flies 30,000 ticks of random input round the test cave and checks.
+
+The rocket starts on the `S` pad, and landing on `E` shows *Level complete* with
+the time. The HUD shows the clock (from lift-off) and a hull bar, and the screen's
+edges flash red on a hit. The camera looks 0.4 s ahead, shows at least 36 m across
+the short side (up to 25% more at speed), and stays inside the level. `/play` loads
+the test cave (`levels/testcave.js`) and the open field is gone. The rocket stands
+on three fins ending in feet, glows red when hit, and carries a light, with another
+under the engine while it burns. Drag went from 0.05 to 0.4 (a fall tops out at
+about 25 m/s) and the turn rate from 3 to 3.5 rad/s; both still need tuning by
+flying the test cave.
 - [ ] The cave looks like rock with smooth corners, not squares, and the rocket is always easy to spot.
 - [ ] Brushing a wall bounces off with a little damage; flying into one fast destroys the rocket.
 - [ ] You can land on any flat floor, but not on a slope or a ledge narrower than the rocket's legs.

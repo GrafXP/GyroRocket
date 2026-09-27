@@ -233,7 +233,7 @@ body.playing nav {
   touch-action: none;
 }
 
-/* Back, the altitude pill and fullscreen along the top. */
+/* Back, the clock and hull pill, and fullscreen along the top. */
 .hud {
   position: absolute;
   top: 0;
@@ -269,10 +269,74 @@ body.playing nav {
   font-variant-numeric: tabular-nums;
 }
 
-.score span {
-  color: var(--muted);
-  font-size: 0.8rem;
+.hull {
+  display: block;
+  width: 110px;
+  height: 6px;
+  margin: 4px 0 3px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 3px;
+}
+
+.hull i {
+  display: block;
+  height: 100%;
+  background: #3fbf6a;
+  transition: width 0.2s;
+}
+
+.hull i[data-level="low"] {
+  background: #e0a000;
+}
+
+.hull i[data-level="bad"] {
+  background: var(--bad);
+}
+
+/* A red flash round the edges when the rocket hits rock. */
+.game::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 60px 10px rgb(214 58 63 / 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game.hit::after {
+  animation: hit 0.4s ease-out;
+}
+
+@keyframes hit {
+  from {
+    opacity: 1;
+  }
+}
+
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 28px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 2px solid #3fbf6a;
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.banner b {
+  font-size: 1.6rem;
+}
+
+.banner span {
+  font-size: 1.2rem;
   font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
 /* What to do next, near the bottom; presses go through it to the canvas. */
