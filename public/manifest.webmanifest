@@ -1,0 +1,10 @@
+{
+  "name": "Gyro Rocket",
+  "short_name": "Gyro Rocket",
+  "start_url": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#0d1020",
+  "theme_color": "#0d1020",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
