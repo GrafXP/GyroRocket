@@ -279,6 +279,12 @@ blocks doesn't search twice. The slowest planning tick in the big cave is now
 0.1–0.2 s once warm (the first can be 0.5 s), and no slower than before on the
 other levels.
 
+To check the frame rate on the phone, the pause menu has a *Frame rate* switch
+(remembered, and always on with `?dev`). It shows the frames a second, the
+slowest frame, the code's time per frame (sim, HUD and handing the scene to
+WebGL; a low frame rate with little code time means the GPU is the slow part),
+and the draw calls and triangles.
+
 Levels are tested a world to a file (`test/world-<n>.test.js`, each calling
 `testWorld` in `test/worlds.js`), a test per level, so `node --test` flies the
 worlds side by side and a failure names its level. Part two's levels also keep to

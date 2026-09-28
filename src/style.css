@@ -670,6 +670,36 @@ h2.part {
   pointer-events: none;
 }
 
+/* The frame rate display, under the buttons at the top left. */
+.fps {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left, 0px));
+  top: calc(62px + env(safe-area-inset-top, 0px));
+  margin: 0;
+  padding: 6px 8px;
+  font: 11px/1.4 ui-monospace, monospace;
+  color: #e6e8ee;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.fps b {
+  font-size: 14px;
+}
+
+.fps[data-level="ok"] b {
+  color: #5fd38a;
+}
+
+.fps[data-level="low"] b {
+  color: #f0b429;
+}
+
+.fps[data-level="bad"] b {
+  color: #ff6b6b;
+}
+
 /* The map: the level scaled to fit, on its own dark panel. */
 .overlay.map {
   padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 8px;

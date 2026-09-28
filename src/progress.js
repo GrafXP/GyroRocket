@@ -11,7 +11,9 @@ const PROGRESS_KEY = "gyrorocket:progress";
 const SETTINGS_KEY = "gyrorocket:settings";
 const UNLOCK_KEY = "gyrorocket:unlock";
 
-export const DEFAULT_SETTINGS = { fullTilt: 35 }; // degrees of tilt that steer all the way
+// fullTilt: degrees of tilt that steer all the way; fps: show the frame rate
+// display (a debug option in the pause menu).
+export const DEFAULT_SETTINGS = { fullTilt: 35, fps: false };
 
 // The stars a record earns on a level: [finished, beat par, every crystal].
 export function starsOf(level, record) {

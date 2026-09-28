@@ -85,6 +85,8 @@ export function createView(container, level, outline) {
 
   return {
     canvas: renderer.domElement,
+    // The last frame's draw calls and triangles.
+    info: renderer.info.render,
     // Draws `world`; `dt` is the seconds since the last frame, for smoothing.
     render(world, dt = 1 / 60) {
       const r = world.rocket;

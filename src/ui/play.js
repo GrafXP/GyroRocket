@@ -19,7 +19,8 @@ const TILT_MAX = 60;
 
 // The play page for level `id`: the game with its HUD, the pause menu (button, P
 // or Esc, and whenever the app is hidden), the level complete sheet, and with ?dev
-// in the URL, a developer overlay (and every level open). My levels, from the
+// in the URL, a developer overlay (and every level open). The frame rate display
+// is a debug option in the pause menu, and ?dev shows it too. My levels, from the
 // editor, have ids "my:<id>", and lead back to the editor.
 export function play(el, id) {
   const mine = id.startsWith("my:") ? id.slice(3) : null;
@@ -79,6 +80,7 @@ export function play(el, id) {
       </div>
       <div class="message" id="message"></div>
       <pre class="dev" id="dev" hidden></pre>
+      <pre class="fps" id="fps" hidden><b>… fps</b></pre>
 
       <div class="overlay menu" id="pause" hidden>
         <section>
@@ -99,7 +101,10 @@ export function play(el, id) {
             <small class="hint" id="tilt-note"></small>
           </label>
           ${THEME_PICKER}
-          <button id="fs-menu"></button>
+          <div class="buttons">
+            <button id="fs-menu"></button>
+            <button id="fps-menu" aria-pressed="false"></button>
+          </div>
         </section>
       </div>
 
@@ -169,6 +174,8 @@ export function play(el, id) {
   let lastHit = -1;
   let finished = false;
   const devHud = dev ? createDevHud($("#dev")) : null;
+  const fpsEl = $("#fps");
+  let fpsShown = 0;
 
   const game = createGame(gameEl, {
     level,
@@ -244,6 +251,10 @@ export function play(el, id) {
 
       if (w.done && !finished && w.tick - w.endTick >= RESULTS_AFTER) finish(w);
       devHud?.update(w, game);
+      if (!fpsEl.hidden && game && game.stats.fps !== fpsShown) {
+        fpsShown = game.stats.fps;
+        showFps(fpsEl, game.stats);
+      }
     },
   });
 
@@ -374,6 +385,20 @@ export function play(el, id) {
   });
   syncTilt();
 
+  // The frame rate display, a debug option.
+  const fpsBtn = $("#fps-menu");
+  const syncFps = () => {
+    fpsBtn.setAttribute("aria-pressed", settings.fps);
+    show(fpsBtn, `Frame rate: ${settings.fps ? "on" : "off"}`);
+    fpsEl.hidden = !settings.fps && !dev;
+  };
+  fpsBtn.addEventListener("click", () => {
+    settings.fps = !settings.fps;
+    saveSettings(settings);
+    syncFps();
+  });
+  syncFps();
+
   if (devHud) {
     gameEl.querySelector("canvas").addEventListener("pointermove", devHud.onPointer(game));
     window.game = game; // to poke at from the console
@@ -395,34 +420,37 @@ function setBar(bar, fraction, level) {
   bar.dataset.level = level;
 }
 
-// The ?dev overlay, for building and tuning levels: frame rate, the tile under the
-// pointer, time and fuel since the last pad, and the cheats (G: no damage, F:
-// endless fuel).
+// The frame rate display, from the game's `stats`: frames a second (green from 55,
+// amber from 40, red below), the slowest frame, the code's time per frame, and
+// the draw calls and triangles.
+function showFps(el, s) {
+  el.dataset.level = s.fps >= 55 ? "ok" : s.fps >= 40 ? "low" : "bad";
+  el.innerHTML = [
+    `<b>${Math.round(s.fps)} fps</b>`,
+    `slowest ${Math.round(s.slowest)} ms`,
+    `code ${s.work.toFixed(1)} ms`,
+    `${s.calls} draws · ${Math.round(s.triangles / 1000)}k tris`,
+  ].join("\n");
+}
+
+// The ?dev overlay, for building and tuning levels: the tile under the pointer,
+// time and fuel since the last pad, and the cheats (G: no damage, F: endless fuel).
 function createDevHud(el) {
   el.hidden = false;
   let pointer = null;
   let lastPad = { tick: 0, fuel: 0 };
-  let frames = 0;
-  let fps = 0;
-  let since = performance.now();
   return {
     onPointer: (game) => (e) => {
       pointer = game.screenToWorld(e.clientX, e.clientY);
     },
     update(w, game) {
-      frames++;
-      const now = performance.now();
-      if (now - since >= 1000) {
-        fps = Math.round((frames * 1000) / (now - since));
-        [frames, since] = [0, now];
-      }
       const r = w.rocket;
       if (padUnder(w.level, r)) lastPad = { tick: w.tick, fuel: r.fuel };
       const tile = pointer
         ? `column ${Math.floor(pointer.x / TILE) + 1}, row ${w.level.height - Math.floor(pointer.y / TILE)}`
         : "point at something";
       el.textContent = [
-        `${fps} fps · ${tile}`,
+        tile,
         `since the last pad: ${((w.tick - lastPad.tick) / TICK_RATE).toFixed(1)} s, ${(lastPad.fuel - r.fuel).toFixed(1)} s of fuel`,
         `G no damage: ${game.cheats.god ? "on" : "off"} · F endless fuel: ${game.cheats.fuel ? "on" : "off"}`,
       ].join("\n");

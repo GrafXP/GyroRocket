@@ -14,7 +14,7 @@ const MAX_TICKS_PER_FRAME = 10; // after a long stall, drop time instead of free
 // the next press restarts from the checkpoint. After the finish, the rocket sits on
 // the exit until the page moves on (restartLevel, or another page). With the
 // autopilot on (setAutopilot), it flies instead of the controls, and the run is
-// marked assisted.
+// marked assisted. `stats` times the frames, for the frame rate display.
 export function createGame(container, { level, onFrame, fullTilt } = {}) {
   const outline = buildOutline(level);
   const view = createView(container, level, outline);
@@ -29,9 +29,11 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
   let last = performance.now();
   let acc = 0;
   let raf = 0;
+  const meter = createMeter();
 
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
+    const began = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
     if (running) {
       acc += now - last;
@@ -54,6 +56,7 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
     last = now;
     view.render(world, running ? dt : 0);
     onFrame?.(world, controls);
+    meter.frame(now, performance.now() - began, view.info);
   };
   raf = requestAnimationFrame(frame);
 
@@ -71,6 +74,7 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
       running = true;
     },
     cheats,
+    stats: meter.stats,
     // Back to the last fuel pad, with the clock running on.
     restartFromPad() {
       if (!world.done) restart(world);
@@ -98,6 +102,43 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
       cancelAnimationFrame(raf);
       controls.dispose();
       view.dispose();
+    },
+  };
+}
+
+// Frame timings over the last second: frames a second, the longest gap between
+// two frames, and the time the code took per frame on average (the sim, the HUD
+// and handing the scene to WebGL; the GPU's drawing isn't in it, so a low frame
+// rate with little code time means the GPU is the slow part). `calls` and
+// `triangles` are the last frame's draw calls and triangles.
+function createMeter() {
+  const stats = { fps: 0, slowest: 0, work: 0, calls: 0, triangles: 0 };
+  let since = 0; // when this second's frames started
+  let prev = 0;
+  let frames = 0;
+  let slowest = 0;
+  let work = 0;
+  return {
+    stats,
+    frame(now, took, info) {
+      // A long gap (the page was hidden) starts the count again.
+      if (!since || now - prev > 1000) {
+        [since, prev, frames, slowest, work] = [now, now, 0, 0, 0];
+        return;
+      }
+      slowest = Math.max(slowest, now - prev);
+      prev = now;
+      frames++;
+      work += took;
+      if (now - since < 1000) return;
+      Object.assign(stats, {
+        fps: (frames * 1000) / (now - since),
+        slowest,
+        work: work / frames,
+        calls: info.calls,
+        triangles: info.triangles,
+      });
+      [since, frames, slowest, work] = [now, 0, 0, 0];
     },
   };
 }

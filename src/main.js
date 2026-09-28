@@ -139,7 +139,7 @@ function help(el) {
     <dl>
       <dt>Steer</dt><dd>Tilt the phone left or right, held flat or upright. Or ← → / A D.</dd>
       <dt>Burn</dt><dd>Hold a finger anywhere on the screen. Or ↑ / W / Space, or hold the mouse.</dd>
-      <dt>Pause</dt><dd>The ❚❚ button, or P / Esc. The pause menu has restarts and tilt sensitivity.</dd>
+      <dt>Pause</dt><dd>The ❚❚ button, or P / Esc. The pause menu has restarts, tilt sensitivity, and a frame rate display to check how smoothly the game runs.</dd>
       <dt>Autopilot</dt><dd>The arrow button, or O: sit back and watch it fly the level, from wherever you are. It's careful rather than quick, and a run it flies any of doesn't earn stars.</dd>
     </dl>
     <h2>Landing</h2>
