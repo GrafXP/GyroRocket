@@ -151,3 +151,30 @@ test("the tiles round the rocket count as seen", () => {
   assert.equal(at(w.rocket.x + 20, w.rocket.y), 1);
   assert.equal(at(w.level.exit.x0, w.level.exit.y), 0);
 });
+
+test("a switch operates every gate or laser instance sharing its target label", () => {
+  for (const kind of ["gate", "laser"]) {
+    const map = MAP.replace("#.......................2................#", "#..............2........2................#");
+    const level = parseLevel({ map, things: { 1: { kind: "switch", opens: "2", time: 2 }, 2: { kind, ...(kind === "laser" ? { facing: "left" } : {}) } } });
+    const w = createWorld(level);
+    w.cheats.god = true;
+    run(w, { thrust: true }, 5);
+    onSwitch(w);
+    const states = kind === "gate" ? w.doors.slice(1) : w.lasers;
+    assert.ok(states.length > 1);
+    assert.ok(
+      states.every((s) => s.open),
+      kind,
+    );
+    assert.ok(
+      states.every((s) => s.until === w.tick + 2 * TICK_RATE),
+      kind,
+    );
+    Object.assign(w.rocket, { x: 70, y: 10, state: "flying", vx: 0, vy: 0 });
+    run(w, {}, 2 * TICK_RATE);
+    assert.ok(
+      states.every((s) => !s.open),
+      `${kind}: timed targets close again`,
+    );
+  }
+});

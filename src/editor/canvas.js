@@ -1,4 +1,5 @@
 import { POINTS, SOLID } from "../sim/outline.js";
+import { drawReach } from "./reach.js";
 import { tileLook, AIR_COLOR, OUTSIDE_COLOR } from "./tiles.js";
 
 // The editor's view of the level: tiles seen straight on, `zoom` pixels across,
@@ -15,7 +16,7 @@ const PINCH_GRACE = 250; // ms: a stroke a second finger joins this soon is a pi
 // Draws the level on `ctx` (already scaled to CSS pixels, `width` × `height`).
 // `outline`, if given, is the rock outline (sim/outline.js) to draw the rock by,
 // smooth corners and all; `marker` is a tile to ring, `preview` a rectangle.
-export function drawEditor(ctx, { grid, view, width, height, colors, outline = null, marker = null, preview = null, hover = null }) {
+export function drawEditor(ctx, { grid, view, width, height, colors, outline = null, marker = null, preview = null, hover = null, reach = [], markers = [] }) {
   const { cx, cy, zoom: s } = view;
   const X = (c) => width / 2 + (c - cx) * s;
   const Y = (r) => height / 2 + (r - cy) * s;
@@ -122,6 +123,8 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
   ctx.lineWidth = 1;
   ctx.strokeRect(X(0) - 0.5, Y(0) - 0.5, W * s + 1, H * s + 1);
 
+  drawReach(ctx, reach, X, Y, s);
+
   if (preview) {
     const [pc0, pc1] = [Math.min(preview.c0, preview.c1), Math.max(preview.c0, preview.c1)];
     const [pr0, pr1] = [Math.min(preview.r0, preview.r1), Math.max(preview.r0, preview.r1)];
@@ -136,12 +139,12 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
     ctx.lineWidth = 1;
     ctx.strokeRect(X(hover.c) + 0.5, Y(hover.r) + 0.5, s - 1, s - 1);
   }
-  if (marker) {
+  for (const at of [...markers, ...(marker ? [marker] : [])]) {
     ctx.strokeStyle = "#ff4d4f";
     ctx.lineWidth = 3;
-    ctx.strokeRect(X(marker.c) - 1.5, Y(marker.r) - 1.5, s + 3, s + 3);
+    ctx.strokeRect(X(at.c) - 1.5, Y(at.r) - 1.5, s + 3, s + 3);
     ctx.beginPath();
-    ctx.arc(X(marker.c + 0.5), Y(marker.r + 0.5), Math.max(18, s * 1.6), 0, Math.PI * 2);
+    ctx.arc(X(at.c + 0.5), Y(at.r + 0.5), Math.max(18, s * 1.6), 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -151,7 +154,7 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
 // a finger or the mouse painting, in tiles, unless `pans()` says one finger moves
 // the view; `onHover` gets the tile under the mouse or finger. `margins` are the
 // pixels the toolbars cover, top, right, bottom, left.
-export function createEditorCanvas(container, { scene, paint, pans = () => false, onHover, margins = [0, 0, 0, 0], view: saved = null }) {
+export function createEditorCanvas(container, { scene, paint, pans = () => false, onHover, canInspect = () => false, onInspect, margins = [0, 0, 0, 0], view: saved = null }) {
   const canvas = document.createElement("canvas");
   canvas.className = "ed-canvas";
   container.append(canvas);
@@ -239,6 +242,21 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
   let mode = null;
   let paintStart = 0;
   let pinch = null;
+  let pressTimer = 0;
+  let pressAt = null;
+  const clearPress = () => {
+    clearTimeout(pressTimer);
+    pressTimer = 0;
+  };
+  const startPress = (at, tile) => {
+    pressAt = at;
+    if (!onInspect || !canInspect(tile.c, tile.r)) return;
+    pressTimer = setTimeout(() => {
+      if (mode === "paint") paint.cancel();
+      mode = "done";
+      onInspect(tile.c, tile.r);
+    }, 550);
+  };
 
   const startPinch = () => {
     const [a, b] = [...pointers.values()];
@@ -251,6 +269,8 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
     canvas.setPointerCapture(e.pointerId);
     const at = local(e);
     pointers.set(e.pointerId, at);
+    clearPress();
+    if (pointers.size === 1 && (e.pointerType !== "mouse" || e.button === 0)) startPress(at, tileAt(at));
     if (pointers.size === 1 && ((e.pointerType === "mouse" && e.button !== 0) || pans())) {
       mode = "drag";
       return;
@@ -277,6 +297,7 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
       if (e.pointerType === "mouse") setHover(tileAt(at));
       return;
     }
+    if (pressTimer && Math.hypot(at.x - pressAt.x, at.y - pressAt.y) > 8) clearPress();
     const last = pointers.get(e.pointerId);
     pointers.set(e.pointerId, at);
     if (mode === "paint") {
@@ -294,6 +315,7 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
     }
   };
   const onUp = (e) => {
+    clearPress();
     if (!pointers.delete(e.pointerId)) return;
     if (mode === "paint") {
       paint.up();
@@ -304,6 +326,7 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
     if (e.pointerType !== "mouse") setHover(null);
   };
   const onCancel = (e) => {
+    clearPress();
     if (mode === "paint") paint.cancel();
     pointers.delete(e.pointerId);
     mode = pointers.size ? "done" : null;
@@ -336,6 +359,7 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
       redraw();
     },
     dispose() {
+      clearPress();
       cancelAnimationFrame(raf);
       observer.disconnect();
       canvas.remove();

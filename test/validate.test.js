@@ -26,6 +26,7 @@ test("the defaults of every kind of thing are allowed", () => {
 });
 
 test("settings it doesn't know, or out of range, are refused", () => {
+  refuses(room({ constructor: 3 }), /no setting "constructor"/);
   refuses(room({ speed: 3 }), /no setting "speed"/);
   refuses(room({ fuel: 0 }), /fuel must be a number from 1 to 300/);
   refuses(room({ fuel: "10" }), /fuel must be/);
@@ -48,6 +49,7 @@ test("things are checked by kind", () => {
   refuses(room({ things: { 1: { kind: "fan", facing: "sideways" } } }), /facing must be left, right, up or down/);
   refuses(room({ things: { 1: { kind: "mover", to: [1.5, 0] } } }), /to must be \[dx, dy\]/);
   refuses(room({ things: { 1: { kind: "switch", opens: "<" } } }), /opens must be a letter or digit/);
+  refuses(room({ things: { 1: { kind: "toString" } } }), /isn't a kind of thing/);
   refuses(room({ things: { 1: { kind: "bomb" } } }), /"bomb" isn't a kind of thing/);
   refuses(room({ things: { S: { kind: "gate" } } }), /"S" can't name a thing/);
   refuses(room({ things: { ab: { kind: "gate" } } }), /"ab" can't name a thing/);

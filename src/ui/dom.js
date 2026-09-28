@@ -23,6 +23,7 @@ const PATHS = {
   rect: "M5 6h14v12H5z",
   fill: "M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z",
   erase: "M9 20h11M4 15l9-9 6 6-8 8H9z",
+  inspect: "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM15 15l6 6M10 7v6M7 10h6",
   pick: "M14 4l6 6-2.5 2.5-6-6zM12.5 7.5L5 15v4h4l7.5-7.5",
 };
 export const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;

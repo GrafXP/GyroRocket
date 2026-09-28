@@ -39,7 +39,7 @@ export const THING_SETTINGS = {
 };
 
 // The level's own settings.
-const SETTINGS = {
+export const LEVEL_SETTINGS = {
   format: whole(1, 1),
   name: { type: "string", max: MAX_NAME },
   look: whole(1, LOOKS),
@@ -53,7 +53,7 @@ const SETTINGS = {
   map: { type: "map" },
   things: { type: "things" },
 };
-const RISE = { speed: number(0.1, 20), from: number(0, MAX_HEIGHT), to: number(0, MAX_HEIGHT), after: { type: "label" }, delay: number(0, 600) };
+export const RISE_SETTINGS = { speed: number(0.1, 20), from: number(0, MAX_HEIGHT), to: number(0, MAX_HEIGHT), after: { type: "label" }, delay: number(0, 600) };
 
 // A character that can name a thing on the map.
 export const isThingLabel = (ch) => typeof ch === "string" && /^[0-9A-Za-z]$/.test(ch) && !RESERVED.has(ch);
@@ -96,7 +96,7 @@ function problem(spec, v) {
 export function validateLevel(def) {
   if (!plain(def)) throw new Error("that isn't a level");
   for (const [key, v] of Object.entries(def)) {
-    const spec = SETTINGS[key];
+    const spec = Object.hasOwn(LEVEL_SETTINGS, key) ? LEVEL_SETTINGS[key] : null;
     if (!spec) throw new Error(`a level has no setting "${key}"`);
     if (spec.type === "map") checkMap(v);
     else if (spec.type === "things") checkThings(v);
@@ -134,7 +134,7 @@ function checkThings(things) {
     if (!isThingLabel(label)) throw new Error(`"${label}" can't name a thing: use a digit, or a letter the map doesn't use for something else`);
     const thing = things[label];
     if (!plain(thing)) throw new Error(`thing ${label} must be a list of settings`);
-    const settings = THING_SETTINGS[thing.kind];
+    const settings = Object.hasOwn(THING_SETTINGS, thing.kind) ? THING_SETTINGS[thing.kind] : null;
     if (!settings) throw new Error(`thing ${label}: "${thing.kind}" isn't a kind of thing`);
     for (const [key, v] of Object.entries(thing)) {
       if (key === "kind") continue;
@@ -148,8 +148,8 @@ function checkThings(things) {
 function checkRise(rise) {
   if (!plain(rise)) throw new Error("rise must be the rising lava's settings");
   for (const [key, v] of Object.entries(rise)) {
-    if (!Object.hasOwn(RISE, key)) throw new Error(`rising lava has no setting "${key}"`);
-    const wrong = problem(RISE[key], v);
+    if (!Object.hasOwn(RISE_SETTINGS, key)) throw new Error(`rising lava has no setting "${key}"`);
+    const wrong = problem(RISE_SETTINGS[key], v);
     if (wrong) throw new Error(`rising lava's ${key} ${wrong}`);
   }
 }

@@ -1049,3 +1049,153 @@ a.button.ed-fly[aria-disabled="true"] {
 main > .ed-text {
   margin-bottom: 10px;
 }
+
+/* Things, settings and checks share a sheet that scrolls on a small phone. */
+.ed-form,
+.ed-report {
+  width: 100%;
+  padding: 16px;
+}
+
+.ed-form h2,
+.ed-report h2 {
+  margin: 0 0 12px;
+}
+
+.ed-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.ed-field > label,
+.ed-toggle {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.ed-field input:not([type="range"]):not([type="checkbox"]),
+.ed-field select {
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ed-field input[type="checkbox"],
+.ed-toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+.ed-number,
+.ed-vector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 12px;
+  align-items: center;
+}
+
+.ed-number input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.ed-vector {
+  grid-template-columns: 1fr 1fr;
+}
+.ed-vector label {
+  font-size: 0.8rem;
+}
+.ed-form fieldset {
+  border: 0;
+  padding: 0 0 0 12px;
+  margin: 0;
+}
+.ed-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0;
+}
+.ed-form details {
+  margin: 18px 0;
+}
+.ed-form summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+.ed-actions {
+  position: sticky;
+  bottom: -16px;
+  padding: 12px 0;
+  background: var(--panel);
+}
+.ed-form .hint,
+.ed-report .hint {
+  font-size: 0.85rem;
+}
+.ed-table-scroll {
+  overflow-x: auto;
+}
+.ed-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ed-report th,
+.ed-report td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+.ed-report th:first-child,
+.ed-report td:first-child {
+  text-align: left;
+  white-space: normal;
+}
+.ed-path-active .ed-bar {
+  visibility: hidden;
+}
+.ed-path {
+  bottom: auto;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  font-size: 0.85rem;
+}
+
+/* Nine controls fit at 360 px; at smaller widths the tools can scroll. */
+@media (max-width: 440px) {
+  .ed-tools {
+    gap: 3px;
+    padding-left: 4px;
+    padding-right: 4px;
+    overflow-x: auto;
+    justify-content: safe center;
+  }
+  .ed-tools .icon-btn {
+    width: 34px;
+    min-width: 34px;
+  }
+  .ed-tools .ed-swatch {
+    width: 42px;
+    min-width: 42px;
+  }
+}
+
+.editor .overlay.menu {
+  justify-content: flex-start;
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .editor .overlay.menu {
+    align-items: flex-start;
+  }
+}

@@ -1,12 +1,16 @@
 import { html, icon, esc, go } from "../ui/dom.js";
 import { loadLevel, saveLevel, deleteLevel } from "../mylevels.js";
-import { buildOutline, setTile } from "../sim/outline.js";
+import { buildOutline, setTile as setOutlineTile } from "../sim/outline.js";
 import { MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT } from "../sim/validate.js";
-import { gridFromLevel, levelFromGrid, resizeGrid, solidOf, charAt, inside, problemOf } from "./grid.js";
+import { gridFromLevel, levelFromGrid, cloneGrid, resizeGrid, solidOf, charAt, inside, problemOf } from "./grid.js";
 import { createStroke, paintAt, paintLine, paintRect, floodFill, strokeChanges, revertStroke } from "./tools.js";
 import { createEditorCanvas } from "./canvas.js";
-import { PALETTE, tileName, lookColors, drawTile } from "./tiles.js";
+import { PALETTE, KIND_NAMES, tileName, lookColors, drawTile } from "./tiles.js";
 import { levelToJson, levelToModule } from "./text.js";
+
+import { addThing, customizeTile, thingDefaults, thingShapes } from "./things.js";
+import { openThingSheet, openSettingsSheet } from "./sheets.js";
+import { reachOf } from "./reach.js";
 
 const UNDO_LIMIT = 200;
 const SAVE_AFTER = 400; // ms after the last change
@@ -19,6 +23,7 @@ const TOOLS = [
   ["fill", "Fill", "f"],
   ["erase", "Eraser", "e"],
   ["pick", "Pick a tile", "i"],
+  ["inspect", "Inspect a thing", "o"],
 ];
 const MARGINS = [64, 12, 76, 12]; // pixels the toolbars cover: top, right, bottom, left
 const SIDES = ["top", "bottom", "left", "right"];
@@ -31,7 +36,7 @@ function sessionFor(id, record) {
   const saved = JSON.stringify(record.level);
   const old = sessions.get(id);
   if (old?.saved === saved) return old;
-  const session = { grid: gridFromLevel(record.level), undo: [], redo: [], view: null, tool: "pan", tile: "#", size: 1, outline: false, saved };
+  const session = { grid: gridFromLevel(record.level), undo: [], redo: [], view: null, tool: "pan", tile: "#", size: 1, outline: false, reach: true, pendingKind: null, saved };
   sessions.set(id, session);
   return session;
 }
@@ -88,6 +93,10 @@ export function editor(el, id) {
       <div class="overlay menu" id="menu" hidden>
         <section>
           <h2>Level</h2>
+          <button id="m-settings">Settings…</button>
+          <button id="m-check">Check</button>
+          <button id="m-auto">Autopilot</button>
+          <button id="m-reach" aria-pressed="true"></button>
           <button id="m-resize">Resize…</button>
           <button id="m-outline" aria-pressed="false"></button>
           <button id="m-fit">Show the whole level</button>
@@ -95,10 +104,17 @@ export function editor(el, id) {
           <button id="m-delete">Delete this level</button>
         </section>
         <section>
-          <p class="hint">One finger paints with the tool and tile below, or moves the view with the arrows (tap the tool that's on to go back to them). Two fingers always move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes.</p>
+          <p class="hint">One finger paints with the tool and tile below, or moves the view with the arrows (tap the tool that's on to go back to them). Two fingers always move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes. Inspect (O) or hold a thing to change its settings.</p>
           <button class="big" id="m-close">Back to the level</button>
         </section>
       </div>
+
+      <div class="overlay ed-palette" id="settings-sheet" hidden></div>
+      <div class="overlay ed-palette" id="report" hidden><div class="ed-sheet ed-report">
+        <h2 id="report-title"></h2><div id="report-body" role="status"></div>
+        <div class="buttons"><button id="report-close">Cancel</button><button id="report-apply" hidden>Use suggested tank and par</button></div>
+      </div></div>
+      <div class="ed-panel ed-path" id="path-panel" hidden><span>Drag the arrow tip to set the travel. Two fingers move the view.</span><div class="buttons"><button id="path-cancel">Cancel</button><button id="path-done">Done</button></div></div>
 
       <div class="overlay menu" id="export" hidden>
         <section>
@@ -124,6 +140,17 @@ export function editor(el, id) {
   let checkTimer = 0;
   let toastTimer = 0;
   let deleted = false;
+  let strokeBefore = null;
+  let strokeKind = null;
+  let oldTile = null;
+  let reach = [];
+  let reachDirty = true;
+  let markers = [];
+  let path = null;
+  let pathDrag = false;
+  let worker = null;
+  let workerTimer = 0;
+  let reportResult = null;
 
   const canvas = createEditorCanvas($("#view"), {
     view: session.view,
@@ -135,13 +162,26 @@ export function editor(el, id) {
         const solid = solidOf(grid);
         const same = outline && outline.level.width === grid.width && outline.level.height === grid.height && outline.level.sky === grid.settings.sky;
         if (!same) outline = buildOutline({ width: grid.width, height: grid.height, solid, sky: grid.settings.sky });
-        else for (let i = 0; i < solid.length; i++) if (solid[i] !== outline.solid[i]) setTile(outline, i % grid.width, Math.floor(i / grid.width), solid[i] === 1);
+        else for (let i = 0; i < solid.length; i++) if (solid[i] !== outline.solid[i]) setOutlineTile(outline, i % grid.width, Math.floor(i / grid.width), solid[i] === 1);
         outlineDirty = false;
       }
-      return { grid, colors: lookColors(grid.settings.look), outline: session.outline ? outline : null, marker: problem?.at ?? null, preview };
+      if (session.reach && reachDirty) {
+        reach = reachOf(grid);
+        reachDirty = false;
+      }
+      const overlays = session.reach ? [...reach] : [];
+      if (path) overlays.push({ type: "arrow", x: path.c, y: path.r, x1: path.c + path.to[0], y1: path.r - path.to[1], color: "#ffffff", handle: true });
+      return { reach: overlays, markers, grid, colors: lookColors(grid.settings.look), outline: session.outline ? outline : null, marker: problem?.at ?? null, preview };
     },
     paint: { down, move, up, cancel },
-    pans: () => session.tool === "pan",
+    pans: () => !path && session.tool === "pan",
+    canInspect: (c, r) =>
+      session.tool !== "inspect" &&
+      !path &&
+      !session.pendingKind &&
+      inside(session.grid, c, r) &&
+      !!(session.grid.things[charAt(session.grid, c, r)] || "><^v!".includes(charAt(session.grid, c, r))),
+    onInspect: inspect,
     onHover: showWhere,
   });
 
@@ -150,9 +190,34 @@ export function editor(el, id) {
   const clampTile = ({ c, r }) => ({ c: Math.max(0, Math.min(session.grid.width - 1, c)), r: Math.max(0, Math.min(session.grid.height - 1, r)) });
   function down(c, r) {
     const { grid, tool } = session;
+    if (path) {
+      const distance = Math.hypot(c + 0.5 - path.c - path.to[0], r + 0.5 - path.r + path.to[1]);
+      pathDrag = distance <= Math.max(1, 24 / (canvas.view?.zoom ?? 16));
+      if (pathDrag) path.from = [...path.to];
+      return;
+    }
+    if (tool === "inspect") {
+      inspect(c, r);
+      return;
+    }
     if (tool === "pick") {
       if (inside(grid, c, r)) setTile(charAt(grid, c, r), "brush");
       return;
+    }
+    if (!inside(grid, c, r)) return;
+    if (session.pendingKind && tool !== "erase") {
+      strokeBefore = cloneGrid(grid);
+      strokeKind = session.pendingKind;
+      oldTile = session.tile;
+      try {
+        session.tile = addThing(grid, session.pendingKind);
+      } catch (e) {
+        strokeBefore = null;
+        toast(e.message);
+        return;
+      }
+      session.pendingKind = null;
+      drawSwatch();
     }
     stroke = createStroke(grid);
     last = { c, r };
@@ -164,6 +229,13 @@ export function editor(el, id) {
     tilesChanged();
   }
   function move(c, r) {
+    if (path) {
+      if (pathDrag) {
+        path.to = [Math.max(-200, Math.min(200, Math.round(c + 0.5 - path.c))), Math.max(-200, Math.min(200, Math.round(path.r - r - 0.5)))];
+        canvas.redraw();
+      }
+      return;
+    }
     if (!stroke || (c === last.c && r === last.r)) return;
     if (session.tool === "rect") {
       const at = clampTile({ c, r });
@@ -173,24 +245,56 @@ export function editor(el, id) {
     tilesChanged();
   }
   function up() {
+    if (path) {
+      pathDrag = false;
+      return;
+    }
     if (!stroke) return;
     if (preview) paintRect(stroke, preview.c0, preview.r0, preview.c1, preview.r1, ink());
     preview = null;
     const tiles = strokeChanges(stroke);
     stroke = null;
-    if (tiles.length) commit({ tiles });
+    if (strokeBefore) {
+      const before = strokeBefore;
+      strokeBefore = null;
+      commit({ before, after: cloneGrid(session.grid) });
+      toast("Placed. Inspect or hold it to change its settings");
+    } else if (tiles.length) commit({ tiles });
     else canvas.redraw();
   }
   function cancel() {
+    if (path) {
+      if (pathDrag) path.to = path.from;
+      pathDrag = false;
+      canvas.redraw();
+      return;
+    }
     if (!stroke) return;
     revertStroke(stroke);
+    if (strokeBefore) {
+      session.grid = strokeBefore;
+      session.pendingKind = strokeKind;
+      session.tile = oldTile;
+      strokeBefore = null;
+      drawSwatch();
+    }
     stroke = null;
     preview = null;
     tilesChanged();
   }
   function tilesChanged() {
     outlineDirty = true;
+    reachDirty = true;
     canvas.redraw();
+  }
+
+  // Whole-grid edits keep independent snapshots, including thing definitions.
+  function mutate(edit, name = false) {
+    const before = cloneGrid(session.grid);
+    const after = cloneGrid(session.grid);
+    edit(after);
+    session.grid = after;
+    commit({ before, after: cloneGrid(after), name });
   }
 
   // Undo and redo: a stroke's tiles, or the whole grid before and after a resize.
@@ -202,20 +306,27 @@ export function editor(el, id) {
   }
   function undoRedo(back) {
     const [from, to] = back ? [session.undo, session.redo] : [session.redo, session.undo];
-    if (stroke || !from.length) return;
+    if (stroke || path || !from.length) return;
     const entry = from.pop();
     if (entry.tiles) {
       for (const [i, was, now] of entry.tiles) session.grid.cells[i] = back ? was : now;
     } else {
       const { name } = session.grid.settings; // the name isn't undone
-      session.grid = back ? entry.before : entry.after;
-      session.grid.settings.name = name;
+      session.grid = cloneGrid(back ? entry.before : entry.after);
+      if (!entry.name) session.grid.settings.name = name;
     }
     to.push(entry);
     changed();
   }
   function changed() {
+    stopWorker();
+    markers = [];
+    reportResult = null;
+    $("#report-apply").hidden = true;
     tilesChanged();
+    $("#name").value = session.grid.settings.name ?? "";
+    if (!session.pendingKind && !"#.*~SEF<>^vrygbRYGB!%".includes(session.tile) && !session.grid.things[session.tile]) session.tile = "#";
+    drawSwatch();
     $("#undo").disabled = !session.undo.length;
     $("#redo").disabled = !session.redo.length;
     $("#resize-size").textContent = `${session.grid.width} × ${session.grid.height} tiles`;
@@ -286,6 +397,7 @@ export function editor(el, id) {
     $("#size").disabled = tool !== "brush" && tool !== "erase";
   }
   function setTile(ch, tool = null) {
+    session.pendingKind = null;
     session.tile = ch;
     if (tool || session.tool === "erase" || session.tool === "pick") setTool(tool ?? "brush");
     drawSwatch();
@@ -301,8 +413,10 @@ export function editor(el, id) {
     [c.width, c.height] = [Math.round(28 * dpr), Math.round(28 * dpr)];
     const ctx = c.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawTile(ctx, session.tile, 0, 0, 28, session.grid.things, lookColors(session.grid.settings.look));
-    $("#swatch").setAttribute("aria-label", `Tile: ${tileName(session.tile, session.grid.things)}. Change it`);
+    const ch = session.pendingKind ? "0" : session.tile;
+    const things = session.pendingKind ? { 0: thingDefaults(session.pendingKind) } : session.grid.things;
+    drawTile(ctx, ch, 0, 0, 28, things, lookColors(session.grid.settings.look));
+    $("#swatch").setAttribute("aria-label", `Tile: ${session.pendingKind ? `New ${KIND_NAMES[session.pendingKind]}` : tileName(session.tile, session.grid.things)}. Change it`);
   }
   // Tapping the tool that's on turns it off: one finger moves the view again.
   for (const b of el.querySelectorAll("[data-tool]")) {
@@ -325,20 +439,32 @@ export function editor(el, id) {
     if (things.length) groups.push({ name: "In this level", tiles: things.join("") });
     $("#palette-list").innerHTML = groups
       .map(
-        (g) => `<h3>${g.name}</h3><div class="ed-tiles">${[...g.tiles]
-          .map((ch) => `<button class="ed-tile" data-ch="${esc(ch)}" aria-pressed="${ch === session.tile}"><canvas></canvas><small>${esc(tileName(ch, grid.things))}</small></button>`)
-          .join("")}</div>`,
+        (g) =>
+          `<h3>${g.name}</h3><div class="ed-tiles">${[...g.tiles]
+            .map(
+              (ch) =>
+                `<button class="ed-tile" data-ch="${esc(ch)}" aria-pressed="${ch === session.tile}"><canvas></canvas><small>${esc(tileName(ch, grid.things))}</small></button>`,
+            )
+            .join("")}</div>`,
       )
       .join("");
+    $("#palette-list").insertAdjacentHTML(
+      "beforeend",
+      `<h3>Add a thing</h3><div class="ed-tiles">${Object.entries(KIND_NAMES)
+        .map(([kind, label]) => `<button class="ed-tile" data-new="${kind}"><canvas></canvas><small>${label}</small></button>`)
+        .join(
+          "",
+        )}</div><p class="hint">Choose a new thing, then place it on the map. Choose an existing label to paint more of it. Inspect or hold a thing to change its settings.</p><button class="big" data-palette-close>Done</button>`,
+    );
     palette.hidden = false;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const colors = lookColors(grid.settings.look);
-    for (const b of palette.querySelectorAll("[data-ch]")) {
+    for (const b of palette.querySelectorAll("[data-ch], [data-new]")) {
       const c = b.querySelector("canvas");
       [c.width, c.height] = [Math.round(36 * dpr), Math.round(36 * dpr)];
       const ctx = c.getContext("2d");
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawTile(ctx, b.dataset.ch, 0, 0, 36, grid.things, colors);
+      drawTile(ctx, b.dataset.ch ?? "0", 0, 0, 36, b.dataset.new ? { 0: thingDefaults(b.dataset.new) } : grid.things, colors);
     }
     palette.querySelector('[aria-pressed="true"]')?.focus();
   }
@@ -346,12 +472,20 @@ export function editor(el, id) {
   palette.addEventListener("click", (e) => {
     const b = e.target.closest("[data-ch]");
     if (b) setTile(b.dataset.ch, session.tool === "rect" || session.tool === "fill" ? session.tool : "brush");
-    if (b || e.target === palette) palette.hidden = true;
+    const add = e.target.closest("[data-new]");
+    if (add) {
+      session.pendingKind = add.dataset.new;
+      setTool("brush");
+      drawSwatch();
+    }
+    if (b || add || e.target.closest("[data-palette-close]") || e.target === palette) palette.hidden = true;
   });
 
   // The menu.
   const menu = $("#menu");
   const syncOutline = () => {
+    $("#m-reach").setAttribute("aria-pressed", session.reach);
+    $("#m-reach").textContent = `Thing reach: ${session.reach ? "on" : "off"}`;
     $("#m-outline").setAttribute("aria-pressed", session.outline);
     $("#m-outline").textContent = `Rock outline: ${session.outline ? "on" : "off"}`;
   };
@@ -363,6 +497,11 @@ export function editor(el, id) {
   $("#m-outline").addEventListener("click", () => {
     session.outline = !session.outline;
     outlineDirty = true;
+    syncOutline();
+    canvas.redraw();
+  });
+  $("#m-reach").addEventListener("click", () => {
+    session.reach = !session.reach;
     syncOutline();
     canvas.redraw();
   });
@@ -389,9 +528,173 @@ export function editor(el, id) {
     const before = session.grid;
     const after = resizeGrid(before, { [b.dataset.side]: Number(b.dataset.n) });
     session.grid = after;
-    commit({ before, after });
+    commit({ before: cloneGrid(before), after: cloneGrid(after) });
   });
   $("#resize-done").addEventListener("click", () => ($("#resize").hidden = true));
+
+  // Inspecting changes only the chosen instance of a plain hazard. Configured
+  // things keep their label, and every occurrence shares its settings.
+  function inspect(c, r) {
+    if (path || !inside(session.grid, c, r)) return;
+    let ch = charAt(session.grid, c, r);
+    if (!session.grid.things[ch]) {
+      if (!"><^v!".includes(ch)) {
+        toast("Inspect a thing, a flame or a stalactite");
+        return;
+      }
+      try {
+        mutate((g) => {
+          ch = customizeTile(g, c, r);
+        });
+      } catch (e) {
+        toast(e.message);
+        return;
+      }
+    }
+    openThingSheet($("#settings-sheet"), {
+      grid: session.grid,
+      ch,
+      onApply: (thing) =>
+        mutate((g) => {
+          g.things[ch] = thing;
+        }),
+      onPath: () => {
+        const shape = thingShapes(session.grid, ch).find((s) => c >= s.c0 && c <= s.c1 && r >= s.r0 && r <= s.r1);
+        if (!shape) return;
+        path = { ...shape, to: [...session.grid.things[ch].to] };
+        $("#path-panel").hidden = false;
+        $("#editor").classList.add("ed-path-active");
+        canvas.redraw();
+      },
+    });
+  }
+  function endPath(apply) {
+    if (!path) return;
+    if (apply && !path.to.some(Boolean)) {
+      toast("Move at least one tile from the start");
+      return;
+    }
+    const { ch, to } = path;
+    path = null;
+    pathDrag = false;
+    $("#path-panel").hidden = true;
+    $("#editor").classList.remove("ed-path-active");
+    if (apply)
+      mutate((g) => {
+        g.things[ch].to = to;
+      });
+    canvas.redraw();
+  }
+  $("#path-done").onclick = () => endPath(true);
+  $("#path-cancel").onclick = () => endPath(false);
+  $("#m-settings").onclick = () => {
+    menu.hidden = true;
+    openSettingsSheet($("#settings-sheet"), {
+      grid: session.grid,
+      onApply: (settings) =>
+        mutate((g) => {
+          g.settings = settings;
+        }, true),
+    });
+  };
+
+  // Both checks run in a worker, which is discarded on cancellation, changes or
+  // leaving the editor. A late message can never apply to a newer map.
+  function stopWorker() {
+    worker?.terminate();
+    worker = null;
+    clearTimeout(workerTimer);
+  }
+  const legsTable = (legs) =>
+    legs.length
+      ? `<div class="ed-table-scroll"><table><thead><tr><th>Leg</th><th>Time</th><th>Fuel</th><th>Hull</th></tr></thead><tbody>${legs.map((leg) => `<tr><td>${esc(leg.name)}</td><td>${leg.seconds.toFixed(1)} s</td><td>${Math.max(0, leg.fuel).toFixed(1)} s</td><td>${Math.round(leg.hull)}</td></tr>`).join("")}</tbody></table></div>`
+      : "";
+  function runCheck(action) {
+    check();
+    menu.hidden = true;
+    stopWorker();
+    reportResult = null;
+    markers = [];
+    $("#report").hidden = false;
+    $("#report-title").textContent = action === "check" ? "Check level" : "Autopilot";
+    $("#report-body").textContent = action === "check" ? "Checking pads, pick-ups and door order…" : "Flying the route…";
+    $("#report-close").textContent = "Cancel";
+    $("#report-apply").hidden = true;
+    if (problem) {
+      showReportError(problem.text, problem.at);
+      return;
+    }
+    try {
+      const running = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+      worker = running;
+      running.onmessage = ({ data }) => {
+        if (worker !== running) return;
+        if (data.progress) {
+          $("#report-body").innerHTML = `<p>${esc(data.progress.status)} · ${data.progress.seconds.toFixed(1)} s</p>${legsTable(data.progress.legs)}`;
+          return;
+        }
+        stopWorker();
+        $("#report-close").textContent = "Done";
+        if (data.error) {
+          showReportError(data.error);
+          return;
+        }
+        if (action === "check") {
+          markers = data.result.filter((p) => p.at).map((p) => p.at);
+          $("#report-body").innerHTML = data.result.length
+            ? data.result.map((p) => `<p>${esc(p.text)}${p.at ? ` <button data-show-c="${p.at.c}" data-show-r="${p.at.r}">Show</button>` : ""}</p>`).join("")
+            : "<p>All pads, keys and crystals are reachable. Doors can open in a working order.</p>";
+          $("#report-body").insertAdjacentHTML("beforeend", "<p class=hint>This checks space and lock order. Use Autopilot or Fly to check timing, moving hazards and fuel.</p>");
+        } else {
+          const result = data.result;
+          reportResult = result;
+          if (result.failed) markers = [result.at];
+          $("#report-body").innerHTML =
+            `<p>${result.failed ? `${esc(result.failed)} <button data-show-c="${result.at.c}" data-show-r="${result.at.r}">Show</button>` : `Finished in ${result.seconds.toFixed(1)} s`}</p>${legsTable(result.legs)}${result.suggested ? `<p>Suggested tank: ${result.suggested.fuel} s · par: ${result.suggested.par} s.</p><p class="hint">Tank includes 40% spare fuel between refills; par rounds the full run up to 5 seconds.</p>` : '<p class="hint">The autopilot may need a route in Settings → Advanced, a larger tank, or a clearer path. A failed flight does not always mean a person cannot finish.</p>'}`;
+          $("#report-apply").hidden = !result.suggested || result.suggested.fuel > 300 || result.suggested.par > 3600;
+        }
+        canvas.redraw();
+      };
+      running.onerror = () => {
+        stopWorker();
+        showReportError("The check couldn't run. Try again or reload the game.");
+      };
+      workerTimer = setTimeout(() => {
+        stopWorker();
+        showReportError("The check took too long. Try a smaller level or a shorter route.");
+      }, 30000);
+      running.postMessage({ action, level: levelFromGrid(session.grid) });
+    } catch (e) {
+      stopWorker();
+      showReportError(`Couldn't start the check: ${e.message}`);
+    }
+  }
+  function showReportError(text, at = null) {
+    markers = at ? [at] : [];
+    $("#report-body").innerHTML = `<p>${esc(text)}${at ? ` <button data-show-c="${at.c}" data-show-r="${at.r}">Show</button>` : ""}</p>`;
+    $("#report-close").textContent = "Done";
+    canvas.redraw();
+  }
+  $("#m-check").onclick = () => runCheck("check");
+  $("#m-auto").onclick = () => runCheck("autopilot");
+  $("#report-close").onclick = () => {
+    stopWorker();
+    $("#report").hidden = true;
+  };
+  $("#report-body").onclick = (e) => {
+    const b = e.target.closest("[data-show-c]");
+    if (b) {
+      $("#report").hidden = true;
+      canvas.show(Number(b.dataset.showC), Number(b.dataset.showR));
+    }
+  };
+  $("#report-apply").onclick = () => {
+    const suggestion = reportResult?.suggested;
+    if (!suggestion) return;
+    mutate((g) => Object.assign(g.settings, suggestion));
+    $("#report").hidden = true;
+    toast("Tank and par updated");
+  };
 
   // Export: the level as JSON or as a level module, to copy or save.
   const exportEl = $("#export");
@@ -428,7 +731,11 @@ export function editor(el, id) {
   });
   $("#export-save").addEventListener("click", () => {
     const json = exportKind === "json";
-    const file = (session.grid.settings.name || "level").replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "level";
+    const file =
+      (session.grid.settings.name || "level")
+        .replace(/[^\w-]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase() || "level";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([exportText()], { type: json ? "application/json" : "text/javascript" }));
     a.download = `${file}.${json ? "json" : "js"}`;
@@ -448,15 +755,20 @@ export function editor(el, id) {
   // Keys: Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z), a letter per tool, [ and ] for the
   // brush size, Esc closes what's open.
   const onKey = (e) => {
-    if (e.target.closest?.("input, textarea")) return;
+    if (e.key === "Escape") {
+      stopWorker();
+      endPath(false);
+      for (const o of [palette, menu, exportEl, $("#resize"), $("#settings-sheet"), $("#report")]) o.hidden = true;
+      return;
+    }
+    if (e.target.closest?.("input, textarea, select")) return;
+    if (!$("#settings-sheet").hidden || !$("#report").hidden) return;
     const key = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && (key === "z" || key === "y")) {
       e.preventDefault();
       undoRedo(key === "z" && !e.shiftKey);
     } else if (e.ctrlKey || e.metaKey || e.altKey) return;
-    else if (key === "escape") {
-      for (const o of [palette, menu, exportEl, $("#resize")]) o.hidden = true;
-    } else if (key === "[" || key === "]") {
+    else if (key === "[" || key === "]") {
       const i = SIZES.indexOf(session.size) + (key === "]" ? 1 : -1);
       setSize(SIZES[Math.max(0, Math.min(SIZES.length - 1, i))]);
     } else {
@@ -476,6 +788,8 @@ export function editor(el, id) {
   check();
 
   return () => {
+    cancel();
+    stopWorker();
     save();
     clearTimeout(checkTimer);
     clearTimeout(toastTimer);

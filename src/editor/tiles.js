@@ -51,7 +51,7 @@ const NAMES = {
   v: "Flame, down",
   "!": "Stalactite",
 };
-const KIND_NAMES = {
+export const KIND_NAMES = {
   switch: "Switch",
   gate: "Gate",
   flame: "Flame",

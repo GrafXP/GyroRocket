@@ -87,6 +87,7 @@ src/
   main.js          + routes: /editor, /editor/<id>, /community, /c/<code>, /profile
   game.js          feeds quantized input to the sim and records it; watch mode plays a replay
   levels/index.js  + levelByKey: built-in ("1-3"), mine ("my:<id>"), shared ("c:<code>")
+  autofly.js      the bounded headless autopilot run, shared by editor and CLI
   mylevels.js      my levels in localStorage: the list, each level, its completion
   sim/
     fmath.js       sin, cos and hypot the same on every JS engine
@@ -102,7 +103,11 @@ src/
     tiles.js       the palette, and how each tile looks
     tools.js       brush, rectangle, fill, eraser, picker, inspect
     text.js        levels as JSON or a level module, and reading them back (no eval)
-    things.js      the settings sheet for each kind of thing, from validate.js
+    things.js      thing defaults, labels, editable settings and connected shapes
+    fields.js      controls generated from validate.js's settings
+    sheets.js      thing and level settings sheets
+    reach.js       reach overlays, including incomplete levels
+    worker.js      Check and Autopilot, away from the drawing thread
   net/
     api.js         fetch with a timeout, JSON, the player's token; offline errors
     player.js      the token, the name, the transfer code
@@ -227,7 +232,7 @@ names from being read as markup. Help has a paragraph on the editor. Tests:
 `validate`, `grid` (with the tools), `text` (every module in `src/levels` reads
 back as the level it exports) and `mylevels`.
 
-### Phase E2: Things and settings
+### Phase E2: Things and settings ✅ (done)
 
 The palette gets the things set up in `things`: switches and gates, flamethrowers
 with their own settings, lava blobs, fans, magnets, movers, crushers, lasers,
@@ -255,6 +260,58 @@ the longest leg) and a par (its time, rounded up to 5 s), like `npm run fly`.
 - [ ] You can see what a thing will do before you fly it.
 - [ ] Check and the autopilot find a level's problems before you find them in the air.
 - [ ] Nothing you can set in a sheet breaks the game (`validate.js` has a test per kind).
+
+What was built: The palette's *Add a thing* section has all eleven kinds, with
+an icon for each. Choosing one and painting creates its definition with a free
+label and the simulator's defaults. The palette's *In this level* section lets
+you paint that label again, extending a gate, switch or block. Inspect (O), or
+hold a thing for 550 ms, to open its settings. Holding a plain flame or
+stalactite gives just that instance its own settings. A long press restores any
+paint it started; moving or adding a second finger cancels the inspection.
+
+Thing sheets use `THING_SETTINGS` for their controls and bounds: sliders with
+precise number inputs, facing and mode buttons, checkboxes, and a switch's list
+of placed gates and lasers. All instances of the selected label respond to
+the switch, including separated gate rectangles and repeated laser emitters. Movers and crushers have Right/Up fields and *Drag
+the path on the map*: drag the arrow tip, then Done (or Cancel). Travel is in
+whole tiles, with positive Y upwards. Each disconnected block has its own handle;
+settings still belong to its label. The menu's *Settings* sheet includes name,
+world colours, tank, par, dark, sky, crumble, rising lava and the route under
+Advanced. Blank routes use the autopilot's default. Applied settings and paths
+are saved and undoable, along with painting and resizing; snapshots are independent.
+
+*Thing reach* starts on and can be toggled in the menu. It shows flames and
+lasers clipped by rock, fan columns, magnet and turret ranges, blob heights,
+stalactite trigger bands, block paths and destination boxes, and switch links.
+Near-flame triggers surround the whole beam. The overlays work while the map is
+incomplete; beam and fan geometry is checked against every built-in level. Ranges
+and trigger bands show potential reach; timing and line-of-sight still depend on
+the running sim. Incremental rock-outline updates also work after painting (the
+outline updater and tile-picker previously shared a name).
+
+*Check* runs the geometry and lock-order checks extracted from the built-in tests
+to `sim/check.js`, and lists problems with Show buttons and markers. It checks
+standing room, reach to every pad, key and crystal, and reaching keys/switches
+before passing their barriers. *Autopilot* reports each completed leg's time,
+fuel and hull, and marks where a failed run stopped. A successful flight suggests
+1.4× the fuel burned between refills, rounded up, and the full elapsed time
+rounded up to 5 seconds as par; a button applies both. `autofly.js` is shared with
+`npm run fly`, which now prints these suggestions too. Both editor checks run in
+a Web Worker, can be cancelled, and terminate on leaving the editor or changing
+the map; a wall-clock timeout and a simulated-time limit bound long runs. Static
+Check does not establish hazard timing or fuel sufficiency, and an autopilot
+failure does not establish that a person cannot finish.
+
+Validation: all 183 Node tests and the production build pass; tests cover each thing's
+defaults and setting bounds, plain-hazard conversion, connected shapes, reach
+geometry, lock order, worker flight reports, and pointer cancellation. A local
+DOM smoke test also exercised placement, sheets, undo/redo, long press, pinch,
+mover arrows, outline updates, both worker actions, applying suggestions and
+session restore. Browser automation is unavailable on this Android/Termux host;
+the physical phone checklist above remains to be tried. On the phone, start with
+a new level, place a gate and switch, connect them with Inspect, adjust a mover
+path, run Check/Autopilot, then Fly and return. Try the sheets in portrait and
+landscape, and reload to check saved settings.
 
 ### Phase E3: Replays, and finishing your own level
 

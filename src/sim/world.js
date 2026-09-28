@@ -167,11 +167,18 @@ export function step(world, input) {
     return world;
   }
   if (pad?.kind === "switch") {
-    // Open the gate (or switch off the laser); a timed one's time starts over while
-    // the rocket sits here.
-    const door = switched(world, pad.opens);
-    if (!door.open) Object.assign(door, { open: true, changed: world.tick });
-    door.until = pad.time ? world.tick + pad.time * TICK_RATE : -1;
+    // Every instance of the target label responds. A timed one's time starts
+    // over while the rocket sits here.
+    const open = (state) => {
+      if (!state.open) Object.assign(state, { open: true, changed: world.tick });
+      state.until = pad.time ? world.tick + pad.time * TICK_RATE : -1;
+    };
+    world.level.doors.forEach((d, i) => {
+      if (d.gate === pad.opens) open(world.doors[i]);
+    });
+    world.level.lasers.forEach((l, i) => {
+      if (l.label === pad.opens) open(world.lasers[i]);
+    });
   }
   shutGates(world);
   if (pad?.kind === "fuel") {

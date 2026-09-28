@@ -322,11 +322,13 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   }
   // Each switch names the gate it opens, or the laser it turns off; each gate has a switch.
   for (const pad of level.pads.filter((p) => p.kind === "switch")) {
-    const gate = level.doors.find((d) => d.gate === pad.opens) ?? level.lasers.find((l) => l.label === pad.opens);
-    if (!gate) throw new Error(`${name}: switch ${pad.label} opens "${pad.opens}", which isn't a gate or laser on the map`);
-    if (!(pad.time >= 0)) throw new Error(`${name}: switch ${pad.label}'s time must be a number of seconds`);
-    gate.switch = pad.label;
-    gate.time = pad.time;
+    const targets = [...level.doors.filter((d) => d.gate === pad.opens), ...level.lasers.filter((l) => l.label === pad.opens)];
+    if (!targets.length) throw new Error(`${where(pad.c0, pad.j)}: switch ${pad.label} opens "${pad.opens}", which isn't a gate or laser on the map`);
+    if (!(pad.time >= 0)) throw new Error(`${where(pad.c0, pad.j)}: switch ${pad.label}'s time must be a number of seconds`);
+    for (const target of targets) {
+      target.switch = pad.label;
+      target.time = pad.time;
+    }
   }
   for (const gate of level.doors.filter((d) => d.gate)) {
     if (!gate.switch) throw new Error(`${where(gate.c0, gate.j0)}: no switch opens gate ${gate.gate}`);
