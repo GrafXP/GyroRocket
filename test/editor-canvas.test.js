@@ -34,7 +34,7 @@ test("canvas draws reach and all problem markers together", () => {
   assert.equal(boxes, 3); // border and both markers
 });
 
-function setup(t) {
+function setup(t, options = {}) {
   class Canvas extends EventTarget {
     getContext() {
       return context();
@@ -71,9 +71,10 @@ function setup(t) {
     { append() {} },
     {
       scene,
-      paint: Object.fromEntries(["down", "move", "up", "cancel"].map((name) => [name, () => calls.push(name)])),
       canInspect: () => true,
       onInspect: () => calls.push("inspect"),
+      ...options,
+      paint: { ...Object.fromEntries(["down", "move", "up", "cancel"].map((name) => [name, () => calls.push(name)])), ...options.paint },
     },
   );
   t.after(() => {
@@ -124,4 +125,39 @@ test("moving, cancelling and disposing clear the pending long press", (t) => {
   editor.dispose();
   t.mock.timers.tick(600);
   assert.ok(!calls.includes("inspect"));
+});
+
+test("Move chooses object dragging or background panning from the touched tile", (t) => {
+  const touched = [];
+  const { calls, pointer, editor } = setup(t, {
+    canInspect: () => false,
+    pans: (c, r) => {
+      touched.push([c, r]);
+      return c > 15;
+    },
+  });
+  pointer("down", 1, 150);
+  pointer("move", 1, 170);
+  pointer("up");
+  assert.deepEqual(calls, ["down", "move", "up"]);
+  const before = editor.view;
+  pointer("down", 1, 300);
+  pointer("move", 1, 320);
+  pointer("up");
+  assert.notEqual(editor.view.cx, before.cx);
+  assert.deepEqual(calls, ["down", "move", "up"]);
+  assert.ok(touched[0][0] < touched[1][0]);
+});
+
+test("adding a second finger cancels an object drag even after the paint grace period", (t) => {
+  let now = 0;
+  t.mock.method(performance, "now", () => now);
+  const { calls, pointer } = setup(t, { canInspect: () => false, paint: { cancelOnPinch: () => true } });
+  pointer("down");
+  pointer("move", 1, 170);
+  now = 1000;
+  pointer("down", 2, 250);
+  pointer("up");
+  pointer("up", 2);
+  assert.deepEqual(calls, ["down", "move", "cancel"]);
 });

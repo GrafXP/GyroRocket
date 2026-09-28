@@ -128,9 +128,11 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
   if (preview) {
     const [pc0, pc1] = [Math.min(preview.c0, preview.c1), Math.max(preview.c0, preview.c1)];
     const [pr0, pr1] = [Math.min(preview.r0, preview.r1), Math.max(preview.r0, preview.r1)];
-    ctx.fillStyle = "rgb(255 179 71 / 0.3)";
+    ctx.fillStyle = preview.color ?? "#ffb347";
+    ctx.globalAlpha = 0.3;
     ctx.fillRect(X(pc0), Y(pr0), (pc1 - pc0 + 1) * s, (pr1 - pr0 + 1) * s);
-    ctx.strokeStyle = "#ffb347";
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = preview.color ?? "#ffb347";
     ctx.lineWidth = 2;
     ctx.strokeRect(X(pc0), Y(pr0), (pc1 - pc0 + 1) * s, (pr1 - pr0 + 1) * s);
   }
@@ -152,7 +154,9 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
 // Puts the canvas in `container` and runs it. `scene()` gives what to draw (see
 // drawEditor, less the view and size); `paint` gets { down, move, up, cancel } of
 // a finger or the mouse painting, in tiles, unless `pans()` says one finger moves
-// the view; `onHover` gets the tile under the mouse or finger. `margins` are the
+// the view (it receives the touched column and row). `paint.cancelOnPinch()` can
+// request cancellation when a second finger joins a drag. `onHover` gets the tile
+// under the mouse or finger. `margins` are the
 // pixels the toolbars cover, top, right, bottom, left.
 export function createEditorCanvas(container, { scene, paint, pans = () => false, onHover, canInspect = () => false, onInspect, margins = [0, 0, 0, 0], view: saved = null }) {
   const canvas = document.createElement("canvas");
@@ -271,7 +275,8 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
     pointers.set(e.pointerId, at);
     clearPress();
     if (pointers.size === 1 && (e.pointerType !== "mouse" || e.button === 0)) startPress(at, tileAt(at));
-    if (pointers.size === 1 && ((e.pointerType === "mouse" && e.button !== 0) || pans())) {
+    const tile = tileAt(at);
+    if (pointers.size === 1 && ((e.pointerType === "mouse" && e.button !== 0) || pans(tile.c, tile.r))) {
       mode = "drag";
       return;
     }
@@ -283,7 +288,7 @@ export function createEditorCanvas(container, { scene, paint, pans = () => false
       paint.down(tile.c, tile.r);
     } else if (pointers.size === 2 && (mode === "paint" || mode === "drag")) {
       if (mode === "paint") {
-        if (performance.now() - paintStart < PINCH_GRACE) paint.cancel();
+        if (performance.now() - paintStart < PINCH_GRACE || paint.cancelOnPinch?.()) paint.cancel();
         else paint.up();
       }
       mode = "pinch";

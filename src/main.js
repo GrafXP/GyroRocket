@@ -156,7 +156,7 @@ function help(el) {
     <h2>Stars</h2>
     <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
     <h2>Level editor</h2>
-    <p>Build your own caves under Editor, from a plain cave or a copy of one you've played. Paint rock, air, pads, keys, doors and hazards with one finger; move and zoom with two. If something's wrong with the level, it says what at the top, and Show finds it. Fly tries it straight away. The palette also adds switches, gates, fans, magnets and other things. Inspect (O), or hold a thing, to change its settings; moving blocks have a path you can drag. The menu has level settings, a reach overlay, Check for unreachable places, and Autopilot for a test flight with tank and par suggestions.</p>
+    <p>Build your own caves under Editor, from a plain cave or a copy of one you've played. Paint rock, air, pads, keys, doors and hazards with one finger. With Move (the arrows), drag a placed thing to reposition it or drag the background to pan; use two fingers to move and zoom. If something's wrong with the level, it says what at the top, and Show finds it. Fly tries it straight away. The palette also adds switches, gates, fans, magnets and other things. Inspect (O), or hold a thing, to change its settings; moving blocks have a path you can drag. The menu has level settings, a reach overlay, Check for unreachable places, and Autopilot for a test flight with tank and par suggestions.</p>
     <h2>Tilt not working?</h2>
     <p class="hint">Browsers only share the motion sensors over HTTPS (or on localhost). On iPhone, allow motion access when asked.</p>
     <button id="fs" class="wide"></button>`,

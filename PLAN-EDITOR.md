@@ -102,6 +102,7 @@ src/
     canvas.js      draws the tiles, outline and reach overlays; pan, zoom, paint
     tiles.js       the palette, and how each tile looks
     tools.js       brush, rectangle, fill, eraser, picker, inspect
+    move.js        selecting and dragging whole placed objects
     text.js        levels as JSON or a level module, and reading them back (no eval)
     things.js      thing defaults, labels, editable settings and connected shapes
     fields.js      controls generated from validate.js's settings
@@ -269,6 +270,15 @@ hold a thing for 550 ms, to open its settings. Holding a plain flame or
 stalactite gives just that instance its own settings. A long press restores any
 paint it started; moving or adding a second finger cancels the inspection.
 
+Move (H, the arrows) also repositions placed things: drag an object to its new
+tile; drag rock or air to pan the view. Pads and switches move as a horizontal
+run, stalactites as a column, and gates, doors and moving blocks as one connected
+shape. A separate instance of the same label stays where it was. Labels, settings,
+switch connections and relative mover paths are kept; moving a fuel pad updates
+route stops that name its columns. The whole object stays within the map and
+occupied drops are rejected. A drag is one undo step and saves only on release;
+a second finger or cancellation restores its starting position before panning.
+
 Thing sheets use `THING_SETTINGS` for their controls and bounds: sliders with
 precise number inputs, facing and mode buttons, checkboxes, and a switch's list
 of placed gates and lasers. All instances of the selected label respond to
@@ -302,9 +312,9 @@ the map; a wall-clock timeout and a simulated-time limit bound long runs. Static
 Check does not establish hazard timing or fuel sufficiency, and an autopilot
 failure does not establish that a person cannot finish.
 
-Validation: all 183 Node tests and the production build pass; tests cover each thing's
+Validation: all 191 Node tests and the production build pass; tests cover each thing's
 defaults and setting bounds, plain-hazard conversion, connected shapes, reach
-geometry, lock order, worker flight reports, and pointer cancellation. A local
+geometry, lock order, worker flight reports, whole-object dragging, and pointer cancellation. A local
 DOM smoke test also exercised placement, sheets, undo/redo, long press, pinch,
 mover arrows, outline updates, both worker actions, applying suggestions and
 session restore. Browser automation is unavailable on this Android/Termux host;

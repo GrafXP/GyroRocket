@@ -11,13 +11,14 @@ import { levelToJson, levelToModule } from "./text.js";
 import { addThing, customizeTile, thingDefaults, thingShapes } from "./things.js";
 import { openThingSheet, openSettingsSheet } from "./sheets.js";
 import { reachOf } from "./reach.js";
+import { movableAt, moveObject } from "./move.js";
 
 const UNDO_LIMIT = 200;
 const SAVE_AFTER = 400; // ms after the last change
 const CHECK_AFTER = 150;
 const SIZES = [1, 2, 3, 5]; // the brush, in tiles across
 const TOOLS = [
-  ["pan", "Move the view", "h"],
+  ["pan", "Move things or the view", "h"],
   ["brush", "Brush", "b"],
   ["rect", "Rectangle", "r"],
   ["fill", "Fill", "f"],
@@ -104,7 +105,7 @@ export function editor(el, id) {
           <button id="m-delete">Delete this level</button>
         </section>
         <section>
-          <p class="hint">One finger paints with the tool and tile below, or moves the view with the arrows (tap the tool that's on to go back to them). Two fingers always move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes. Inspect (O) or hold a thing to change its settings.</p>
+          <p class="hint">With Move (the arrows), drag a thing to reposition it or drag the background to move the view. Tap the tool that's on to return to Move. Other tools paint with one finger. Two fingers always move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes. Inspect (O) or hold a thing to change its settings.</p>
           <button class="big" id="m-close">Back to the level</button>
         </section>
       </div>
@@ -148,6 +149,7 @@ export function editor(el, id) {
   let markers = [];
   let path = null;
   let pathDrag = false;
+  let dragging = null;
   let worker = null;
   let workerTimer = 0;
   let reportResult = null;
@@ -171,10 +173,27 @@ export function editor(el, id) {
       }
       const overlays = session.reach ? [...reach] : [];
       if (path) overlays.push({ type: "arrow", x: path.c, y: path.r, x1: path.c + path.to[0], y1: path.r - path.to[1], color: "#ffffff", handle: true });
-      return { reach: overlays, markers, grid, colors: lookColors(grid.settings.look), outline: session.outline ? outline : null, marker: problem?.at ?? null, preview };
+      const movingPreview = dragging
+        ? {
+            c0: dragging.object.c0 + dragging.dc,
+            c1: dragging.object.c1 + dragging.dc,
+            r0: dragging.object.r0 + dragging.dr,
+            r1: dragging.object.r1 + dragging.dr,
+            color: dragging.problem ? "#ff4d4f" : "#ffb347",
+          }
+        : preview;
+      return {
+        reach: overlays,
+        markers,
+        grid,
+        colors: lookColors(grid.settings.look),
+        outline: session.outline ? outline : null,
+        marker: problem?.at ?? null,
+        preview: movingPreview,
+      };
     },
-    paint: { down, move, up, cancel },
-    pans: () => !path && session.tool === "pan",
+    paint: { down, move, up, cancel, cancelOnPinch: () => !!dragging },
+    pans: (c, r) => !path && session.tool === "pan" && !movableAt(session.grid, c, r),
     canInspect: (c, r) =>
       session.tool !== "inspect" &&
       !path &&
@@ -194,6 +213,14 @@ export function editor(el, id) {
       const distance = Math.hypot(c + 0.5 - path.c - path.to[0], r + 0.5 - path.r + path.to[1]);
       pathDrag = distance <= Math.max(1, 24 / (canvas.view?.zoom ?? 16));
       if (pathDrag) path.from = [...path.to];
+      return;
+    }
+    if (tool === "pan") {
+      const object = movableAt(grid, c, r);
+      if (object) {
+        dragging = { object, before: cloneGrid(grid), c, r, dc: 0, dr: 0, problem: null };
+        canvas.redraw();
+      }
       return;
     }
     if (tool === "inspect") {
@@ -229,6 +256,14 @@ export function editor(el, id) {
     tilesChanged();
   }
   function move(c, r) {
+    if (dragging) {
+      const result = moveObject(dragging.before, dragging.object, c - dragging.c, r - dragging.r);
+      if (result.dc === dragging.dc && result.dr === dragging.dr) return;
+      Object.assign(dragging, { dc: result.dc, dr: result.dr, problem: result.problem });
+      session.grid = result.grid;
+      tilesChanged();
+      return;
+    }
     if (path) {
       if (pathDrag) {
         path.to = [Math.max(-200, Math.min(200, Math.round(c + 0.5 - path.c))), Math.max(-200, Math.min(200, Math.round(path.r - r - 0.5)))];
@@ -245,6 +280,18 @@ export function editor(el, id) {
     tilesChanged();
   }
   function up() {
+    if (dragging) {
+      const { before, dc, dr, problem } = dragging;
+      dragging = null;
+      if (!problem && (dc || dr)) commit({ before, after: cloneGrid(session.grid) });
+      else {
+        session.grid = before;
+        tilesChanged();
+        check();
+        if (problem) toast(problem);
+      }
+      return;
+    }
     if (path) {
       pathDrag = false;
       return;
@@ -258,11 +305,18 @@ export function editor(el, id) {
       const before = strokeBefore;
       strokeBefore = null;
       commit({ before, after: cloneGrid(session.grid) });
-      toast("Placed. Inspect or hold it to change its settings");
+      toast("Placed. Move drags it; Inspect or hold changes its settings");
     } else if (tiles.length) commit({ tiles });
     else canvas.redraw();
   }
   function cancel() {
+    if (dragging) {
+      session.grid = dragging.before;
+      dragging = null;
+      tilesChanged();
+      check();
+      return;
+    }
     if (path) {
       if (pathDrag) path.to = path.from;
       pathDrag = false;
@@ -306,7 +360,7 @@ export function editor(el, id) {
   }
   function undoRedo(back) {
     const [from, to] = back ? [session.undo, session.redo] : [session.redo, session.undo];
-    if (stroke || path || !from.length) return;
+    if (stroke || dragging || path || !from.length) return;
     const entry = from.pop();
     if (entry.tiles) {
       for (const [i, was, now] of entry.tiles) session.grid.cells[i] = back ? was : now;
@@ -344,7 +398,7 @@ export function editor(el, id) {
   function save() {
     clearTimeout(saveTimer);
     if (deleted) return;
-    const level = levelFromGrid(session.grid);
+    const level = levelFromGrid(dragging?.before ?? session.grid);
     const text = JSON.stringify(level);
     if (text === session.saved) return;
     if (saveLevel(id, level)) session.saved = text;
@@ -756,6 +810,7 @@ export function editor(el, id) {
   // brush size, Esc closes what's open.
   const onKey = (e) => {
     if (e.key === "Escape") {
+      cancel();
       stopWorker();
       endPath(false);
       for (const o of [palette, menu, exportEl, $("#resize"), $("#settings-sheet"), $("#report")]) o.hidden = true;
