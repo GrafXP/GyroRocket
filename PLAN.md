@@ -563,8 +563,7 @@ levels page. (This was phase 6; it moved to the end, so the game's all there fir
 
 ## Later
 
-- **Level editor** on the phone: paint tiles, place things, fly the level at once,
-  and share it as a link (the map compressed into the URL).
+- **Level editor**, shared levels and top scores: planned in `PLAN-EDITOR.md`.
 - **Ghosts:** record your best run's inputs and race against it. The sim is
   deterministic, so replaying the inputs replays the run.
 - **Endless caves:** a generated cave each day, the same for everyone.
