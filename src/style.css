@@ -700,6 +700,11 @@ body.playing nav {
   width: 100%;
   height: 100%;
   touch-action: none;
+  cursor: crosshair;
+}
+
+.editor[data-mode="pan"] .ed-canvas {
+  cursor: grab;
 }
 
 /* The bars float over the level; the level shows between their buttons. */
@@ -785,6 +790,23 @@ a.button.ed-fly[aria-disabled="true"] {
 
 .ed-size {
   font-weight: 700;
+}
+
+/* Eight buttons across a narrow phone held upright. */
+@media (max-width: 400px) {
+  .ed-tools {
+    gap: 4px;
+    padding-left: calc(8px + env(safe-area-inset-left, 0px));
+    padding-right: calc(8px + env(safe-area-inset-right, 0px));
+  }
+
+  .ed-tools .icon-btn {
+    width: 38px;
+  }
+
+  .ed-swatch {
+    width: 46px;
+  }
 }
 
 /* The level's first problem, under the top bar. */

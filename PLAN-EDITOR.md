@@ -193,9 +193,10 @@ the same object as a level module, map and all, plus `look`.
 
 The editor page (`/editor/<id>`) hides the nav like the game. The top bar has the
 way back, the level's name (edited in place), undo, redo, a menu and Fly; the
-bottom bar the tile (it opens the palette), the tools (brush, rectangle, fill,
-eraser, picker) and the brush size (1, 2, 3 or 5 tiles). Keys: B R F E I pick the
-tools, [ and ] the size, Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z) undo and redo, Esc
+bottom bar the tile (it opens the palette), the tools (move, brush, rectangle,
+fill, eraser, picker) and the brush size (1, 2, 3 or 5 tiles). It starts on Move,
+where one finger moves the view; tapping the tool that's on goes back to it. Keys:
+H B R F E I pick the tools, [ and ] the size, Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z) undo and redo, Esc
 closes things. Pads paint as a row of three, the least a pad can be; painting a
 start, an exit or a key moves the one that was there. A second finger within a
 quarter of a second of the first makes it a pinch and drops what the first

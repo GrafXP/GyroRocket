@@ -13,6 +13,7 @@ const SAVE_AFTER = 400; // ms after the last change
 const CHECK_AFTER = 150;
 const SIZES = [1, 2, 3, 5]; // the brush, in tiles across
 const TOOLS = [
+  ["pan", "Move the view", "h"],
   ["brush", "Brush", "b"],
   ["rect", "Rectangle", "r"],
   ["fill", "Fill", "f"],
@@ -30,7 +31,7 @@ function sessionFor(id, record) {
   const saved = JSON.stringify(record.level);
   const old = sessions.get(id);
   if (old?.saved === saved) return old;
-  const session = { grid: gridFromLevel(record.level), undo: [], redo: [], view: null, tool: "brush", tile: "#", size: 1, outline: false, saved };
+  const session = { grid: gridFromLevel(record.level), undo: [], redo: [], view: null, tool: "pan", tile: "#", size: 1, outline: false, saved };
   sessions.set(id, session);
   return session;
 }
@@ -48,7 +49,7 @@ export function editor(el, id) {
   const session = sessionFor(id, record);
   const $ = html(
     el,
-    `<div class="editor">
+    `<div class="editor" id="editor">
       <div class="ed-view" id="view"></div>
       <div class="ed-bar ed-top">
         <a class="icon-btn" href="/editor" data-link aria-label="My levels">${icon("back")}</a>
@@ -94,7 +95,7 @@ export function editor(el, id) {
           <button id="m-delete">Delete this level</button>
         </section>
         <section>
-          <p class="hint">One finger paints with the tool and tile below. Two fingers move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes.</p>
+          <p class="hint">One finger paints with the tool and tile below, or moves the view with the arrows (tap the tool that's on to go back to them). Two fingers always move the view and pinch to zoom. With a mouse, drag with the right button and zoom with the wheel; Ctrl+Z undoes.</p>
           <button class="big" id="m-close">Back to the level</button>
         </section>
       </div>
@@ -140,6 +141,7 @@ export function editor(el, id) {
       return { grid, colors: lookColors(grid.settings.look), outline: session.outline ? outline : null, marker: problem?.at ?? null, preview };
     },
     paint: { down, move, up, cancel },
+    pans: () => session.tool === "pan",
     onHover: showWhere,
   });
 
@@ -279,6 +281,7 @@ export function editor(el, id) {
   // Tools, the brush size and the tile.
   function setTool(tool) {
     session.tool = tool;
+    $("#editor").dataset.mode = tool;
     for (const b of el.querySelectorAll("[data-tool]")) b.setAttribute("aria-pressed", b.dataset.tool === tool);
     $("#size").disabled = tool !== "brush" && tool !== "erase";
   }
@@ -301,7 +304,10 @@ export function editor(el, id) {
     drawTile(ctx, session.tile, 0, 0, 28, session.grid.things, lookColors(session.grid.settings.look));
     $("#swatch").setAttribute("aria-label", `Tile: ${tileName(session.tile, session.grid.things)}. Change it`);
   }
-  for (const b of el.querySelectorAll("[data-tool]")) b.addEventListener("click", () => setTool(b.dataset.tool));
+  // Tapping the tool that's on turns it off: one finger moves the view again.
+  for (const b of el.querySelectorAll("[data-tool]")) {
+    b.addEventListener("click", () => setTool(b.dataset.tool === session.tool ? "pan" : b.dataset.tool));
+  }
   $("#size").addEventListener("click", () => setSize(SIZES[(SIZES.indexOf(session.size) + 1) % SIZES.length]));
 
   // Where the finger or mouse is, as the parser counts rows and columns.

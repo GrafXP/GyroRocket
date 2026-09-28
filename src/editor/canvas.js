@@ -3,8 +3,9 @@ import { tileLook, AIR_COLOR, OUTSIDE_COLOR } from "./tiles.js";
 
 // The editor's view of the level: tiles seen straight on, `zoom` pixels across,
 // with tile (cx, cy) (in tiles, from the top left) in the middle of the canvas.
-// One finger paints; two pan and pinch to zoom. With a mouse, the left button
-// paints, the others drag, and the wheel zooms.
+// One finger paints, or moves the view when there's no tool to paint with; two
+// move it and pinch to zoom. With a mouse, the left button does what a finger
+// does, the others drag, and the wheel zooms.
 
 const MAX_ZOOM = 64; // pixels per tile
 const GLYPHS_FROM = 6; // pixels per tile, below which tiles are just colours
@@ -147,9 +148,10 @@ export function drawEditor(ctx, { grid, view, width, height, colors, outline = n
 
 // Puts the canvas in `container` and runs it. `scene()` gives what to draw (see
 // drawEditor, less the view and size); `paint` gets { down, move, up, cancel } of
-// a finger or the mouse painting, in tiles; `onHover` the tile under the mouse or
-// finger. `margins` are the pixels the toolbars cover, top, right, bottom, left.
-export function createEditorCanvas(container, { scene, paint, onHover, margins = [0, 0, 0, 0], view: saved = null }) {
+// a finger or the mouse painting, in tiles, unless `pans()` says one finger moves
+// the view; `onHover` gets the tile under the mouse or finger. `margins` are the
+// pixels the toolbars cover, top, right, bottom, left.
+export function createEditorCanvas(container, { scene, paint, pans = () => false, onHover, margins = [0, 0, 0, 0], view: saved = null }) {
   const canvas = document.createElement("canvas");
   canvas.className = "ed-canvas";
   container.append(canvas);
@@ -249,7 +251,7 @@ export function createEditorCanvas(container, { scene, paint, onHover, margins =
     canvas.setPointerCapture(e.pointerId);
     const at = local(e);
     pointers.set(e.pointerId, at);
-    if (e.pointerType === "mouse" && e.button !== 0) {
+    if (pointers.size === 1 && ((e.pointerType === "mouse" && e.button !== 0) || pans())) {
       mode = "drag";
       return;
     }
@@ -259,7 +261,7 @@ export function createEditorCanvas(container, { scene, paint, onHover, margins =
       const tile = tileAt(at);
       setHover(tile);
       paint.down(tile.c, tile.r);
-    } else if (pointers.size === 2) {
+    } else if (pointers.size === 2 && (mode === "paint" || mode === "drag")) {
       if (mode === "paint") {
         if (performance.now() - paintStart < PINCH_GRACE) paint.cancel();
         else paint.up();
