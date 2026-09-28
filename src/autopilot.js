@@ -28,11 +28,13 @@ import { lavaHeight } from "./sim/hazards/rise.js";
 // flame or beam, a lava blob's column, or the ground a crusher or moving block
 // covers, it slows as it comes up to it and waits, hovering, until the hazard's
 // schedule shows a gap long enough to get across; then it goes, and doesn't change
-// its mind. If there's a way round the ground a block covers, it takes that
-// instead. Under a stalactite, it edges forward until the stalactite shakes, backs
-// off, and goes once it has fallen. If crumbling rock is in the way, and there's
-// no way round, it edges up to it until it cracks, backs off, and goes through
-// once it has fallen away.
+// its mind. Hazards too close together to wait between, it crosses as one, when
+// all of them have a gap. If there's a way round the ground a block covers, it
+// takes that instead, or else it keeps clear of where crushers rest. Under a
+// stalactite, it edges forward until the stalactite shakes, backs off, and goes
+// once it has fallen. If crumbling rock is in the way, and there's no way round,
+// it edges up to it until it cracks, backs off, and goes through once it has
+// fallen away.
 
 const MAX_SPEED = 9; // m/s it flies at, at most
 const BRAKE = 3; // m/s² it plans to slow down at
@@ -40,9 +42,11 @@ const LOOK = 5; // m ahead along the path it steers for
 const HOVER = 2; // m above a pad it flies to before letting down
 const LEG_LIMIT = 90 * TICK_RATE;
 const HAZARD_MARGIN = 0.8; // m it keeps from flames and blobs
+const PASSING = 1.2; // m from a flame or beam that it counts as crossing it: a lean swings the feet out
 const MARGINS = [2, 1.5, 1, 0.5, 0]; // m it tries to keep from rock, widest first, when finding a path
 const APPROACH = 3; // m before a hazard it decides whether to cross or wait
 const CROSS_SPEED = 6; // m/s it crosses a hazard at, and slows to as it comes up to one
+const LINK = 4; // m between two hazards it needs to wait between them
 const SPARE = 0.25; // s either side of a hazard's burning that it counts as burning too
 const CREEP = 1.2; // m/s it edges forward at to set off a stalactite, or crack crumbling rock
 const LAVA_MARGIN = 1.5; // m its feet keep above rising lava, where it plans its path…
@@ -110,14 +114,17 @@ export function createPilot(world, { restart = true } = {}) {
       if (pilot.next >= route.length) return fail("the route doesn't end on the exit");
       const stop = route[pilot.next];
       if (stop.missing) return fail(`nothing on the map for ${stop.name} in the route`);
-      // Round the ground moving blocks cover, if there's a way; else through it, waiting.
+      // Round the ground moving blocks cover, if there's a way; else through it,
+      // waiting, and clear of where crushers rest if it can be.
       const boxes = blocking(world);
+      const resting = level.movers.filter((m) => m.kind === "crusher");
       // Through crumbling rock only if there's no way round it, and there's none
       // at all if air doesn't join here and there.
       const [a, b] = [here(r), stop.target];
       const open = airJoins(world.outline, a, b);
       const path =
         (open && findPath(world, a, b, [...boxes, ...level.movers.map(sweep)], world.outline, true)) ||
+        (open && resting.length && findPath(world, a, b, [...boxes, ...resting], world.outline, true)) ||
         (open && level.movers.length && findPath(world, a, b, boxes, world.outline, true)) ||
         breakThrough(world, a, b, boxes);
       if (!path) return fail(`${from} → ${stop.name}: no way through`);
@@ -164,11 +171,18 @@ function steer(world, leg) {
   // The next hazard on the path: wait short of it until it's safe to cross, then go.
   const zone = zones.find((z) => z.to >= at);
   const ahead = zone ? zone.from - at : Infinity;
-  if (zone && !zone.go && (zone.from === 0 || (ahead <= APPROACH && safeToCross(world, zone, Math.max(0, ahead))))) zone.go = true;
+  // It goes only if it can cross the hazards after this one that it couldn't
+  // stop short of, too.
+  const run = zone ? linked(zones, zone, at) : [];
+  const clear = () => run.every((z) => safeToCross(world, z, Math.max(0, z.from - at)));
+  if (zone && !zone.go && (zone.from === 0 || (ahead <= APPROACH && clear()))) for (const z of run) z.go = true;
   const wait = zone && !zone.go && ahead <= APPROACH;
-  // Straight across, but through a hole in crumbling rock, along the path.
+  // Across at crossing speed, but through a hole in crumbling rock with care.
   const crossing = zone && zone.go && !zone.crumble && ahead <= APPROACH && zone.to < path.length - 3;
-  const cap = zone && ahead <= APPROACH + 8 ? CROSS_SPEED : MAX_SPEED;
+  // Slowing for a hazard it can't cross yet: no faster than it can stop at by the
+  // time it has to decide.
+  const halt = zone && !zone.go && ahead > APPROACH && ahead <= APPROACH + 8 && !clear() ? Math.sqrt(2 * BRAKE * (ahead - APPROACH)) + 1 : Infinity;
+  const cap = Math.min(halt, zone && ahead <= APPROACH + 8 ? CROSS_SPEED : MAX_SPEED);
   let vx, vy;
   // Slowing, to creep up to a stalactite or crumbling rock: as fast as it can
   // still brake to CREEP a little short of it (gently: leaning back to brake
@@ -190,8 +204,8 @@ function steer(world, leg) {
     const d = Math.hypot(bx - r.x, by - r.y) || 1;
     [vx, vy] = ahead < 1.5 ? [((bx - r.x) / d) * 2, ((by - r.y) / d) * 2] : [0, 0];
   } else if (crossing) {
-    // Straight on at crossing speed, towards the far side.
-    const [tx, ty] = path[Math.min(path.length - 1, zone.to + 2)];
+    // On along the path at crossing speed, not slowing.
+    const [tx, ty] = path[Math.min(path.length - 1, at + LOOK, zone.to + 2)];
     const d = Math.hypot(tx - r.x, ty - r.y) || 1;
     [vx, vy] = [((tx - r.x) / d) * CROSS_SPEED, ((ty - r.y) / d) * CROSS_SPEED];
   } else if (stop.pad && left < 2 && Math.abs(r.x - padX) < 1) {
@@ -221,6 +235,22 @@ function steer(world, leg) {
   const thrust = leg.duty >= 1;
   if (thrust) leg.duty -= 1;
   return { steer: lean / MAX_LEAN, thrust };
+}
+
+// Zone `first` and the ones after it that it can't stop between, once it's going
+// (it's at `at` along the path): each starting less than LINK metres after the
+// ones before end. Stalactites and crumbling rock it deals with one at a time.
+function linked(zones, first, at) {
+  const run = [first];
+  if (first.stalactite || first.crumble) return run;
+  let end = first.to;
+  for (const z of zones) {
+    if (z === first || z.to < at || z.from < first.from) continue;
+    if (z.stalactite || z.crumble || z.from - end >= LINK) break;
+    run.push(z);
+    end = Math.max(end, z.to);
+  }
+  return run;
 }
 
 // Whether a zone's stalactite hasn't been set off, or its crumbling rock is still
@@ -362,7 +392,8 @@ const blocking = (world) => [...world.level.doors.filter((d, i) => !world.doors[
 // there. It goes by the world's rock unless given another `outline`. With `avoid`,
 // of the shortest paths it takes the one that spends least time in reach of
 // hazards it would have to wait for (a straight line along a band rather than a
-// dip through every lava blob's column). Returns a list of [x, y], or null.
+// dip through every lava blob's column), and of those the straightest (the grid's
+// shortest paths can weave). Returns a list of [x, y], or null.
 export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outline, avoid = false) {
   const { level } = world;
   // The lowest the rocket's centre can be, `steps` metres along the path.
@@ -402,6 +433,7 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
   const queue = new Int32Array(cols * rows);
   const hazard = avoid ? hazardGrid(world, x0, y0, gx0, gy0, cols, rows) : null;
   const exposed = new Int32Array(avoid ? cols * rows : 0); // steps in reach of hazards, from the start
+  const length = new Float32Array(avoid ? cols * rows : 0); // metres from the start, diagonal steps and all
   const start = index(0, 0);
   // Breadth first from the start, keeping MARGINS[pass] clear of rock.
   const search = (pass) => {
@@ -425,11 +457,12 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
           if (nx < gx0 || ny < gy0 || nx - gx0 >= cols || ny - gy0 >= rows) continue;
           const n = index(nx, ny);
           if (from[n] >= 0) {
-            // Found again as far from the start: keep the way with less exposure.
-            // (Breadth first, so i's exposure is settled, and n's isn't used yet.)
-            if (hazard && steps[n] === steps[i] + 1 && n !== start && exposed[i] + hazard[n] < exposed[n]) {
-              from[n] = i;
-              exposed[n] = exposed[i] + hazard[n];
+            // Found again as far from the start: keep the way with less exposure,
+            // and of those the straightest. (Breadth first, so i's are settled, and
+            // n's aren't used yet.)
+            if (hazard && steps[n] === steps[i] + 1 && n !== start) {
+              const [e, l] = [exposed[i] + hazard[n], length[i] + (dx && dy ? Math.SQRT2 : 1)];
+              if (e < exposed[n] || (e === exposed[n] && l < length[n] - 1e-3)) [from[n], exposed[n], length[n]] = [i, e, l];
             }
             continue;
           }
@@ -449,7 +482,7 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
           }
           from[n] = i;
           steps[n] = steps[i] + 1;
-          if (hazard) exposed[n] = exposed[i] + hazard[n];
+          if (hazard) [exposed[n], length[n]] = [exposed[i] + hazard[n], length[i] + (dx && dy ? Math.SQRT2 : 1)];
           queue[tail++] = n;
         }
       }
@@ -549,9 +582,9 @@ const touches = (h, circles) =>
   h.stalactite
     ? underStalactite(h.stalactite, h.floor, circles)
     : h.flame
-      ? inFlame(h.flame, circles, HAZARD_MARGIN)
+      ? inFlame(h.flame, circles, PASSING)
       : h.laser
-        ? inLaser(h.laser, circles, HAZARD_MARGIN)
+        ? inLaser(h.laser, circles, PASSING)
         : h.blob
           ? inColumn(h.blob, circles)
           : inBox(h.swept, circles);
@@ -566,7 +599,7 @@ function reachBox(h) {
 }
 
 // How far the rocket reaches from its centre, upright, and a little more.
-const ROCKET_REACH = Math.max(...circlesAt(0, 0, 0).map((c) => Math.hypot(c.x, c.y) + c.r)) + HAZARD_MARGIN + 1;
+const ROCKET_REACH = Math.max(...circlesAt(0, 0, 0).map((c) => Math.hypot(c.x, c.y) + c.r)) + PASSING + 1;
 
 // For findPath: 1 at each point of its grid where the rocket would be in reach of
 // a hazard it would have to wait for. Points are (x0 + gx, y0 + gy) for gx from

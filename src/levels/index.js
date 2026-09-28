@@ -46,6 +46,14 @@ import l6_5 from "./6-5.js";
 import l6_6 from "./6-6.js";
 import l6_7 from "./6-7.js";
 import l6_8 from "./6-8.js";
+import l7_1 from "./7-1.js";
+import l7_2 from "./7-2.js";
+import l7_3 from "./7-3.js";
+import l7_4 from "./7-4.js";
+import l7_5 from "./7-5.js";
+import l7_6 from "./7-6.js";
+import l7_7 from "./7-7.js";
+import l7_8 from "./7-8.js";
 import testCave from "./testcave.js";
 import bigCave from "./bigcave.js";
 
@@ -90,6 +98,13 @@ export const WORLDS = [
     colors: { face: 0x3b2c28, wall: 0x503a33, rim: 0xe0783a, back: 0x160a07, crumble: 0x9a8070, cracks: 0xff9a40 },
     ending: { title: "Out of the core!", text: "From the heart of the planet up to the surface, and the stars." },
     levels: [l6_1, l6_2, l6_3, l6_4, l6_5, l6_6, l6_7, l6_8],
+  },
+  {
+    name: "Foundry",
+    about: "The old machines still run, and the fire with them: time your way through.",
+    part: 2,
+    colors: { face: 0x34302c, wall: 0x433d37, rim: 0xc8a050, back: 0x100e0c, crumble: 0x7a6a5a, cracks: 0xffa040 },
+    levels: [l7_1, l7_2, l7_3, l7_4, l7_5, l7_6, l7_7, l7_8],
   },
 ].map((world, w) => ({
   ...world,

@@ -241,7 +241,7 @@ Before any new level, make sure big ones run well.
   a *Part two* heading above world 7. The ending moves off whichever level is last:
   6-8 keeps "you made it out", and 10-8 will get the real ending.
 
-- [ ] The stress level runs at 60 fps on the phone, and loads in a couple of seconds.
+- [x] The stress level runs at 60 fps on the phone (110 fps on the frame rate display), and loads in a couple of seconds.
 - [ ] Switching the autopilot on in the stress level starts it flying without a noticeable pause.
 - [ ] `npm test` takes no more than about twice as long as before, with the stress level included.
 - [ ] Finishing 6-8 still gives its ending, and then opens world 7.
@@ -301,7 +301,7 @@ part one, not because it's the last level; "That's every level, for now" only
 shows when there's no next level. The levels page puts a heading over each part
 once there's more than one.
 
-### Phase C2: World 7, Foundry
+### Phase C2: World 7, Foundry ✅ (done)
 
 The eight levels above, with the world's colours and `about` line. Timing is the
 skill here, so the cycles that meet are tuned together, and the dev overlay's
@@ -313,6 +313,47 @@ flame).
 - [ ] A section that goes wrong costs one section, never the whole level.
 - [ ] 7-1 feels like a way back in after world 6, not a step down.
 - [ ] 7-8 is the hardest level yet, and feels like the world's test.
+
+What was built: the Foundry, world 7, the first of part two, with soot-black rock
+and brass edges. Each level's header comment lists its sections. The levels were
+drawn with a building script (rectangles of rock and air, then ragged edges eaten
+into the rock), and are plain text maps like the others.
+
+| Level | Name             | Size      | Autopilot | Par   | Tank | Pads | Sections                                             |
+| ----- | ---------------- | --------- | --------- | ----- | ---- | ---- | ---------------------------------------------------- |
+| 7-1   | Cold start       | 150 × 70  | 144 s     | 145 s | 24 s | 4    | lake with fans, chimney, gallery, run home           |
+| 7-2   | Bellows          | 164 × 64  | 97 s      | 100 s | 24 s | 3    | tailwind, updraft, headwind, tailwind                |
+| 7-3   | Conveyor         | 180 × 60  | 136 s     | 140 s | 26 s | 4    | shutters, conveyor, pools, pistons                   |
+| 7-4   | Hammer and tongs | 184 × 46  | 136 s     | 140 s | 27 s | 3    | anvils, tongs, quench, hammer mill, drop forge, lift |
+| 7-5   | Magnet crane     | 170 × 70  | 95 s      | 95 s  | 24 s | 4    | hub, crane, swing, the way out                       |
+| 7-6   | The pour         | 150 × 100 | 113 s     | 115 s | 26 s | 4    | flue, quench, ladle, pour, spout                     |
+| 7-7   | The forge        | 180 × 86  | 129 s     | 130 s | 20 s | 5    | three keys round a hall, then the pit                |
+| 7-8   | The foundry      | 200 × 96  | 232 s     | 235 s | 26 s | 6    | nine, one from each level before it                  |
+
+Tanks are 1.3× the longest burn between refills and pars the autopilot's time
+rounded up to 5 s, for C6 to tighten. Each level has a beat, mostly 5 s, that
+its cycles fit, so where two things cover the same stretch the gap comes round
+regularly. Flames are mostly walls from floor to roof, so a crossing is a clear
+matter of timing, not a near miss at a flame's tip. 7-4 is lower than the 60 rows
+the worlds table asks for (46), being one long tunnel there and back. 7-8 names 44
+things.
+
+The autopilot needed more work than expected, and none of it was riding blocks:
+the levels never need it, and on the conveyor a rider and a flyer both have a way.
+Coming up to a hazard it can't cross yet, it now slows in time to stop where it
+waits, rather than overshooting into it. Hazards too close together to wait
+between (less than 4 m) it crosses as one, when all of them have a gap: shutters
+one over another, or tongs and the blob pit behind them. It plans round where
+crushers rest when it can, instead of through the floor crusher of a pair of
+tongs. Crossing, it follows its path instead of heading straight for the far
+side, which cut corners. Of the grid's equally short paths it takes the
+straightest, where it used to weave, dipping between blob columns. And it counts
+passing within 1.2 m of a flame or beam, not 0.8, as crossing it, since a lean
+swings the feet out. Worlds 1–6 still fly within their tanks, a few seconds either
+way and never over par.
+
+Levels can be copied into the editor with world 7's look: `LOOKS` (`validate.js`)
+is seven, and goes up with each world.
 
 ### Phase C3: World 8, The Vaults
 

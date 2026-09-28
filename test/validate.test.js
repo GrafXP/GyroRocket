@@ -30,7 +30,7 @@ test("settings it doesn't know, or out of range, are refused", () => {
   refuses(room({ speed: 3 }), /no setting "speed"/);
   refuses(room({ fuel: 0 }), /fuel must be a number from 1 to 300/);
   refuses(room({ fuel: "10" }), /fuel must be/);
-  refuses(room({ look: 7 }), /look must be a whole number from 1 to 6/);
+  refuses(room({ look: LOOKS + 1 }), new RegExp(`look must be a whole number from 1 to ${LOOKS}`));
   refuses(room({ sky: 1.5 }), /sky must be a whole number/);
   refuses(room({ dark: "yes" }), /dark must be true or false/);
   refuses(room({ name: "x".repeat(41) }), /at most 40 characters/);
