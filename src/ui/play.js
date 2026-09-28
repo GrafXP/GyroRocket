@@ -1,8 +1,9 @@
 import { createGame } from "../game.js";
 import { requestTiltPermission } from "../controls.js";
-import { SAFE_SPEED, HULL, TICK_RATE } from "../sim/rocket.js";
+import { SAFE_SPEED, HULL, TICK_RATE, CENTRE_Y } from "../sim/rocket.js";
 import { parseLevel, TILE } from "../sim/level.js";
 import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
+import { rising } from "../sim/hazards/rise.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
 import { levelById, nextLevel, TEST_CAVE } from "../levels/index.js";
@@ -10,6 +11,8 @@ import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSet
 import { html, icon, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
+const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
+const LAVA_NEAR = 10; // m below the rocket that rising lava shows red
 const TILT_MIN = 15; // degrees for full steer, at the sensitivity slider's ends
 const TILT_MAX = 60;
 
@@ -35,6 +38,7 @@ export function play(el, id) {
   const title = def === TEST_CAVE ? def.name : `${def.id} ${def.name}`;
   const settings = loadSettings();
   const next = def === TEST_CAVE ? null : nextLevel(id);
+  const last = def !== TEST_CAVE && !next; // the way out of the core, and the end
   const $ = html(
     el,
     `<div class="game" id="game">
@@ -46,7 +50,7 @@ export function play(el, id) {
           <b id="time">0:00.0</b>
           <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
           <span class="gauge"><small>Hull</small><span class="bar" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="100"><i class="hull" id="hull"></i></span></span>
-          <span class="readout"><span class="crystals" id="crystals"></span><span class="keys" id="keys"></span><span class="speed" id="speed">0.0 m/s</span></span>
+          <span class="readout"><span class="crystals" id="crystals"></span><span class="keys" id="keys"></span><span class="lava" id="lava"></span><span class="speed" id="speed">0.0 m/s</span></span>
         </div>
         <button class="icon-btn" id="fs"></button>
       </div>
@@ -83,8 +87,9 @@ export function play(el, id) {
 
       <div class="overlay menu" id="done" hidden>
         <section>
-          <h2>Level complete</h2>
+          <h2>${last ? "Out of the core!" : "Level complete"}</h2>
           <p class="hint">${title}</p>
+          ${last ? `<p>From the heart of the planet up to the surface, and the stars. That's every level, for now: go back for the stars you missed.</p>` : ""}
           <div class="awards" id="awards"></div>
           <dl class="results" id="results"></dl>
         </section>
@@ -127,6 +132,7 @@ export function play(el, id) {
     speed: $("#speed"),
     crystals: $("#crystals"),
     keys: $("#keys"),
+    lava: $("#lava"),
     message: $("#message"),
   };
   let keysShown = "";
@@ -155,6 +161,10 @@ export function play(el, id) {
       show(hud.speed, `${v.toFixed(1)} m/s`);
       hud.speed.dataset.safe = r.state === "flying" && v <= SAFE_SPEED;
       show(hud.crystals, level.crystals.length ? `◆ ${crystalCount(w)}/${level.crystals.length}` : "");
+      // Rising lava: how far below the rocket's feet it is.
+      const below = w.rise && w.rise.from >= 0 ? Math.max(0, r.y - CENTRE_Y - w.rise.y) : null;
+      show(hud.lava, below === null ? "" : `Lava ${below.toFixed(0)} m ↓`);
+      hud.lava.dataset.near = below !== null && below < LAVA_NEAR;
       if (w.keys.join() !== keysShown) {
         keysShown = w.keys.join();
         hud.keys.innerHTML = w.keys
@@ -185,12 +195,15 @@ export function play(el, id) {
       const on = padUnder(level, r);
       const timer = gateTimers(w)[0];
       let text = "";
-      const how = { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!", laser: "Zapped!", shot: "Shot down!" }[r.cause] ?? "Crashed!";
+      const how =
+        { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!", laser: "Zapped!", shot: "Shot down!", stalactite: "Hit by falling rock!" }[r.cause] ??
+        "Crashed!";
       if (w.done) text = "";
       else if (game?.pilot) text = game.pilot.status;
       else if (performance.now() < lostUntil) text = game.lastPilot.status;
       else if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
       else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
+      else if (rising(w) && w.tick - w.rise.from < LAVA_NEWS) text = "The lava's rising!";
       else if (on?.kind === "switch") {
         const laser = level.lasers.some((l) => l.label === on.opens);
         text = `${laser ? `Laser ${on.label} is off` : `Gate ${on.label} is open`}${on.time ? `. You have ${on.time} s from lift-off` : ""}`;

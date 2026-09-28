@@ -4,9 +4,11 @@ const near = []; // reused, to keep the hot path free of garbage
 
 // The deepest overlap between any of `circles` ({ x, y, r, foot }) and rock, or the
 // rectangles in `boxes` ({ x0, y0, x1, y1 }: shut doors and gates, moving blocks),
-// or null if none touch. Returns { depth, nx, ny, px, py, foot, box }: moving the
-// circle `depth` along (nx, ny) frees it, (px, py) is the point it touches, and
-// `box` is the rectangle it touches, if it's one.
+// or null if none touch. A box with a `poly` (a convex polygon, anticlockwise, as
+// [x, y] points inside its rectangle) is that shape instead: a stalactite. Returns
+// { depth, nx, ny, px, py, foot, box }: moving the circle `depth` along (nx, ny)
+// frees it, (px, py) is the point it touches, and `box` is the box it touches, if
+// it's one.
 export function deepestContact(outline, circles, boxes = []) {
   let x0 = Infinity;
   let y0 = Infinity;
@@ -51,6 +53,11 @@ export function deepestContact(outline, circles, boxes = []) {
   for (const b of boxes) {
     if (b.x0 > x1 || b.x1 < x0 || b.y0 > y1 || b.y1 < y0) continue;
     for (const c of circles) {
+      if (b.poly) {
+        const hit = polyContact(b.poly, c);
+        if (hit && (!best || hit.depth > best.depth)) best = { ...hit, foot: c.foot, box: b };
+        continue;
+      }
       const px = Math.max(b.x0, Math.min(b.x1, c.x));
       const py = Math.max(b.y0, Math.min(b.y1, c.y));
       let depth, nx, ny;
@@ -72,4 +79,33 @@ export function deepestContact(outline, circles, boxes = []) {
     }
   }
   return best;
+}
+
+// How deep circle `c` is in the convex polygon `poly` (anticlockwise), as
+// { depth, nx, ny, px, py } like deepestContact, or null if it isn't.
+export function polyContact(poly, c) {
+  let inside = true;
+  let nearest = null; // the closest edge, from inside: { d, nx, ny }
+  let closest = null; // the closest point on the edges, from outside: { d, px, py }
+  for (let i = 0; i < poly.length; i++) {
+    const [ax, ay] = poly[i];
+    const [bx, by] = poly[(i + 1) % poly.length];
+    const [dx, dy] = [bx - ax, by - ay];
+    const len = Math.hypot(dx, dy);
+    const [nx, ny] = [dy / len, -dx / len]; // outwards
+    const d = (c.x - ax) * nx + (c.y - ay) * ny;
+    if (d > 0) inside = false;
+    if (!nearest || d > nearest.d) nearest = { d, nx, ny };
+    const t = Math.max(0, Math.min(1, ((c.x - ax) * dx + (c.y - ay) * dy) / (len * len)));
+    const [px, py] = [ax + dx * t, ay + dy * t];
+    const e = Math.hypot(c.x - px, c.y - py);
+    if (!closest || e < closest.d) closest = { d: e, px, py };
+  }
+  if (inside) {
+    const { d, nx, ny } = nearest;
+    return { depth: c.r - d, nx, ny, px: c.x - nx * d, py: c.y - ny * d };
+  }
+  const { d, px, py } = closest;
+  if (d >= c.r) return null;
+  return { depth: c.r - d, nx: (c.x - px) / d, ny: (c.y - py) / d, px, py };
 }

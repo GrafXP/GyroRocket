@@ -38,6 +38,14 @@ import l5_5 from "./5-5.js";
 import l5_6 from "./5-6.js";
 import l5_7 from "./5-7.js";
 import l5_8 from "./5-8.js";
+import l6_1 from "./6-1.js";
+import l6_2 from "./6-2.js";
+import l6_3 from "./6-3.js";
+import l6_4 from "./6-4.js";
+import l6_5 from "./6-5.js";
+import l6_6 from "./6-6.js";
+import l6_7 from "./6-7.js";
+import l6_8 from "./6-8.js";
 import testCave from "./testcave.js";
 
 // The worlds in order, each with its levels in order. A level's id is
@@ -72,6 +80,12 @@ export const WORLDS = [
     about: "Caves with no light but your own, laser gates, and turrets that shoot when they can see you.",
     colors: { face: 0x3a4050, wall: 0x4a5266, rim: 0x7f8fb0, back: 0x0c0e14 },
     levels: [l5_1, l5_2, l5_3, l5_4, l5_5, l5_6, l5_7, l5_8],
+  },
+  {
+    name: "Core",
+    about: "Stalactites drop on you, crumbling rock gives way, and the lava rises: get out, up to the surface.",
+    colors: { face: 0x3b2c28, wall: 0x503a33, rim: 0xe0783a, back: 0x160a07, crumble: 0x9a8070, cracks: 0xff9a40 },
+    levels: [l6_1, l6_2, l6_3, l6_4, l6_5, l6_6, l6_7, l6_8],
   },
 ].map((world, w) => ({
   ...world,

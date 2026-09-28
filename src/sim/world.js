@@ -7,6 +7,9 @@ import { inBlob } from "./hazards/blob.js";
 import { fieldAt, moverBox } from "./machines.js";
 import { laserPhase, inLaser } from "./hazards/laser.js";
 import { stepTurrets } from "./hazards/turret.js";
+import { hangingState, hangingShapes, stepStalactites } from "./hazards/stalactite.js";
+import { crumbleState, crumbleIndex, crackAt, stepCrumbles, restoreCrumbles } from "./hazards/crumble.js";
+import { riseState, triggerRise, stepRise, lavaHeight, inRisingLava } from "./hazards/rise.js";
 
 export const REFUEL_TIME = 1.5; // seconds on a fuel pad to fill an empty tank, or mend a wrecked hull
 export const RETRY_AFTER = TICK_RATE; // ticks after a crash, getting stranded or the finish before a tap goes on
@@ -26,16 +29,18 @@ const SEEN_RADIUS = 12; // tiles round the rocket that count as seen, for the ma
 // when its time is up, but not on the rocket.
 //
 // Flamethrowers burn the hull while the rocket is in their flame; lava, the blobs
-// it throws up, and laser beams destroy it; turrets' shots cost hull. Fans and magnets push it about, and moving blocks
-// shove it, carry it when it's landed on them, and crush it against rock. They all
-// keep to the level clock (world.tick).
+// it throws up, laser beams and rising lava destroy it; turrets' shots and falling
+// stalactites cost hull. Fans and magnets push it about, and moving blocks shove
+// it, carry it when it's landed on them, and crush it against rock. Crumbling rock
+// it touches falls away. They all keep to the level clock (world.tick).
 //
 // Landing on a fuel pad fills the tank, mends the hull and saves a checkpoint: the
 // pad, and the level as it is (crystals, keys, doors, gates open and lasers off for
-// good). After a crash, or when the rocket is stranded (out of fuel away from a
-// fuel pad), `restart` puts a fresh rocket on the checkpoint's pad and the level
-// back as it was, with timed gates shut, timed lasers on, and no shots in the air.
-// Until the first fuel pad, the checkpoint is the start.
+// good, the stalactites and crumbling rock that have fallen, the rising lava). After
+// a crash, or when the rocket is stranded (out of fuel away from a fuel pad),
+// `restart` puts a fresh rocket on the checkpoint's pad and the level back as it
+// was, with timed gates shut, timed lasers on, no shots in the air, and the lava
+// waiting for lift-off. Until the first fuel pad, the checkpoint is the start.
 export function createWorld(level, outline = buildOutline(level)) {
   const world = {
     level,
@@ -55,6 +60,10 @@ export function createWorld(level, outline = buildOutline(level)) {
     turrets: level.turrets.map((t) => ({ charge: -1, ready: Math.round(t.offset * TICK_RATE) })),
     shots: [], // { x, y, vx, vy, damage, born }
     flames: level.flames.map(() => ({ fired: -1 })), // when each "near" flamethrower was set off
+    stalactites: level.stalactites.map(hangingState),
+    crumbles: [], // per crumbling tile: { cracked, fell }
+    crumbleAt: crumbleIndex(level), // each tile's index in crumbles, or -1
+    rise: riseState(level), // the rising lava, if there is: { y, from, held }
     seen: new Uint8Array(level.width * level.height), // tiles the rocket has been near
     seenFrom: -1,
     checkpoint: null,
@@ -66,6 +75,7 @@ export function createWorld(level, outline = buildOutline(level)) {
     cheats: { god: false, fuel: false }, // for the dev overlay
     assisted: false, // the autopilot flew some of it, so it doesn't count
   };
+  restoreCrumbles(world, level.crumbles.map(crumbleState)); // the outline may have been played in before
   save(world, level.start);
   place(world);
   return world;
@@ -79,6 +89,9 @@ function save(world, pad) {
     keyTicks: [...world.keyTicks],
     open: world.doors.map((d) => d.open && d.until < 0),
     off: world.lasers.map((l) => l.open && l.until < 0),
+    fallen: world.stalactites.map((s) => s.gone >= 0),
+    crumbles: world.crumbles.map((c) => (c.fell >= 0 ? { ...c } : crumbleState())),
+    rise: world.rise && { y: world.rise.y, from: world.rise.from },
   };
 }
 
@@ -98,6 +111,9 @@ export function restart(world) {
   world.lasers = saved.off.map((open) => ({ open, changed: open ? -Infinity : -1, until: -1 }));
   world.turrets = world.level.turrets.map(() => ({ charge: -1, ready: world.tick + TICK_RATE }));
   world.shots = [];
+  world.stalactites = saved.fallen.map((gone) => ({ ...hangingState(), gone: gone ? 0 : -1 }));
+  restoreCrumbles(world, saved.crumbles);
+  if (saved.rise) world.rise = { ...saved.rise, held: true };
   world.restarts++;
   world.stranded = false;
   world.downTick = -1;
@@ -114,9 +130,12 @@ export function step(world, input) {
   r.god = world.cheats.god;
   if (world.cheats.fuel) r.fuel = r.tank;
   const { level, tick } = world;
-  // Blocks at any point through this tick (0 to 1), with doors and gates.
-  const doors = shut(world);
-  const boxesAt = (f) => (level.movers.length ? [...doors, ...level.movers.map((m) => moverBox(m, tick - 1 + f))] : doors);
+  stepCrumbles(world);
+  stepRise(world);
+  // Blocks at any point through this tick (0 to 1), with doors, gates and hanging
+  // stalactites.
+  const blocks = [...shut(world), ...hangingShapes(world)];
+  const boxesAt = (f) => (level.movers.length ? [...blocks, ...level.movers.map((m) => moverBox(m, tick - 1 + f))] : blocks);
   const now = level.movers.map((m) => moverBox(m, tick));
   if (r.state === "landed") carry(world, r, now);
   stepRocket(r, input, world.outline, {
@@ -130,9 +149,17 @@ export function step(world, input) {
     openDoors(world);
     see(world);
     hazards(world);
+    crumble(world);
   }
+  const hit = stepStalactites(world, circlesAt(r.x, r.y, r.angle), [...shut(world), ...now], lavaHeight(world));
+  if (hit) hurt(r, hit, "stalactite");
+  level.stalactites.forEach((s, i) => {
+    const state = world.stalactites[i];
+    if (state.gone === world.tick) crackAt(world, s.x, s.tip - state.drop - 0.3); // shattered on crumbling rock
+  });
 
   const pad = padUnder(world.level, r);
+  triggerRise(world, pad);
   world.refuelling = false;
   if (pad?.kind === "exit" && world.startTick >= 0) {
     world.done = true;
@@ -183,8 +210,8 @@ function collect(world) {
   }
 }
 
-// Burns the rocket in any flame that's on, destroys it in a lava blob or a laser
-// beam, and steps the turrets and their shots.
+// Burns the rocket in any flame that's on, destroys it in a lava blob, a laser
+// beam or the rising lava, and steps the turrets and their shots.
 function hazards(world) {
   const r = world.rocket;
   const circles = circlesAt(r.x, r.y, r.angle);
@@ -196,6 +223,18 @@ function hazards(world) {
   if (world.level.lasers.some((l, i) => laserPhase(l, world.lasers[i], world.tick) === "on" && inLaser(l, circles))) hurt(r, r.hull, "laser");
   const shot = stepTurrets(world, circles);
   if (shot) hurt(r, shot, "shot");
+  if (inRisingLava(world, circles)) hurt(r, r.hull, "lava");
+}
+
+// Cracks the crumbling rock the rocket touched this tick, or is standing on.
+function crumble(world) {
+  const r = world.rocket;
+  for (let i = 0; i < r.touched.length; i += 2) crackAt(world, r.touched[i], r.touched[i + 1]);
+  if (r.state === "landed") {
+    const feet = r.y - CENTRE_Y - 0.1;
+    crackAt(world, r.x - FOOT_X, feet);
+    crackAt(world, r.x + FOOT_X, feet);
+  }
 }
 
 // The state of the gate, or laser, that switch `label` works: { open, changed, until }.

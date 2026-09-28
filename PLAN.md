@@ -71,10 +71,12 @@ src/
   sim/
     rocket.js      flight: thrust, gravity, lean, fuel, hull
     level.js       parses a level's text into tiles, pads, keys, doors and hazards
-    outline.js     marching squares: tiles → rock outline segments, looked up by tile
-    collide.js     the rocket against the outline and closed doors; landing
+    outline.js     marching squares: tiles → rock outline segments, looked up by tile;
+                   crumbling rock falling away changes it
+    collide.js     the rocket against the outline, closed doors and stalactites; landing
     world.js       a level in play: rocket, pickups, doors and gates, checkpoint, clock
-    hazards/       one file per kind: its schedule, and what it hits
+    hazards/       one file per kind: its schedule, and what it hits (flames, blobs,
+                   lasers, turrets, stalactites, crumbling rock, rising lava)
     machines.js    fans, magnets, movers and crushers: their push, and where they are
   levels/
     index.js       the worlds in order, each with its levels and colours
@@ -88,6 +90,8 @@ src/
     hazards.js     flamethrowers, lava and blobs
     machines.js    fans, magnets, movers and crushers
     defences.js    laser gates, turrets and their shots
+    core.js        stalactites, crumbling rock breaking up, rising lava
+    sky.js         the night sky over a level that comes out on the surface
   ui/
     dom.js         shared page bits: icons, stars, theme picker, fullscreen button
     play.js        the play page: HUD, pause menu, level complete sheet, dev overlay
@@ -140,13 +144,20 @@ export default {
 | `R Y G B`   | door: a rectangle of its letter, opened by its key         |
 | `< > ^ v`   | flamethrower facing that way, with the default cycle       |
 | `~`         | lava: rock that destroys the rocket                        |
-| `1`–`9`, other letters | a thing set up in `things` by that character: a switch (a pad), a gate, mover or crusher (rectangles), a flamethrower, a lava blob, a fan, a magnet, a laser or a turret |
+| `!`         | stalactite, hanging from the rock above (a column of them is a longer one) |
+| `%`         | crumbling rock: falls away a moment after it's touched     |
+| `1`–`9`, other letters | a thing set up in `things` by that character: a switch (a pad), a gate, mover or crusher (rectangles), a flamethrower, a lava blob, a fan, a magnet, a laser, a turret or a stalactite |
 
 A pad is a run of at least 3 of its letter on the air row just above a flat floor;
 so is a switch. Door and gate tiles are air to the rock outline, and block as
 rectangles while shut. A level has at most one key of each colour, every door's key
 is on the map, every switch opens a gate and every gate has a switch. Later hazards
 get letters as they arrive.
+
+A level can also have `dark: true`; `rise: { speed, from, to, after, delay }`,
+lava that fills the cave from `from` tiles above the map's bottom at `speed` m/s,
+from lift-off or `delay` seconds after the key or switch named in `after`; and
+`sky: n`, the top n rows open to the sky, with nothing above the map.
 
 `route` lists the autopilot's stops: keys by letter, `F` for the nearest other fuel
 pad or `F@45` for the one at map column 45, switches by digit, and `E`. Without
@@ -490,7 +501,7 @@ Crossfire, 5-6 Blind maze, 5-7 Laser grid, 5-8 The deep dark; 5-1, 5-3, 5-6, 5-7
 5-8 are dark. Tanks are about 1.25× the longest stretch between fuel pads. Lasers on
 a cycle are off 2.5 s at a time.
 
-### Phase 8: The core
+### Phase 8: The core ✅ (done)
 Stalactites shake, then drop, when the rocket passes under them. Crumbling rock
 (`%`) cracks and falls away a moment after the rocket touches it or lands on it.
 In escape levels lava rises at a set speed, from the start or from a trigger, and
@@ -500,6 +511,43 @@ prototype are waiting.
 - [ ] Stalactites always shake before they fall.
 - [ ] Crumbling floor gives you time to take off if you're quick.
 - [ ] The last level is hard but fair, and feels like an ending.
+
+What was built: a stalactite (`!`, or a `things` kind "stalactite") hangs from the
+rock above it, 1.6 m across at the top and coming to a point, and is rock to fly
+into (a triangle in the collision; `deepestContact` takes convex shapes as well
+as rectangles). Once the rocket's centre is below its tip and within `reach` (5 m)
+to either side, with no rock in between, it shakes for `warn` (0.7 s), shedding
+dust, then drops and shatters on the first rock, door, block or lava it meets; a
+hit costs `damage` (40, "Hit by falling rock!"). Crumbling rock is rock in the
+outline, which now keeps its own copy of the tiles and can redo the cells round
+one (`setTile`). Where the rocket touches it, or lands on it, it cracks, its
+cracks glowing brighter, and falls away `crumble` (1) seconds later, the crumbling
+rock joined to it following a tile every 0.2 s, so a whole bridge or plug goes.
+The cave's mesh builds the cells round crumbling rock apart, and again when a tile
+falls. Rising lava (`rise`) is a surface across the whole cave, drawn over
+everything below it; the camera drops to keep it in view while it's within about
+25 m of the rocket, and the HUD says how far below it is. Checkpoints keep the
+stalactites and crumbling rock that have fallen, and the lava's height; after a
+restart the lava waits for lift-off. `sky: n` opens the top of a level: no rock
+above it, no back wall behind its top n rows, and a night sky with stars and the
+moon instead. The last level's results say you made it out.
+
+The autopilot treats hanging stalactites as rock. Where its path goes under one,
+it edges forward until the stalactite shakes, backs off, and goes once it has
+fallen. If there's no way but through crumbling rock, it plans through one piece
+of it at a time, creeps up until it cracks, holds still, and follows its path
+through the hole. It keeps its path above where rising lava will be by the time
+it gets there (at about 4 m/s), and leaves a fuel pad early if the lava's coming.
+The level flood fill treats crumbling rock as air and stalactites as rock. A
+path-search bug is fixed on the way: a foot wholly inside a thin wedge of rock
+touched none of its edges, so paths could clip the end of a one-tile ledge.
+
+World 6, *Core*: 6-1 Falling rock, 6-2 Brittle, 6-3 Rising tide, 6-4 Cave-in, 6-5
+Brimstone (flamethrowers, a key and a door), 6-6 Wake the core (the key wakes the
+lava), 6-7 Collapse (dark; a switch wakes the lava), 6-8 Escape (from the core to
+the surface, the lava rising from lift-off at 1.5 m/s). Tanks are 1.4× the longest
+stretch between fuel pads in 6-1 to 6-3, and 1.2× after; pars are the autopilot's
+time, which waits out every stalactite, so players will beat them.
 
 ### Phase 9: Game feel
 Sound made in code with Web Audio (no files): an engine roar that follows the

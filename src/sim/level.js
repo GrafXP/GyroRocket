@@ -35,7 +35,14 @@ export const CRUSHER = { to: [0, 0], rest: 2, warn: 0.6, slam: 0.15, hold: 0.6, 
 // `range` m, after winding up for `windup` s, then reloads; a shot costs `damage`.
 export const LASER = { mode: "always", on: 2, off: 2, warn: 0.5, offset: 0 };
 export const TURRET = { range: 40, windup: 0.5, reload: 0.7, speed: 6, damage: 30, offset: 0 };
-const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
+// A stalactite shakes for `warn` seconds once the rocket is below it and within
+// `reach` metres to either side, then drops; a hit costs `damage`. It's
+// STALACTITE_WIDTH across where it hangs from the roof, and comes to a point.
+export const STALACTITE = { reach: 5, warn: 0.7, damage: 40 };
+export const STALACTITE_WIDTH = 1.6; // m
+// Crumbling rock falls away `crumble` seconds after the rocket touches it.
+export const CRUMBLE = 1;
+const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB!%"]);
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything
 // wrong with it, naming the row and column as written.
@@ -57,11 +64,19 @@ const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB"]);
 //   rectangle of its character where it rests;
 // - { kind: "laser", facing: "up", ...LASER settings } is a laser gate's emitter;
 //   a switch can name it in `opens`, to turn it off;
-// - { kind: "turret", ...TURRET settings } is a gun turret.
+// - { kind: "turret", ...TURRET settings } is a gun turret;
+// - { kind: "stalactite", ...STALACTITE settings } is a stalactite, like `!`.
+// A stalactite (!) hangs from the rock above it; a column of them is a longer one.
+// Crumbling rock (%) is rock until it's touched, then falls away (level.crumbles).
 // `dark: true` makes a level dark but for the rocket's headlight and what glows.
-// Door, gate, mover and crusher tiles are air to the rock outline; they block as
-// rectangles (level.doors, level.movers). Flamethrowers, fans, magnets and lava are
-// rock.
+// `crumble` is how long crumbling rock takes to fall (CRUMBLE seconds).
+// `rise: { speed, from, to, after, delay }` fills the cave with lava from `from`
+// tiles above the map's bottom (0), rising `speed` m/s up to `to` (the top), from
+// lift-off, or `delay` seconds after the key (r y g b) or switch named in `after`.
+// `sky: n` opens the top n rows of the map to the sky, and everything above it.
+// Door, gate, mover, crusher and stalactite tiles are air to the rock outline; they
+// block as shapes of their own (level.doors, level.movers, level.stalactites).
+// Flamethrowers, fans, magnets, lava and crumbling rock are rock.
 export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const lines = map.split("\n");
   while (lines.length && !lines[0].trim()) lines.shift();
@@ -84,6 +99,9 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   const magnets = [];
   const emitters = [];
   const turrets = [];
+  const crumbly = new Uint8Array(width * height);
+  const crumbles = [];
+  const hanging = [];
   rows.forEach((row, r) => {
     const j = height - 1 - r;
     for (let c = 0; c < width; c++) {
@@ -93,7 +111,11 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
       else if (FLAME_LETTERS[ch] || kindOf(ch) === "flame") {
         solid[j * width + c] = 1;
         nozzles.push({ c, j, ...FLAME, facing: FLAME_LETTERS[ch], ...(FLAME_LETTERS[ch] ? {} : things[ch]) });
-      } else if (ch === "~" || kindOf(ch) === "blob") {
+      } else if (ch === "%") {
+        solid[j * width + c] = crumbly[j * width + c] = 1;
+        crumbles.push({ c, j, x0: c * TILE, y0: j * TILE, x1: (c + 1) * TILE, y1: (j + 1) * TILE });
+      } else if (ch === "!" || kindOf(ch) === "stalactite") hanging.push({ c, j, ch });
+      else if (ch === "~" || kindOf(ch) === "blob") {
         solid[j * width + c] = lava[j * width + c] = 1;
         if (kindOf(ch) === "blob") blobs.push({ ...BLOB, ...things[ch], x: at.x, y: (j + 1) * TILE });
       } else if (kindOf(ch) === "fan") {
@@ -114,7 +136,7 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
         keys.push({ color: KEY_COLORS[ch], ...at });
       } else if (!RESERVED.has(ch) && !kindOf(ch)) {
         if (!/[0-9A-Za-z]/.test(ch)) throw new Error(`${where(c, j)}: unknown tile "${ch}"`);
-        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame, blob, fan, magnet, mover, crusher, laser or turret`);
+        throw new Error(`${where(c, j)}: "${ch}" isn't set up in things as a switch, gate, flame, blob, fan, magnet, mover, crusher, laser, turret or stalactite`);
       } else if (kindOf(ch) && !["switch", "gate", "mover", "crusher"].includes(kindOf(ch))) {
         throw new Error(`${where(c, j)}: "${ch}" is set up as a "${kindOf(ch)}", which isn't a kind of thing`);
       }
@@ -123,6 +145,9 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   });
 
   if (settings.fuel !== undefined && !(settings.fuel > 0)) throw new Error(`${name}: fuel must be a number of seconds`);
+  if (settings.sky !== undefined && !(Number.isInteger(settings.sky) && settings.sky > 0 && settings.sky < height)) {
+    throw new Error(`${name}: sky must be a number of rows at the top of the map`);
+  }
   const level = {
     name,
     width,
@@ -140,8 +165,13 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
     movers: [],
     lasers: [],
     turrets,
+    crumbly,
+    crumbles,
+    stalactites: [],
     things,
+    crumble: CRUMBLE,
     ...settings,
+    rise: null,
   };
   const letter = (c, j) => (c < 0 || j < 0 || c >= width || j >= height ? "#" : letters[(height - 1 - j) * width + c]);
 
@@ -157,6 +187,7 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
       if (c1 - c + 1 < PAD_WIDTH) throw new Error(`${where(c, j)}: a pad is at least ${PAD_WIDTH} tiles wide`);
       for (let k = c; k <= c1; k++) {
         if (!isSolid(level, k, j - 1)) throw new Error(`${where(k, j)}: a pad must stand on rock`);
+        if (crumbly[(j - 1) * width + k]) throw new Error(`${where(k, j)}: a pad can't stand on crumbling rock`);
         for (let h = 1; h < HEADROOM; h++) {
           if (isSolid(level, k, j + h)) throw new Error(`${where(k, j)}: a pad needs ${HEADROOM} tiles of air above it`);
         }
@@ -214,6 +245,19 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
         level.movers.push({ ...spec, kind, ...box, to: [spec.to[0] * TILE, spec.to[1] * TILE] });
       }
     }
+  }
+
+  // Stalactites: each a column of its character, hanging from rock.
+  for (const { c, j, ch } of hanging) {
+    if (letter(c, j + 1) === ch) continue; // not the top of its column
+    if (!isSolid(level, c, j + 1) || crumbly[(j + 1) * width + c]) throw new Error(`${where(c, j)}: a stalactite must hang from rock`);
+    let j0 = j;
+    while (letter(c, j0 - 1) === ch) j0--;
+    const x = (c + 0.5) * TILE;
+    const [top, tip] = [(j + 1) * TILE, j0 * TILE];
+    const half = STALACTITE_WIDTH / 2;
+    const { reach, warn, damage } = { ...STALACTITE, ...(ch === "!" ? {} : things[ch]) };
+    level.stalactites.push({ c, j0, j1: j, x, top, tip, reach, warn, damage, x0: x - half, x1: x + half, y0: tip, y1: top });
   }
 
   // Flames: from the nozzle's face, as far as `length` tiles or the first rock.
@@ -293,7 +337,22 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   }
   level.start = level.pads.find((p) => p.kind === "start");
   level.exit = level.pads.find((p) => p.kind === "exit");
+  if (settings.rise) level.rise = parseRise(level, settings.rise);
   return level;
+}
+
+// A level's rising lava, from its `rise` setting: heights in metres.
+function parseRise(level, { speed, from = 0, to = level.height, after = null, delay = 0 }) {
+  const { name } = level;
+  if (!(speed > 0)) throw new Error(`${name}: rising lava needs a speed, in m/s`);
+  if (!(from >= 0 && to > from)) throw new Error(`${name}: rising lava goes up, from ${from} to ${to}?`);
+  if (!(delay >= 0)) throw new Error(`${name}: rising lava's delay must be a number of seconds`);
+  if (after !== null) {
+    const key = KEY_COLORS[after];
+    const known = key ? level.keys.some((k) => k.color === key) : level.pads.some((p) => p.kind === "switch" && p.label === String(after));
+    if (!known) throw new Error(`${name}: rising lava comes after "${after}", which isn't a key or switch on the map`);
+  }
+  return { speed, from: from * TILE, to: to * TILE, after: after === null ? null : String(after), delay };
 }
 
 // Whether the point (x, y) is in a lava tile.
@@ -302,7 +361,10 @@ export function lavaAt(level, x, y) {
   return c >= 0 && j >= 0 && c < level.width && j < level.height && level.lava[j * level.width + c] === 1;
 }
 
+// Whether tile (c, j) is rock, as parsed. Outside the map is rock, but for the
+// sky above a level that has one.
 export function isSolid(level, c, j) {
+  if (j >= level.height && level.sky) return false;
   if (c < 0 || j < 0 || c >= level.width || j >= level.height) return true;
   return level.solid[j * level.width + c] === 1;
 }

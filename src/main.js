@@ -143,6 +143,8 @@ function help(el) {
     <p>Fans blow you along their column of dust: burn hard to fight them. Magnets pull you in (their rings close in) or push you away (their rings spread out), hardest close up. Moving blocks shove you and carry you if you land on them. Crushers shake before they slam: don't be in the way, or squeezed against the rock.</p>
     <h2>Dark, lasers and turrets</h2>
     <p>Some caves are dark: your headlight shows the way ahead, and pads, keys and crystals glow. A laser beam destroys you at a touch; some flicker before they come on, and a switch can turn one off. Turrets glow as they wind up, then fire a slow shot at where you are: keep moving, or put rock between you.</p>
+    <h2>Falling rock, crumbling rock and rising lava</h2>
+    <p>Stalactites shake and shed dust when you pass beneath them, then drop: hang back until they've fallen, or be quick. A hit costs hull. Crumbling rock is paler, with glowing cracks: touch it or land on it and it gives way a moment later, with all the crumbling rock joined to it, so take off fast. In some caves the lava rises, from the start or once you've taken something: the HUD shows how far below you it is. Climb!</p>
     <h2>Stars</h2>
     <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
     <h2>Tilt not working?</h2>

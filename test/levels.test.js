@@ -2,13 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LEVELS, WORLDS, levelById, nextLevel } from "../src/levels/index.js";
 import { parseLevel } from "../src/sim/level.js";
-import { buildOutline } from "../src/sim/outline.js";
+import { buildOutline, setTile } from "../src/sim/outline.js";
 import { deepestContact } from "../src/sim/collide.js";
 import { circlesAt, canStand, CENTRE_Y } from "../src/sim/rocket.js";
 import { touches } from "../src/sim/world.js";
 import { flyLevel } from "../scripts/autopilot.js";
 import { inFlame } from "../src/sim/hazards/flame.js";
 import { inLaser } from "../src/sim/hazards/laser.js";
+import { stalactiteShape } from "../src/sim/hazards/stalactite.js";
 
 // Everywhere an upright rocket can get to from the start pad, moving in 1 m steps
 // without touching rock, the shut doors and gates in `boxes`, a flame that's always
@@ -56,15 +57,19 @@ const onPad = (spots, pad) => {
 
 // Everywhere the rocket can get to, opening each door once its key has been
 // reached, and each gate (or laser that's always on) once its switch has.
-// Cycling lasers are no bar: they go off.
-function reachable(level, outline) {
+// Cycling lasers are no bar: they go off; nor is crumbling rock, which falls away
+// once it's touched. Stalactites are: some might never fall.
+function reachable(level) {
+  const outline = buildOutline(level);
+  for (const t of level.crumbles) setTile(outline, t.c, t.j, false);
+  const stalactites = level.stalactites.map((s) => stalactiteShape(s));
   const open = new Set();
   const off = new Set();
   for (;;) {
     const spots = flood(
       level,
       outline,
-      level.doors.filter((d, i) => !open.has(i)),
+      [...level.doors.filter((d, i) => !open.has(i)), ...stalactites],
       level.lasers.filter((l, i) => l.mode === "always" && !off.has(i)),
     );
     const keys = level.keys.filter((k) => spots.some(([x, y]) => touches({ x, y, angle: 0 }, k))).map((k) => k.color);
@@ -100,7 +105,7 @@ for (const def of LEVELS) {
     for (const pad of level.pads) {
       assert.ok(canStand(outline, (pad.x0 + pad.x1) / 2, pad.y), `can't stand on the ${pad.kind} pad at column ${pad.c0 + 1}`);
     }
-    const spots = reachable(level, outline);
+    const spots = reachable(level);
     for (const pad of level.pads) {
       assert.ok(onPad(spots, pad), `can't get to the ${pad.kind} pad at column ${pad.c0 + 1}`);
     }

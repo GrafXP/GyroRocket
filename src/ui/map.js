@@ -1,4 +1,5 @@
-import { TILE, isSolid } from "../sim/level.js";
+import { TILE } from "../sim/level.js";
+import { tileSolid } from "../sim/outline.js";
 import { KEY_LOOKS, GATE_COLOR, css, drawShape } from "../looks.js";
 
 const COLORS = {
@@ -10,7 +11,7 @@ const COLORS = {
 };
 
 // Draws the parts of the level the rocket has been near (world.seen) on `canvas`,
-// scaled to fit it: rock and air, pads, shut doors and gates, the keys and
+// scaled to fit it: rock (as it is now, with crumbled rock gone) and air, pads, shut doors and gates, the keys and
 // crystals still there, and the rocket.
 export function drawMap(canvas, world) {
   const { level, seen } = world;
@@ -32,7 +33,7 @@ export function drawMap(canvas, world) {
   for (let j = 0; j < level.height; j++) {
     for (let c = 0; c < level.width; c++) {
       if (!seen[j * level.width + c]) continue;
-      ctx.fillStyle = isSolid(level, c, j) ? COLORS.rock : COLORS.air;
+      ctx.fillStyle = tileSolid(world.outline, c, j) ? COLORS.rock : COLORS.air;
       ctx.fillRect(ox + c * s, oy + (level.height - 1 - j) * s, s + 0.5, s + 0.5);
     }
   }

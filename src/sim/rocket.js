@@ -71,8 +71,9 @@ export function createRocket(x, floorY, tank = TANK) {
     hitTick: -1, // when it last hit rock, and how much hull that cost
     hitDamage: 0,
     crashTick: -1,
-    cause: null, // what destroyed it: "impact", "lava", "flame" or "crush"
+    cause: null, // what destroyed it: "impact", "lava", "flame", "crush", "laser", "shot" or "stalactite"
     god: false, // a dev cheat: hits cost nothing
+    touched: [], // where it touched rock this tick, as x, y, x, y…: just inside the rock
   };
 }
 
@@ -102,6 +103,7 @@ export function step(r, { steer = 0, turnRate = TURN_RATE, thrust = false } = {}
   const { field = NO_FIELD, boxSpeed = 0 } = env;
   const boxesAt = typeof env.boxes === "function" ? env.boxes : () => env.boxes ?? NONE;
   r.tick++;
+  r.touched.length = 0;
   const wants = thrust && r.state !== "crashed";
   r.burning = wants && r.fuel > 0;
   r.sputtering = wants && !r.burning;
@@ -152,6 +154,7 @@ function collide(r, outline, boxes, worst) {
     if (!c) break;
     r.x += c.nx * c.depth;
     r.y += c.ny * c.depth;
+    if (!c.box) r.touched.push(c.px - c.nx * 0.05, c.py - c.ny * 0.05);
     if (!r.god && !c.box && lavaAt(outline.level, c.px - c.nx * 0.1, c.py - c.ny * 0.1)) {
       crash(r, "lava");
       return;

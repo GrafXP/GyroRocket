@@ -337,6 +337,22 @@ body.playing nav {
   color: var(--good);
 }
 
+/* How far below the rising lava is: amber, and red when it's close. */
+.lava {
+  color: #c2410c;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+:root:not([data-theme="light"]) .lava {
+  color: #ff8a3a;
+}
+
+.lava[data-near="true"] {
+  color: var(--bad);
+}
+
 /* A labelled bar: fuel or hull. */
 .gauge {
   display: flex;

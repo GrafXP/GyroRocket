@@ -8,6 +8,8 @@ import { createDoors } from "./doors.js";
 import { createHazards } from "./hazards.js";
 import { createMachines } from "./machines.js";
 import { createDefences } from "./defences.js";
+import { createCore } from "./core.js";
+import { createSky, SKY_COLORS } from "./sky.js";
 
 const FOV = 50; // degrees, vertical
 const VIEW = 36; // m across the screen's short side, at least
@@ -15,6 +17,8 @@ const ZOOM_OUT = 0.25; // how much further the camera backs off at speed
 const LOOK_AHEAD = 0.4; // seconds of flight the camera looks ahead
 const MAX_AHEAD = 8; // m
 const FOLLOW = 6; // how quickly the camera catches up, per second
+const LAVA_VIEW = 0.9; // how far down the view (of half its height) rising lava is kept, while it's near
+const ROCKET_VIEW = 0.5; // how far up the view the rocket can go, to show the lava
 const TAN = Math.tan(((FOV / 2) * Math.PI) / 180);
 
 // Draws a level in play (sim/world.js) from the side, the camera following the
@@ -34,7 +38,12 @@ export function createView(container, level, outline) {
   sun.position.set(-0.3, 0.5, 1);
   scene.add(sun);
 
-  scene.add(createCave(outline, level.colors));
+  const cave = createCave(outline, level.colors);
+  scene.add(cave.group);
+  if (level.sky) {
+    scene.background.setHex(SKY_COLORS.zenith);
+    scene.add(createSky(level).group);
+  }
   const things = createThings(level, dark);
   scene.add(things.group);
   const doors = createDoors(level, dark);
@@ -45,6 +54,8 @@ export function createView(container, level, outline) {
   scene.add(machines.group);
   const defences = createDefences(level);
   scene.add(defences.group);
+  const core = createCore(level, level.colors);
+  scene.add(core.group);
   const rocket = createRocketModel(dark);
   scene.add(rocket.group);
 
@@ -66,7 +77,7 @@ export function createView(container, level, outline) {
   resize();
 
   const width = level.width * TILE;
-  const height = level.height * TILE;
+  const height = level.sky ? Infinity : level.height * TILE; // no roof over the sky
   // Keeps a view centre `half` from the edges of a level `size` long, or centres
   // the view on a level too small to fill it.
   const inside = (v, half, size) => (size < 2 * half ? size / 2 : Math.max(half, Math.min(size - half, v)));
@@ -83,6 +94,8 @@ export function createView(container, level, outline) {
       hazards.update(world);
       machines.update(world, dt);
       defences.update(world);
+      core.update(world);
+      cave.update();
 
       const since = (r.tick - r.crashTick) / TICK_RATE;
       boom.visible = r.state === "crashed" && since < 1;
@@ -100,8 +113,12 @@ export function createView(container, level, outline) {
       const halfH = ((VIEW / 2) * cam.zoom) / Math.min(1, camera.aspect);
       const halfW = halfH * camera.aspect;
       const ahead = (v) => Math.max(-MAX_AHEAD, Math.min(MAX_AHEAD, v * LOOK_AHEAD));
+      let y = inside(r.y + ahead(r.vy), halfH, height);
+      // Rising lava on its way: low enough to see it coming, if it's near, but
+      // keeping the rocket in view.
+      if (world.rise?.from >= 0) y = inside(Math.max(Math.min(y, world.rise.y + halfH * LAVA_VIEW), r.y - halfH * ROCKET_VIEW), halfH, height);
       cam.x += (inside(r.x + ahead(r.vx), halfW, width) - cam.x) * k;
-      cam.y += (inside(r.y + ahead(r.vy), halfH, height) - cam.y) * k;
+      cam.y += (y - cam.y) * k;
       cam.placed = true;
       camera.position.set(cam.x, cam.y, halfH / TAN);
       camera.lookAt(cam.x, cam.y, 0);

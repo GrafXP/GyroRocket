@@ -162,7 +162,7 @@ function createLava(level, group) {
 }
 
 // Molten rock: bright orange cells in dark red crust, seamless.
-function lavaTexture() {
+export function lavaTexture() {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -187,7 +187,7 @@ function lavaTexture() {
 }
 
 // White at the bottom, fading to nothing at the top.
-function glowTexture() {
+export function glowTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = 4;
   canvas.height = 64;

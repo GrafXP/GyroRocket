@@ -59,3 +59,53 @@ test("without restarts, a crash is a failure, saying where", () => {
   for (let i = 0; i < TICK_RATE && !pilot.failed; i++) step(w, pilot.input());
   assert.match(pilot.failed, /^start → exit: crashed at \d+, \d+$/);
 });
+
+test("it waits out stalactites, and breaks through crumbling rock only where it must, unhurt", () => {
+  const maps = {
+    // Two stalactites over the way.
+    stalactites: `
+      ################################
+      ################################
+      #....!......!..................#
+      #...........!..................#
+      #..............................#
+      #..............................#
+      #..............................#
+      #.SSS...................FFF.EEE#
+      ################################`,
+    // A plug of crumbling rock right across the cave.
+    plug: `
+      ##################################
+      #................%%..............#
+      #................%%..............#
+      #................%%..............#
+      #................%%..............#
+      #................%%..............#
+      #.SSS............%%..........EEE.#
+      ##################################`,
+    // A crumbling floor to drop through, and a crumbling lump off to the side,
+    // which is left alone.
+    trapdoor: `
+      ########################
+      #......................#
+      #......................#
+      #..................%%..#
+      #..................%%..#
+      #.SSS..................#
+      ##########%%%%%%########
+      #######..........#######
+      #######..........#######
+      #######..........#######
+      #######..EEE.....#######
+      ########################`,
+  };
+  for (const [name, map] of Object.entries(maps)) {
+    const w = createWorld(parseLevel({ name, map, fuel: 20 }));
+    const pilot = createPilot(w, { restart: false });
+    for (let i = 0; i < 60 * TICK_RATE && !w.done && !pilot.failed; i++) step(w, pilot.input());
+    assert.equal(w.done, true, `${name}: ${pilot.failed}`);
+    assert.equal(w.rocket.hull, 100, `${name}: hurt`);
+    if (name === "stalactites") assert.ok(w.stalactites.every((s) => s.gone > 0), "it didn't set them off");
+    if (name === "trapdoor") assert.equal(w.crumbles.filter((c) => c.fell >= 0).length, 6, "it broke the lump too");
+  }
+});
