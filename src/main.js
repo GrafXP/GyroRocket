@@ -93,16 +93,21 @@ function home(el) {
   };
 }
 
-// Every world's levels, with the stars earned and best times; locked levels greyed out.
+const PART_NAMES = ["Part one", "Part two", "Part three"];
+
+// Every world's levels, with the stars earned and best times; locked levels greyed
+// out. Once the game has more than one part, each part gets a heading.
 function levels(el) {
   const progress = loadProgress();
   const all = allUnlocked();
+  const parts = WORLDS.at(-1).part > 1;
   html(
     el,
     `<h1>Levels</h1>
-    ${WORLDS.map((world) => {
+    ${WORLDS.map((world, w) => {
       const stars = world.levels.reduce((n, l) => n + starCount(l, progress.levels[l.id]), 0);
-      return `<section class="world">
+      const part = parts && world.part !== WORLDS[w - 1]?.part ? `<h2 class="part">${PART_NAMES[world.part - 1]}</h2>` : "";
+      return `${part}<section class="world">
         <h2>${world.number} · ${world.name} <small>★ ${stars}/${world.levels.length * 3}</small></h2>
         <p class="hint">${world.about}</p>
         <div class="level-grid">
@@ -121,7 +126,7 @@ function levels(el) {
         </div>
       </section>`;
     }).join("")}
-    <p class="hint">More worlds are on the way. There's also the <a href="/play/test" data-link>test cave</a>.</p>
+    <p class="hint">More worlds are on the way. There's also the <a href="/play/test" data-link>test cave</a>, and the <a href="/play/big" data-link>big cave</a>, a 200 × 150 stress test.</p>
     ${all ? `<p class="hint">Every level is open (the ?unlock debug flag). <a href="/levels?unlock=off">Lock them again</a></p>` : ""}`,
   );
 }

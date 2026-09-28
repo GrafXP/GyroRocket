@@ -1,5 +1,5 @@
 import { html, esc, go } from "../ui/dom.js";
-import { WORLDS, TEST_CAVE, levelById } from "../levels/index.js";
+import { WORLDS, TEST_CAVE, BIG_CAVE, levelById } from "../levels/index.js";
 import { loadProgress, isUnlocked, allUnlocked } from "../progress.js";
 import { listLevels, createLevel, duplicateLevel, deleteLevel, newLevel, copyOfLevel } from "../mylevels.js";
 import { validateLevel } from "../sim/validate.js";
@@ -29,6 +29,7 @@ export function editorList(el) {
           .map((w) => `<optgroup label="${w.number} · ${w.name}">${w.levels.map((l) => `<option value="${l.id}">${l.id} ${esc(l.name)}</option>`).join("")}</optgroup>`)
           .join("")}
         <option value="${TEST_CAVE.id}">The test cave</option>
+        <option value="${BIG_CAVE.id}">The big cave (200 × 150)</option>
       </select>
       <button id="copy">Copy</button>
     </div>

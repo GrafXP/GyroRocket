@@ -40,6 +40,7 @@ const LOOK = 5; // m ahead along the path it steers for
 const HOVER = 2; // m above a pad it flies to before letting down
 const LEG_LIMIT = 90 * TICK_RATE;
 const HAZARD_MARGIN = 0.8; // m it keeps from flames and blobs
+const MARGINS = [2, 1.5, 1, 0.5, 0]; // m it tries to keep from rock, widest first, when finding a path
 const APPROACH = 3; // m before a hazard it decides whether to cross or wait
 const CROSS_SPEED = 6; // m/s it crosses a hazard at, and slows to as it comes up to one
 const SPARE = 0.25; // s either side of a hazard's burning that it counts as burning too
@@ -111,11 +112,14 @@ export function createPilot(world, { restart = true } = {}) {
       if (stop.missing) return fail(`nothing on the map for ${stop.name} in the route`);
       // Round the ground moving blocks cover, if there's a way; else through it, waiting.
       const boxes = blocking(world);
-      // Through crumbling rock only if there's no way round it.
+      // Through crumbling rock only if there's no way round it, and there's none
+      // at all if air doesn't join here and there.
+      const [a, b] = [here(r), stop.target];
+      const open = airJoins(world.outline, a, b);
       const path =
-        findPath(world, here(r), stop.target, [...boxes, ...level.movers.map(sweep)]) ??
-        findPath(world, here(r), stop.target, boxes) ??
-        breakThrough(world, here(r), stop.target, boxes);
+        (open && findPath(world, a, b, [...boxes, ...level.movers.map(sweep)], world.outline, true)) ||
+        (open && level.movers.length && findPath(world, a, b, boxes, world.outline, true)) ||
+        breakThrough(world, a, b, boxes);
       if (!path) return fail(`${from} → ${stop.name}: no way through`);
       leg = { stop, path, zones: hazardZones(world, path), at: 0, duty: 0, tick: world.tick, fuel: r.fuel };
       pilot.status = `Autopilot: to the ${stop.name}`;
@@ -236,11 +240,11 @@ function breakThrough(world, from, to, boxes) {
   if (!level.crumbles.length) return null;
   let best = null;
   crumbleMasses(level).forEach((mass, m) => {
-    if (mass.every((i) => world.crumbles[i].fell >= 0)) return;
-    const path = findPath(world, from, to, boxes, openOutline(level, m));
+    if (mass.every((i) => world.crumbles[i].fell >= 0) || !airJoins(openOutline(level, m), from, to)) return;
+    const path = findPath(world, from, to, boxes, openOutline(level, m), true);
     if (path && (!best || path.length < best.length)) best = path;
   });
-  return best ?? findPath(world, from, to, boxes, openOutline(level));
+  return best ?? findPath(world, from, to, boxes, openOutline(level), true);
 }
 
 const masses = new WeakMap();
@@ -355,9 +359,11 @@ const blocking = (world) => [...world.level.doors.filter((d, i) => !world.doors[
 // ways), keeping `margin` metres clear of rock, `boxes` and flames that never go
 // out where it can, except near its ends (which are over pads, or at keys), and
 // its feet out of reach of rising lava, as high as it will be by the time it gets
-// there. It goes by the world's rock unless given another `outline`. Returns a
-// list of [x, y], or null.
-export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outline) {
+// there. It goes by the world's rock unless given another `outline`. With `avoid`,
+// of the shortest paths it takes the one that spends least time in reach of
+// hazards it would have to wait for (a straight line along a band rather than a
+// dip through every lava blob's column). Returns a list of [x, y], or null.
+export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outline, avoid = false) {
   const { level } = world;
   // The lowest the rocket's centre can be, `steps` metres along the path.
   const { rise } = level;
@@ -385,13 +391,21 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
     );
   };
   const tight = new Int8Array(cols * rows); // 0 not checked, 1 fits, 2 doesn't
+  // Whether a point fits at each margin, as far as known: it fits at every margin
+  // from pass fitsFrom on, and not at any up to pass failsTo. (A point that fits
+  // with a wide margin fits with a narrower one, so a failed pass costs little more
+  // than the search itself.)
+  const fitsFrom = new Int8Array(cols * rows).fill(MARGINS.length);
+  const failsTo = new Int8Array(cols * rows).fill(-1);
   const from = new Int32Array(cols * rows);
   const steps = new Int32Array(cols * rows); // from the start
   const queue = new Int32Array(cols * rows);
-  for (const margin of [2, 1.5, 1, 0.5, 0]) {
-    const loose = new Int8Array(cols * rows);
+  const hazard = avoid ? hazardGrid(world, x0, y0, gx0, gy0, cols, rows) : null;
+  const exposed = new Int32Array(avoid ? cols * rows : 0); // steps in reach of hazards, from the start
+  const start = index(0, 0);
+  // Breadth first from the start, keeping MARGINS[pass] clear of rock.
+  const search = (pass) => {
     from.fill(-1);
-    const start = index(0, 0);
     from[start] = start;
     let [head, tail] = [0, 0];
     queue[tail++] = start;
@@ -410,21 +424,83 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
           const [nx, ny] = [gx + dx, gy + dy];
           if (nx < gx0 || ny < gy0 || nx - gx0 >= cols || ny - gy0 >= rows) continue;
           const n = index(nx, ny);
-          if (from[n] >= 0) continue;
+          if (from[n] >= 0) {
+            // Found again as far from the start: keep the way with less exposure.
+            // (Breadth first, so i's exposure is settled, and n's isn't used yet.)
+            if (hazard && steps[n] === steps[i] + 1 && n !== start && exposed[i] + hazard[n] < exposed[n]) {
+              from[n] = i;
+              exposed[n] = exposed[i] + hazard[n];
+            }
+            continue;
+          }
           const [x, y] = [x0 + nx, y0 + ny];
           const near = Math.hypot(nx, ny) < 3 || Math.hypot(x - x1, y - y1) < 3;
           if (Math.hypot(nx, ny) >= 3 && y < lava(steps[i] + 1)) continue;
-          const cache = near ? tight : loose;
-          if (!cache[n]) cache[n] = fits(x, y, near ? 0 : margin) ? 1 : 2;
-          if (cache[n] === 2) continue;
+          if (near) {
+            if (!tight[n]) tight[n] = fits(x, y, 0) ? 1 : 2;
+            if (tight[n] === 2) continue;
+          } else if (pass < fitsFrom[n]) {
+            if (pass <= failsTo[n]) continue;
+            if (!fits(x, y, MARGINS[pass])) {
+              failsTo[n] = pass;
+              continue;
+            }
+            fitsFrom[n] = pass;
+          }
           from[n] = i;
           steps[n] = steps[i] + 1;
+          if (hazard) exposed[n] = exposed[i] + hazard[n];
           queue[tail++] = n;
         }
       }
     }
+    return null;
+  };
+  // The roomiest way there. If there's none with no margin at all, there's none,
+  // so that's tried second, to save searching the whole cave at every margin.
+  const roomy = search(0);
+  if (roomy) return roomy;
+  const any = search(MARGINS.length - 1);
+  if (!any) return null;
+  for (let pass = 1; pass < MARGINS.length - 1; pass++) {
+    const path = search(pass);
+    if (path) return path;
   }
-  return null;
+  return any;
+}
+
+// Whether air joins the tiles at points a and b in `outline`, corners and all,
+// with doors, gates, blocks and stalactites left out. If it doesn't, the rocket
+// can't get from one to the other, whichever way it goes.
+function airJoins(outline, a, b) {
+  const { level, solid } = outline;
+  const { width, height } = level;
+  const tile = ([x, y]) => {
+    const [c, j] = [Math.floor(x / TILE), Math.floor(y / TILE)];
+    return c < 0 || j < 0 || c >= width || j >= height ? -1 : j * width + c;
+  };
+  const [from, to] = [tile(a), tile(b)];
+  if (from < 0 || to < 0 || solid[from] || solid[to]) return true; // can't tell: let the search find out
+  const seen = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let [head, tail] = [0, 0];
+  seen[from] = 1;
+  queue[tail++] = from;
+  while (head < tail) {
+    const i = queue[head++];
+    if (i === to) return true;
+    const [c, j] = [i % width, Math.floor(i / width)];
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const [nc, nj] = [c + dc, j + dj];
+        const n = nj * width + nc;
+        if (nc < 0 || nj < 0 || nc >= width || nj >= height || seen[n] || solid[n]) continue;
+        seen[n] = 1;
+        queue[tail++] = n;
+      }
+    }
+  }
+  return false;
 }
 
 // Whether a fan that's always on blows harder than the rocket can fly against:
@@ -437,30 +513,11 @@ const tooStrong = (f) => f.mode === "always" && (f.dir[1] < 0 ? f.strength > 8 :
 // a mover or crusher covers, or under a stalactite; and where it goes through
 // crumbling rock.
 function hazardZones(world, path) {
-  const { flames, blobs, movers, stalactites } = world.level;
   const zones = crumbleZones(world, path);
-  const hazards = [
-    ...stalactites
-      .map((stalactite, i) => ({ stalactite, state: world.stalactites[i], floor: dropFloor(world, stalactite) }))
-      .filter((h) => h.state.gone < 0),
-    ...flames.map((flame, i) => ({ flame, state: world.flames[i] })).filter((h) => h.flame.mode !== "always"),
-    ...blobs.map((blob) => ({ blob })),
-    ...movers.map((mover) => ({ mover, swept: sweep(mover) })),
-    ...world.level.lasers.map((laser, i) => ({ laser, state: world.lasers[i] })).filter((h) => h.laser.mode === "cycle"),
-  ];
-  for (const h of hazards) {
+  for (const h of passingHazards(world)) {
     let from = -1;
     path.forEach(([x, y], i) => {
-      const circles = circlesAt(x, y, 0);
-      const inside = h.stalactite
-        ? underStalactite(h.stalactite, h.floor, circles)
-        : h.flame
-        ? inFlame(h.flame, circles, HAZARD_MARGIN)
-        : h.laser
-          ? inLaser(h.laser, circles, HAZARD_MARGIN)
-          : h.blob
-            ? inColumn(h.blob, circles)
-            : inBox(h.swept, circles);
+      const inside = touches(h, circlesAt(x, y, 0));
       if (inside && from < 0) from = i;
       if ((!inside || i === path.length - 1) && from >= 0) {
         const to = inside ? i : i - 1;
@@ -470,6 +527,64 @@ function hazardZones(world, path) {
     });
   }
   return zones.sort((a, b) => a.from - b.from);
+}
+
+// The hazards a path can cross by waiting for them: stalactites still hanging,
+// flames and lasers that go off, blobs, and moving blocks.
+function passingHazards(world) {
+  const { flames, blobs, movers, stalactites, lasers } = world.level;
+  return [
+    ...stalactites
+      .map((stalactite, i) => ({ stalactite, state: world.stalactites[i], floor: dropFloor(world, stalactite) }))
+      .filter((h) => h.state.gone < 0),
+    ...flames.map((flame, i) => ({ flame, state: world.flames[i] })).filter((h) => h.flame.mode !== "always"),
+    ...blobs.map((blob) => ({ blob })),
+    ...movers.map((mover) => ({ mover, swept: sweep(mover) })),
+    ...lasers.map((laser, i) => ({ laser, state: world.lasers[i] })).filter((h) => h.laser.mode === "cycle"),
+  ];
+}
+
+// Whether the rocket's `circles` are in reach of hazard `h` (from passingHazards).
+const touches = (h, circles) =>
+  h.stalactite
+    ? underStalactite(h.stalactite, h.floor, circles)
+    : h.flame
+      ? inFlame(h.flame, circles, HAZARD_MARGIN)
+      : h.laser
+        ? inLaser(h.laser, circles, HAZARD_MARGIN)
+        : h.blob
+          ? inColumn(h.blob, circles)
+          : inBox(h.swept, circles);
+
+// A box round everything hazard `h` can reach, give or take a metre.
+function reachBox(h) {
+  if (h.stalactite) return { x0: h.stalactite.x0, x1: h.stalactite.x1, y0: h.floor, y1: h.stalactite.top };
+  if (h.blob) return { x0: h.blob.x - 0.8, x1: h.blob.x + 0.8, y0: h.blob.y - 1, y1: h.blob.y + h.blob.height * TILE + 1.8 };
+  if (h.swept) return h.swept;
+  const { x0, y0, x1, y1 } = h.flame ?? h.laser;
+  return { x0: Math.min(x0, x1) - 1, x1: Math.max(x0, x1) + 1, y0: Math.min(y0, y1) - 1, y1: Math.max(y0, y1) + 1 };
+}
+
+// How far the rocket reaches from its centre, upright, and a little more.
+const ROCKET_REACH = Math.max(...circlesAt(0, 0, 0).map((c) => Math.hypot(c.x, c.y) + c.r)) + HAZARD_MARGIN + 1;
+
+// For findPath: 1 at each point of its grid where the rocket would be in reach of
+// a hazard it would have to wait for. Points are (x0 + gx, y0 + gy) for gx from
+// gx0, cols of them, and gy from gy0, rows of them.
+function hazardGrid(world, x0, y0, gx0, gy0, cols, rows) {
+  const grid = new Uint8Array(cols * rows);
+  for (const h of passingHazards(world)) {
+    const b = reachBox(h);
+    const [ga, gb] = [Math.max(gx0, Math.ceil(b.x0 - ROCKET_REACH - x0)), Math.min(gx0 + cols - 1, Math.floor(b.x1 + ROCKET_REACH - x0))];
+    const [ha, hb] = [Math.max(gy0, Math.ceil(b.y0 - ROCKET_REACH - y0)), Math.min(gy0 + rows - 1, Math.floor(b.y1 + ROCKET_REACH - y0))];
+    for (let gy = ha; gy <= hb; gy++) {
+      for (let gx = ga; gx <= gb; gx++) {
+        const k = (gy - gy0) * cols + (gx - gx0);
+        if (!grid[k] && touches(h, circlesAt(x0 + gx, y0 + gy, 0))) grid[k] = 1;
+      }
+    }
+  }
+  return grid;
 }
 
 // The stretches of `path` through crumbling rock that's standing, each with the

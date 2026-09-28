@@ -34,11 +34,12 @@ or in between them.
   flying (a player does it faster). A four-minute level has six to ten pads.
   Length makes a level harder by asking you to stay good for longer, not by making
   you repeat more.
-- **Big, but within the editor's limits.** At most 200×150 tiles, 60 things and
-  48 KB, like a shared level (`PLAN-EDITOR.md`, *The level file*). Every new level
-  then opens in the editor as "Copy of a built-in level", passes `validate.js`, and
-  can be seeded for top scores in E6 like the others. A level only has so many free
-  characters for things, so flamethrowers and stalactites keep their plain letters
+- **Big, but within the editor's limits.** At most 200×150 tiles and 48 KB, like
+  a shared level (`PLAN-EDITOR.md`, *The level file*). Every new level then opens
+  in the editor as "Copy of a built-in level", passes `validate.js`, and can be
+  seeded for top scores in E6 like the others. A map can name at most 50 things
+  (the digits, and the letters that don't mean something else), fewer than the
+  editor's limit of 60, so flamethrowers and stalactites keep their plain letters
   where the default settings do, and copies of a thing with the same settings share
   its character.
 - **Fix the autopilot, not the level.** Every level must still be finished by the
@@ -219,13 +220,13 @@ Each phase ends with a build to play on the phone and a short checklist, and is
 committed when `npm test` and the build pass (for example "Phase C2: world 7,
 Foundry").
 
-### Phase C1: Room for big levels
+### Phase C1: Room for big levels ✅ (done)
 
 Before any new level, make sure big ones run well.
 
-- **A stress level.** A 200×150 test level with 60 things, 30 of them hazards on
-  screen at once in places, played at `/play/big` beside the test cave and kept out
-  of the worlds. On the phone: the frame rate, how long the cave mesh takes to
+- **A stress level.** A 200×150 test level with 50 things (all a map can name),
+  30 hazards on screen at once in places, played at `/play/big` beside the test
+  cave and kept out of the worlds. On the phone: the frame rate, how long the cave mesh takes to
   build, how long the autopilot takes to plan its longest leg, and memory. Anything
   that falls short gets fixed here: `PLAN.md`'s target is 60 fps in a 200×100 level
   with 30 hazards on screen, and this is half as big again.
@@ -234,9 +235,8 @@ Before any new level, make sure big ones run well.
   place. It's split into one test per level, and, if that isn't enough, one file per
   world so `node --test` runs them in parallel.
 - **Checks for big levels.** For worlds 7–10 the tests also check what this plan
-  promises: within the editor's limits (200×150, 60 things, 48 KB, passes
-  `validate.js`), three crystals, and no leg between pads over 45 s of the
-  autopilot's flying.
+  promises: within the editor's limits (200×150, 48 KB, passes `validate.js`),
+  three crystals, and no leg between pads over 45 s of the autopilot's flying.
 - **Part two.** `levels/index.js` gets room for worlds 7–10. The levels page shows
   a *Part two* heading above world 7. The ending moves off whichever level is last:
   6-8 keeps "you made it out", and 10-8 will get the real ending.
@@ -245,6 +245,55 @@ Before any new level, make sure big ones run well.
 - [ ] Switching the autopilot on in the stress level starts it flying without a noticeable pause.
 - [ ] `npm test` takes no more than about twice as long as before, with the stress level included.
 - [ ] Finishing 6-8 still gives its ending, and then opens world 7.
+
+What was built: the *Big cave* (`src/levels/bigcave.js`, at `/play/big`, linked
+from the levels page and in the editor's list to copy from) is 200×150 tiles with
+50 things, as many as a map can name. It's six bands of 20 rows, flown in a zigzag
+from the bottom: lava pools with 38 blobs under 83 flamethrowers in the roof; fans,
+crushers and sliding blocks; magnets and lasers; stalactites and turrets; flame
+waves from floor and roof, and a crumbling wall; then a key and its door, a switch
+and its gate, blocks and the exit. Its pads in the lava and flame bands stand on
+ledges, clear of what's on the floor. The autopilot flies it in 357 s over 19 legs,
+at most 42 s between pads, so the tank is 30 s and par 360 s.
+
+Measured in node on the phone (the dev machine is a phone, whose timings vary a
+lot as it warms up): the cave mesh is 28,000 triangles and builds in about 0.1 s.
+The scene has about 1,500 objects, and updating and culling them costs about
+0.5 ms a frame. The sim takes 0.16 ms a tick. What the GPU makes of it is for the
+checklist.
+
+The autopilot needed two fixes. It couldn't fly the big cave at all. Its path
+search is breadth first in 1 m steps, where many paths are equally short, and it
+took the first it found, which dived from the start ledge to just over the lava
+and then waited at every blob's column until the tank ran dry. With `avoid`, the
+search now takes, of the shortest paths, the one with the fewest steps in reach
+of hazards it would have to wait for (`hazardGrid` marks them; `hazardZones` and it
+share `passingHazards` and `touches`). That also flies 3-8 in 74 s instead of 85.
+Planning was also slow when a leg has no way through until crumbling rock falls:
+each search that failed flooded the whole cave at all five margins from rock, 1.6 s
+for that leg. Now each point's fit carries over between margins (a point that fits
+with a wide margin fits with a narrow one). The search tries the widest margin,
+then none, and gives up if that fails. A flood over the tiles (`airJoins`) skips the
+searches altogether when air doesn't join the two ends. And a level without moving
+blocks doesn't search twice. The slowest planning tick in the big cave is now
+0.1–0.2 s once warm (the first can be 0.5 s), and no slower than before on the
+other levels.
+
+Levels are tested a world to a file (`test/world-<n>.test.js`, each calling
+`testWorld` in `test/worlds.js`), a test per level, so `node --test` flies the
+worlds side by side and a failure names its level. Part two's levels also keep to
+the big-level rules (`keepsToBigRules`): their copy in the editor is valid, within
+200×150 and 48 KB as JSON, three crystals, and no more than 45 s of the autopilot's
+flying between pads. The big cave keeps them too (`test/levels.test.js`). `npm
+test` takes 20–35 s, against 16.5 s before on the same phone run back to back; the
+big cave's test (6.5 s, 0.7 s of it the level check) is the longest. Worlds 7–10
+will add their flights, about 3–5 s a big level, side by side.
+
+Worlds have a `part` (1 if not given) and the one that ends a part an `ending`
+(`endingOf`), so the results say "Out of the core!" after 6-8 because world 6 ends
+part one, not because it's the last level; "That's every level, for now" only
+shows when there's no next level. The levels page puts a heading over each part
+once there's more than one.
 
 ### Phase C2: World 7, Foundry
 

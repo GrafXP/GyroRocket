@@ -6,7 +6,7 @@ import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
 import { rising } from "../sim/hazards/rise.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
-import { levelById, nextLevel, TEST_CAVE } from "../levels/index.js";
+import { levelById, nextLevel, endingOf, EXTRAS } from "../levels/index.js";
 import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
 import { playableLevel } from "../mylevels.js";
 import { html, icon, esc, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
@@ -44,7 +44,8 @@ export function play(el, id) {
     );
     return null;
   }
-  if (!def || (def !== TEST_CAVE && !mine && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
+  const extra = EXTRAS.includes(def); // the test cave and the big cave: always open, never recorded
+  if (!def || (!extra && !mine && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
     html(
       el,
       `<h1>${def ? `${id} is locked` : "No such level"}</h1>
@@ -55,10 +56,10 @@ export function play(el, id) {
   }
   document.body.classList.add("playing");
 
-  const title = def === TEST_CAVE || mine ? def.name || "My level" : `${def.id} ${def.name}`;
+  const title = extra || mine ? def.name || "My level" : `${def.id} ${def.name}`;
   const settings = loadSettings();
-  const next = def === TEST_CAVE || mine ? null : nextLevel(id);
-  const last = def !== TEST_CAVE && !mine && !next; // the way out of the core, and the end
+  const next = extra || mine ? null : nextLevel(id);
+  const ending = extra || mine ? null : endingOf(id); // the way out of the core, the end of part one
   // Where the menus lead: the levels, or for my level, back to the editor.
   const back = mine ? { href: `/editor/${mine}`, label: "Back to editor" } : { href: "/levels", label: "Levels" };
   const $ = html(
@@ -109,9 +110,9 @@ export function play(el, id) {
 
       <div class="overlay menu" id="done" hidden>
         <section>
-          <h2>${last ? "Out of the core!" : "Level complete"}</h2>
+          <h2>${ending ? ending.title : "Level complete"}</h2>
           <p class="hint">${esc(title)}</p>
-          ${last ? `<p>From the heart of the planet up to the surface, and the stars. That's every level, for now: go back for the stars you missed.</p>` : ""}
+          ${ending ? `<p>${ending.text}${next ? "" : " That's every level, for now: go back for the stars you missed."}</p>` : ""}
           <div class="awards" id="awards"></div>
           <dl class="results" id="results"></dl>
         </section>
@@ -253,7 +254,7 @@ export function play(el, id) {
     const got = crystalCount(w);
     const all = got === level.crystals.length;
     let result = null;
-    if (def !== TEST_CAVE && !mine && !w.assisted) {
+    if (!extra && !mine && !w.assisted) {
       result = recordRun(progress, def, { time, crystals: all });
       saveProgress(progress);
     }

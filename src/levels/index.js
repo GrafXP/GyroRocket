@@ -47,10 +47,13 @@ import l6_6 from "./6-6.js";
 import l6_7 from "./6-7.js";
 import l6_8 from "./6-8.js";
 import testCave from "./testcave.js";
+import bigCave from "./bigcave.js";
 
 // The worlds in order, each with its levels in order. A level's id is
 // "world-level", like "1-3", which is also its URL: /play/1-3. A world's `colors`
-// are its rock's (render/cave.js), the world 1 ones if not given.
+// are its rock's (render/cave.js), the world 1 ones if not given. Worlds come in
+// parts (`part`, 1 if not given), and a world that ends one has an `ending`, for
+// the results of its last level.
 export const WORLDS = [
   {
     name: "Training caves",
@@ -85,20 +88,29 @@ export const WORLDS = [
     name: "Core",
     about: "Stalactites drop on you, crumbling rock gives way, and the lava rises: get out, up to the surface.",
     colors: { face: 0x3b2c28, wall: 0x503a33, rim: 0xe0783a, back: 0x160a07, crumble: 0x9a8070, cracks: 0xff9a40 },
+    ending: { title: "Out of the core!", text: "From the heart of the planet up to the surface, and the stars." },
     levels: [l6_1, l6_2, l6_3, l6_4, l6_5, l6_6, l6_7, l6_8],
   },
 ].map((world, w) => ({
   ...world,
   number: w + 1,
+  part: world.part ?? 1,
   levels: world.levels.map((level, i) => ({ ...level, id: `${w + 1}-${i + 1}`, world: w + 1, colors: world.colors })),
 }));
 
 export const LEVELS = WORLDS.flatMap((w) => w.levels);
 
-// The test cave from phases 1 and 2, outside the worlds, at /play/test.
+// Levels outside the worlds: the test cave from phases 1 and 2, at /play/test,
+// and the stress level for big levels (PLAN-CONTENT.md), at /play/big.
 export const TEST_CAVE = { ...testCave, id: "test" };
+export const BIG_CAVE = { ...bigCave, id: "big" };
+export const EXTRAS = [TEST_CAVE, BIG_CAVE];
 
-export const levelById = (id) => (id === TEST_CAVE.id ? TEST_CAVE : (LEVELS.find((l) => l.id === id) ?? null));
+export const levelById = (id) => EXTRAS.find((l) => l.id === id) ?? LEVELS.find((l) => l.id === id) ?? null;
 
 // The level after `id`, or null after the last.
 export const nextLevel = (id) => LEVELS[LEVELS.findIndex((l) => l.id === id) + 1] ?? null;
+
+// What finishing level `id` means, if it's the last of a world that ends a part
+// of the game: { title, text }. Otherwise null.
+export const endingOf = (id) => WORLDS.find((w) => w.ending && w.levels.at(-1).id === id)?.ending ?? null;

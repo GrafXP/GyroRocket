@@ -593,7 +593,14 @@ body.playing nav {
   color: var(--muted);
 }
 
-/* The levels page. */
+/* The levels page. A part's heading stands over its worlds' headings. */
+h2.part {
+  margin: 32px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.5rem;
+}
+
 .world h2 small {
   color: var(--muted);
   font-size: 0.9rem;
