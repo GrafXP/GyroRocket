@@ -95,10 +95,13 @@ src/
     replay.js      input ↔ bytes, encode/decode, replay a run and say how it ended
     hash.js        SHA-256, and a level's content hash
   editor/
+    list.js        /editor: my levels, new, copy of a built-in level, import
     editor.js      the editor page: toolbar, palette, sheets, autosave, undo
-    grid.js        the level as editable tiles and things; resize; to and from a level
+    grid.js        the level as editable tiles and things; resize; its first problem
     canvas.js      draws the tiles, outline and reach overlays; pan, zoom, paint
+    tiles.js       the palette, and how each tile looks
     tools.js       brush, rectangle, fill, eraser, picker, inspect
+    text.js        levels as JSON or a level module, and reading them back (no eval)
     things.js      the settings sheet for each kind of thing, from validate.js
   net/
     api.js         fetch with a timeout, JSON, the player's token; offline errors
@@ -145,7 +148,7 @@ a new run. Limits: 16–200 columns, 12–150 rows, up to 60 things, 48 KB in al
 Each phase ends with a build to try on the phone and a short checklist, and is
 committed when `npm test` and the build pass. Phases E1–E3 need no server.
 
-### Phase E1: The editor
+### Phase E1: The editor ✅ (done)
 
 `/editor` lists my levels: New, Open, Duplicate, Delete, and "Copy of a built-in
 level", to start from 2-5 and change it. A new level is a small cave with a start
@@ -180,6 +183,48 @@ level module; Import takes either, pasted, through `validate.js`.
 - [ ] Every problem the parser finds shows where it is.
 - [ ] Fly and Back take a couple of seconds at most, and you're where you left off.
 - [ ] A level survives a reload, and undo goes all the way back.
+
+What was built: Editor is in the nav. `/editor` lists my levels, last edited
+first, each with Fly, Copy and Delete, and starts new ones: a plain 48×24 cave, a
+copy of any built-in level that's open to you (with its world as its look), or an
+import. `mylevels.js` keeps each level in localStorage under its own key, with a
+list of names and sizes, and says when the storage is full. A level is saved as
+the same object as a level module, map and all, plus `look`.
+
+The editor page (`/editor/<id>`) hides the nav like the game. The top bar has the
+way back, the level's name (edited in place), undo, redo, a menu and Fly; the
+bottom bar the tile (it opens the palette), the tools (brush, rectangle, fill,
+eraser, picker) and the brush size (1, 2, 3 or 5 tiles). Keys: B R F E I pick the
+tools, [ and ] the size, Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z) undo and redo, Esc
+closes things. Pads paint as a row of three, the least a pad can be; painting a
+start, an exit or a key moves the one that was there. A second finger within a
+quarter of a second of the first makes it a pinch and drops what the first
+painted. Up to 200 steps undo, a stroke or a resize each, and they last while the
+app's open, so Fly and back keeps them, and the view and tool too.
+
+The canvas draws each row as runs of one colour, and the things on top (pads,
+keys with their shapes, doors, flame nozzles, stalactites, crumbling cracks, lava,
+and things by kind with their character) only once tiles are 6 px or more, so a
+200×150 level draws in about 2 ms in node. The menu's *Rock outline* draws the rock
+as the game will cut it, from `sim/outline.js`, updating only the tiles that
+change. The level's first problem is checked as you go (`problemOf` in
+`grid.js`: validateLevel, then parseLevel) and shows under the top bar, with Show
+to find the tile, which gets a red ring; Fly won't go while there's one. Resize
+adds or takes away 1 or 5 rows or columns on any side (16–200 by 12–150), and
+moves rising lava and the route's `F@` columns to match. Export shows the level as
+JSON (the map as a list of rows) or as a level module, to copy or save as a file.
+Import (on `/editor`) takes either, read by a small parser in `editor/text.js`
+that never runs the text, then `validate.js`.
+
+`sim/validate.js` has every setting of every kind of thing and of the level, with
+types and ranges, and refuses anything else; every built-in level passes. `mapRows`
+moved out of `parseLevel` so the parser, the checker and the grid read maps the
+same way. The play page flies my levels at `/play/my/<id>` with *Back to editor*
+in the pause menu and on the results (no stars or records for them yet), and says
+what's wrong with one that can't be flown. `esc()` in `ui/dom.js` keeps level
+names from being read as markup. Help has a paragraph on the editor. Tests:
+`validate`, `grid` (with the tools), `text` (every module in `src/levels` reads
+back as the level it exports) and `mylevels`.
 
 ### Phase E2: Things and settings
 

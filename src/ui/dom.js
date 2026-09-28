@@ -15,8 +15,26 @@ const PATHS = {
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   map: "M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15",
   auto: "M12 3l7 18-7-4-7 4z",
+  undo: "M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3",
+  redo: "M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3",
+  menu: "M4 7h16M4 12h16M4 17h16",
+  brush: "M4 20l1-4L16 5l3 3L8 19zM13 8l3 3",
+  rect: "M5 6h14v12H5z",
+  fill: "M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z",
+  erase: "M9 20h11M4 15l9-9 6 6-8 8H9z",
+  pick: "M14 4l6 6-2.5 2.5-6-6zM12.5 7.5L5 15v4h4l7.5-7.5",
 };
 export const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;
+
+// Text made safe to put in markup: a level's or a player's name.
+export const esc = (text) =>
+  String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+
+// Goes to another page, as a link with data-link does (main.js listens).
+export function go(path) {
+  history.pushState(null, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
 
 // Seconds → "m:ss.s".
 export function formatTime(s) {

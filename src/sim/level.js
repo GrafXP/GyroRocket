@@ -42,7 +42,7 @@ export const STALACTITE = { reach: 5, warn: 0.7, damage: 40 };
 export const STALACTITE_WIDTH = 1.6; // m
 // Crumbling rock falls away `crumble` seconds after the rocket touches it.
 export const CRUMBLE = 1;
-const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB!%"]);
+export const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB!%"]);
 
 // Parses a level module's export ({ name, map, things, ... }). Throws on anything
 // wrong with it, naming the row and column as written.
@@ -78,11 +78,7 @@ const RESERVED = new Set([..."#.*~SEF<>^vrygbRYGB!%"]);
 // block as shapes of their own (level.doors, level.movers, level.stalactites).
 // Flamethrowers, fans, magnets, lava and crumbling rock are rock.
 export function parseLevel({ name = "level", map, things = {}, ...settings }) {
-  const lines = map.split("\n");
-  while (lines.length && !lines[0].trim()) lines.shift();
-  while (lines.length && !lines.at(-1).trim()) lines.pop();
-  const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length));
-  const rows = lines.map((l) => l.slice(indent).trimEnd());
+  const rows = mapRows(map);
   const width = Math.max(...rows.map((r) => r.length));
   const height = rows.length;
   const where = (c, j) => `${name}: row ${height - j}, column ${c + 1}`;
@@ -339,6 +335,16 @@ export function parseLevel({ name = "level", map, things = {}, ...settings }) {
   level.exit = level.pads.find((p) => p.kind === "exit");
   if (settings.rise) level.rise = parseRise(level, settings.rise);
   return level;
+}
+
+// A map's rows as written, top to bottom: without the blank lines before and
+// after, the indent they share, or spaces at their ends.
+export function mapRows(map) {
+  const lines = map.split("\n");
+  while (lines.length && !lines[0].trim()) lines.shift();
+  while (lines.length && !lines.at(-1).trim()) lines.pop();
+  const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length));
+  return lines.map((l) => l.slice(indent).trimEnd());
 }
 
 // A level's rising lava, from its `rise` setting: heights in metres.

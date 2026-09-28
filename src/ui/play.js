@@ -8,7 +8,8 @@ import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
 import { levelById, nextLevel, TEST_CAVE } from "../levels/index.js";
 import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
-import { html, icon, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { playableLevel } from "../mylevels.js";
+import { html, icon, esc, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
 const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
@@ -18,12 +19,32 @@ const TILT_MAX = 60;
 
 // The play page for level `id`: the game with its HUD, the pause menu (button, P
 // or Esc, and whenever the app is hidden), the level complete sheet, and with ?dev
-// in the URL, a developer overlay (and every level open).
+// in the URL, a developer overlay (and every level open). My levels, from the
+// editor, have ids "my:<id>", and lead back to the editor.
 export function play(el, id) {
-  const def = levelById(id);
+  const mine = id.startsWith("my:") ? id.slice(3) : null;
   const dev = new URLSearchParams(location.search).has("dev");
   const progress = loadProgress();
-  if (!def || (def !== TEST_CAVE && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
+  let def = null;
+  let level = null;
+  let problem = null;
+  try {
+    def = mine ? playableLevel(mine) : levelById(id);
+    level = def && parseLevel(def);
+  } catch (e) {
+    if (!mine) throw e; // the game's own levels are tested
+    problem = e.message;
+  }
+  if (mine && !level) {
+    html(
+      el,
+      `<h1>${problem ? "This level can't be flown yet" : "No such level"}</h1>
+      <p>${problem ? esc(problem) : "It may have been deleted."}</p>
+      <p><a href="${problem ? `/editor/${mine}` : "/editor"}" data-link>Back to the editor</a></p>`,
+    );
+    return null;
+  }
+  if (!def || (def !== TEST_CAVE && !mine && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
     html(
       el,
       `<h1>${def ? `${id} is locked` : "No such level"}</h1>
@@ -34,11 +55,12 @@ export function play(el, id) {
   }
   document.body.classList.add("playing");
 
-  const level = parseLevel(def);
-  const title = def === TEST_CAVE ? def.name : `${def.id} ${def.name}`;
+  const title = def === TEST_CAVE || mine ? def.name || "My level" : `${def.id} ${def.name}`;
   const settings = loadSettings();
-  const next = def === TEST_CAVE ? null : nextLevel(id);
-  const last = def !== TEST_CAVE && !next; // the way out of the core, and the end
+  const next = def === TEST_CAVE || mine ? null : nextLevel(id);
+  const last = def !== TEST_CAVE && !mine && !next; // the way out of the core, and the end
+  // Where the menus lead: the levels, or for my level, back to the editor.
+  const back = mine ? { href: `/editor/${mine}`, label: "Back to editor" } : { href: "/levels", label: "Levels" };
   const $ = html(
     el,
     `<div class="game" id="game">
@@ -60,13 +82,13 @@ export function play(el, id) {
       <div class="overlay menu" id="pause" hidden>
         <section>
           <h2>Paused</h2>
-          <p class="hint">${title}</p>
+          <p class="hint">${esc(title)}</p>
           <button class="big" id="resume">Resume</button>
           <div class="buttons">
             <button id="restart-pad">Restart from pad</button>
             <button id="restart-level">Restart level</button>
           </div>
-          <a class="button" href="/levels" data-link>Levels</a>
+          <a class="button" href="${back.href}" data-link>${back.label}</a>
         </section>
         <section>
           <button id="auto-menu" aria-pressed="false">Autopilot: off</button>
@@ -88,7 +110,7 @@ export function play(el, id) {
       <div class="overlay menu" id="done" hidden>
         <section>
           <h2>${last ? "Out of the core!" : "Level complete"}</h2>
-          <p class="hint">${title}</p>
+          <p class="hint">${esc(title)}</p>
           ${last ? `<p>From the heart of the planet up to the surface, and the stars. That's every level, for now: go back for the stars you missed.</p>` : ""}
           <div class="awards" id="awards"></div>
           <dl class="results" id="results"></dl>
@@ -97,11 +119,13 @@ export function play(el, id) {
           ${
             next
               ? `<a class="button big" href="/play/${next.id}${dev ? "?dev" : ""}" data-link id="next">Next: ${next.id} ${next.name}</a>`
-              : `<a class="button big" href="/levels" data-link id="next">Back to the levels</a>`
+              : mine
+                ? `<a class="button big" href="${back.href}" data-link id="next">Back to editor</a>`
+                : `<a class="button big" href="/levels" data-link id="next">Back to the levels</a>`
           }
           <div class="buttons">
             <button id="retry">Retry</button>
-            <a class="button" href="/levels" data-link>Levels</a>
+            <a class="button" href="${mine ? "/editor" : "/levels"}" data-link>${mine ? "My levels" : "Levels"}</a>
           </div>
         </section>
       </div>
@@ -229,12 +253,14 @@ export function play(el, id) {
     const got = crystalCount(w);
     const all = got === level.crystals.length;
     let result = null;
-    if (def !== TEST_CAVE && !w.assisted) {
+    if (def !== TEST_CAVE && !mine && !w.assisted) {
       result = recordRun(progress, def, { time, crystals: all });
       saveProgress(progress);
     }
     const best = progress.levels[def.id]?.best;
-    $("#awards").innerHTML = w.assisted
+    $("#awards").innerHTML = mine
+      ? ""
+      : w.assisted
       ? `<p class="hint">Flown with the autopilot, so no stars</p>`
       : result
       ? [

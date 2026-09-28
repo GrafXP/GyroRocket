@@ -4,6 +4,8 @@ import { WORLDS, LEVELS } from "./levels/index.js";
 import { loadProgress, nextToPlay, isUnlocked, allUnlocked, setAllUnlocked, starsOf, starCount } from "./progress.js";
 import { html, icon, formatTime, starsHtml, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./ui/dom.js";
 import { play } from "./ui/play.js";
+import { editorList } from "./editor/list.js";
+import { editor } from "./editor/editor.js";
 
 const view = document.getElementById("view");
 let cleanup = null;
@@ -15,6 +17,7 @@ if (unlock !== null) setAllUnlocked(unlock !== "off");
 const routes = {
   "/": home,
   "/levels": levels,
+  "/editor": editorList,
   "/help": help,
 };
 
@@ -32,6 +35,10 @@ function pageFor(path) {
   }
   const level = path.match(/^\/play\/([\w-]+)$/)?.[1];
   if (level) return (el) => play(el, level);
+  const mine = path.match(/^\/play\/my\/(\w+)$/)?.[1];
+  if (mine) return (el) => play(el, `my:${mine}`);
+  const editing = path.match(/^\/editor\/(\w+)$/)?.[1];
+  if (editing) return (el) => editor(el, editing);
   return routes[path] || notFound;
 }
 
@@ -41,7 +48,8 @@ function render() {
   document.body.classList.remove("playing"); // the play page puts it back
   view.innerHTML = "";
   cleanup = pageFor(location.pathname)(view) || null;
-  const section = location.pathname.startsWith("/play") ? "/levels" : location.pathname;
+  const path = location.pathname;
+  const section = path.startsWith("/play/my/") || path.startsWith("/editor") ? "/editor" : path.startsWith("/play") ? "/levels" : path;
   for (const a of document.querySelectorAll("#nav a")) {
     a.classList.toggle("active", a.getAttribute("href") === section);
   }
@@ -147,6 +155,8 @@ function help(el) {
     <p>Stalactites shake and shed dust when you pass beneath them, then drop: hang back until they've fallen, or be quick. A hit costs hull. Crumbling rock is paler, with glowing cracks: touch it or land on it and it gives way a moment later, with all the crumbling rock joined to it, so take off fast. In some caves the lava rises, from the start or once you've taken something: the HUD shows how far below you it is. Climb!</p>
     <h2>Stars</h2>
     <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
+    <h2>Level editor</h2>
+    <p>Build your own caves under Editor, from a plain cave or a copy of one you've played. Paint rock, air, pads, keys, doors and hazards with one finger; move and zoom with two. If something's wrong with the level, it says what at the top, and Show finds it. Fly tries it straight away.</p>
     <h2>Tilt not working?</h2>
     <p class="hint">Browsers only share the motion sensors over HTTPS (or on localhost). On iPhone, allow motion access when asked.</p>
     <button id="fs" class="wide"></button>`,
