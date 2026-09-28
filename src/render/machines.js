@@ -62,9 +62,9 @@ export function createMachines(level) {
         view.slab.position.set((box.x0 + box.x1) / 2 + (Math.random() - 0.5) * shake, (box.y0 + box.y1) / 2 + (Math.random() - 0.5) * shake, -DEPTH / 2);
         if (view.rod) {
           // The rod runs from the head back to where it rests, and on into the rock.
-          const out = Math.hypot(box.x0 - m.x0, box.y0 - m.y0);
-          view.rod.scale.y = out + view.rodBase;
-          view.rod.position.set((box.x0 + box.x1) / 2 - view.back[0] * (out + view.rodBase) / 2, (box.y0 + box.y1) / 2 - view.back[1] * (out + view.rodBase) / 2, -DEPTH / 2);
+          const len = Math.hypot(box.x0 - m.x0, box.y0 - m.y0) + view.rodBase;
+          view.rod.scale.y = len;
+          view.rod.position.set((box.x0 + box.x1) / 2 + (view.back[0] * len) / 2, (box.y0 + box.y1) / 2 + (view.back[1] * len) / 2, -DEPTH / 2);
           view.lamp.visible = crusherWarning(m, tick) && Math.sin(seconds * 30) > 0;
         }
       });
