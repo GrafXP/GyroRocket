@@ -1,4 +1,5 @@
 import { TICK_RATE, GRAVITY } from "../rocket.js";
+import { hypot } from "../fmath.js";
 import { TILE } from "../level.js";
 
 export const BLOB_RADIUS = 0.8; // m
@@ -19,5 +20,5 @@ export const flightTime = (blob) => (2 * Math.sqrt(2 * GRAVITY * blob.height * T
 // Whether any of `circles` touches the blob at `tick`. `margin` widens it.
 export function inBlob(blob, circles, tick, margin = 0) {
   const { y, up } = blobAt(blob, tick);
-  return up && circles.some((c) => Math.hypot(c.x - blob.x, c.y - y) < c.r + BLOB_RADIUS + margin);
+  return up && circles.some((c) => hypot(c.x - blob.x, c.y - y) < c.r + BLOB_RADIUS + margin);
 }

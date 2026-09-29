@@ -3,7 +3,6 @@
 
 export const FULL_TILT = 35; // degrees of tilt that steer all the way, unless set
 const TILT_TAKEOVER = 5; // degrees the tilt has to move after the keys to steer again
-const KEY_TURN_RATE = 2.5; // rad/s: the keys turn slower than the tilt can, for small corrections
 
 // How far the phone is rolled to the right, in degrees, from a deviceorientation
 // event's beta and gamma and the screen's rotation (screen.orientation.angle).
@@ -40,7 +39,7 @@ export async function requestTiltPermission() {
 const screenAngle = () => screen.orientation?.angle ?? window.orientation ?? 0;
 
 // Listens on `canvas` for presses and on the window for keys and tilt. `input()`
-// gives { steer, thrust } for the sim; `hasTilt` turns true once the phone has
+// gives { steer, slow, thrust } for the sim (the keys turn it slowly); `hasTilt` turns true once the phone has
 // sent a real reading (desktops send none, or nulls). `fullTilt` is how many
 // degrees of tilt steer all the way.
 export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
@@ -94,17 +93,14 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
       // A key turns the rocket while it's held; letting go (or holding both) keeps
       // the lean it's got, which is a null steer, until the tilt moves again.
       let steer = null;
-      let turnRate; // the rocket's own, unless the keys steer
       if (left || right) keyTilt = tilt;
-      if (left !== right) {
-        steer = right - left;
-        turnRate = KEY_TURN_RATE;
-      } else if (!left && hasTilt && (keyTilt === null || Math.abs(tilt - keyTilt) > TILT_TAKEOVER)) {
+      if (left !== right) steer = right - left;
+      else if (!left && hasTilt && (keyTilt === null || Math.abs(tilt - keyTilt) > TILT_TAKEOVER)) {
         keyTilt = null;
         steer = steerOf(tilt, fullTilt);
       }
       const thrust = pointers.size > 0 || keys.has("ArrowUp") || keys.has("KeyW") || keys.has("Space");
-      return { steer, turnRate, thrust };
+      return { steer, slow: left !== right, thrust };
     },
     dispose() {
       window.removeEventListener("deviceorientation", onOrientation);

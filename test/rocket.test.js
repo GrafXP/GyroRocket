@@ -8,6 +8,7 @@ import {
   TICK_RATE,
   MAX_LEAN,
   TURN_RATE,
+  SLOW_TURN_RATE,
   SAFE_SPEED,
   HULL,
   TANK,
@@ -87,13 +88,13 @@ test("with no steer, the rocket holds its lean", () => {
   assert.equal(r.angle, lean);
 });
 
-test("a lower turnRate turns the rocket slower", () => {
+test("a slow steer, as the keys give, turns the rocket slower", () => {
   const { outline } = room();
   const fast = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
   const slow = run(createRocket(11, FLOOR), outline, { thrust: true }, 10);
   run(fast, outline, { thrust: true, steer: 1 }, 5);
-  run(slow, outline, { thrust: true, steer: 1, turnRate: TURN_RATE / 2 }, 5);
-  assert.ok(Math.abs(slow.angle - fast.angle / 2) < 1e-9);
+  run(slow, outline, { thrust: true, steer: 1, slow: true }, 5);
+  assert.ok(Math.abs(slow.angle - (fast.angle * SLOW_TURN_RATE) / TURN_RATE) < 1e-9);
 });
 
 test("a gentle touchdown lands, upright", () => {

@@ -1,4 +1,5 @@
 import { deepestContact } from "./collide.js";
+import { sin, cos, hypot } from "./fmath.js";
 import { floorAt } from "./outline.js";
 import { lavaAt } from "./level.js";
 
@@ -16,6 +17,7 @@ export const THRUST = 20; // m/s² at full burn: at full lean, just about a hove
 export const DRAG = 0.4; // per second, which caps a fall at about 25 m/s
 export const MAX_LEAN = Math.PI / 3; // how far the rocket leans at full steer
 export const TURN_RATE = 3.5; // how fast the lean follows the steer, rad/s
+export const SLOW_TURN_RATE = 2.5; // rad/s, as the keys steer: slower than the tilt can, for small corrections
 export const SAFE_SPEED = 5; // m/s: a landing has to be slower than this…
 export const SAFE_LEAN = 0.35; // rad: …and more upright than this
 export const HULL = 100;
@@ -82,24 +84,24 @@ const scratch = SHAPE.map((s) => ({ ...s }));
 // The rocket's circles at (x, y) leaning `angle`, in world coordinates. Reuses one
 // array unless given `out`.
 export function circlesAt(x, y, angle, out = scratch) {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  SHAPE.forEach((s, i) => {
-    out[i].x = x + s.x * cos + s.y * sin;
-    out[i].y = y - s.x * sin + s.y * cos;
+  const c = cos(angle);
+  const s = sin(angle);
+  SHAPE.forEach((p, i) => {
+    out[i].x = x + p.x * c + p.y * s;
+    out[i].y = y - p.x * s + p.y * c;
   });
   return out;
 }
 
 // Advances one tick. `steer` is -1 (full left) to 1 (full right) and sets the lean
-// the rocket turns towards, or null to hold the lean it has, and `turnRate` how
-// fast it turns (rad/s); `thrust` burns the engine along the rocket's axis, while
-// there's fuel. It flies in `outline`'s rock, and `env` has the rest: `boxes`, the
+// the rocket turns towards, or null to hold the lean it has, and `slow` turns it at
+// SLOW_TURN_RATE instead of TURN_RATE; `thrust` burns the engine along the rocket's
+// axis, while there's fuel. It flies in `outline`'s rock, and `env` has the rest: `boxes`, the
 // rectangles that block it (shut doors and gates, and moving blocks with their
 // velocity), as a list or as a function of how far through the tick it is (0 to 1);
 // `boxSpeed`, the fastest any of them moves (m/s); and `field`, the push of fans
 // and magnets, { ax, ay } in m/s².
-export function step(r, { steer = 0, turnRate = TURN_RATE, thrust = false } = {}, outline, env = {}) {
+export function step(r, { steer = 0, slow = false, thrust = false } = {}, outline, env = {}) {
   const { field = NO_FIELD, boxSpeed = 0 } = env;
   const boxesAt = typeof env.boxes === "function" ? env.boxes : () => env.boxes ?? NONE;
   r.tick++;
@@ -117,16 +119,16 @@ export function step(r, { steer = 0, turnRate = TURN_RATE, thrust = false } = {}
     r.state = "flying";
   } else if (steer != null) {
     const target = Math.max(-1, Math.min(1, steer)) * MAX_LEAN;
-    const turn = turnRate * DT;
+    const turn = (slow ? SLOW_TURN_RATE : TURN_RATE) * DT;
     r.angle += Math.max(-turn, Math.min(turn, target - r.angle));
   }
 
   const push = r.burning ? THRUST : 0;
-  const ax = Math.sin(r.angle) * push + field.ax;
-  const ay = Math.cos(r.angle) * push - GRAVITY + field.ay;
+  const ax = sin(r.angle) * push + field.ax;
+  const ay = cos(r.angle) * push - GRAVITY + field.ay;
   // Small enough steps that nothing moves further than its radius into rock, and
   // no block moves further than that into the rocket.
-  const n = Math.min(MAX_SUBSTEPS, Math.ceil((Math.max(Math.hypot(r.vx, r.vy), boxSpeed) * DT) / MAX_MOVE) || 1);
+  const n = Math.min(MAX_SUBSTEPS, Math.ceil((Math.max(hypot(r.vx, r.vy), boxSpeed) * DT) / MAX_MOVE) || 1);
   const dt = DT / n;
   const worst = { impact: 0, box: null };
   for (let i = 0; i < n && r.state === "flying"; i++) {
@@ -177,7 +179,7 @@ function collide(r, outline, boxes, worst) {
 // Lands the rocket if it's slow enough (relative to what it's landing on) and
 // upright enough, and there's room to stand.
 function tryLand(r, outline, boxes, floorY, rx, ry) {
-  if (Math.hypot(rx, ry) > SAFE_SPEED || Math.abs(r.angle) > SAFE_LEAN) return false;
+  if (hypot(rx, ry) > SAFE_SPEED || Math.abs(r.angle) > SAFE_LEAN) return false;
   if (!canStand(outline, r.x, floorY, boxes)) return false;
   Object.assign(r, { state: "landed", angle: 0, vx: 0, vy: 0, y: floorY + CENTRE_Y });
   return true;

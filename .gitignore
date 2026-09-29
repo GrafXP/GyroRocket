@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Runs saved from the phone with ?dev, for npm run verify
+runs

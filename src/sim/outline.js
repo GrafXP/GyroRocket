@@ -1,4 +1,5 @@
 import { TILE, isSolid } from "./level.js";
+import { hypot } from "./fmath.js";
 
 // The rock's outline, by marching squares over the tile centres. Cell (c, j) spans
 // the centres of tiles (c, j) to (c+1, j+1), so the outline runs along tile edges
@@ -77,7 +78,7 @@ function buildCell(outline, cc, jj) {
     const ay = (j + 0.5 + POINTS[p][1]) * TILE;
     const bx = (c + 0.5 + POINTS[q][0]) * TILE;
     const by = (j + 0.5 + POINTS[q][1]) * TILE;
-    const len = Math.hypot(bx - ax, by - ay);
+    const len = hypot(bx - ax, by - ay);
     return { ax, ay, bx, by, nx: (ay - by) / len, ny: (bx - ax) / len };
   });
   outline.cells[i] = segs.length ? segs : NONE;

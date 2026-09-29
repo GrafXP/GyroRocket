@@ -38,6 +38,15 @@ export function go(path) {
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
+// Hands the viewer `text` as a file called `name`, to save.
+export function saveFile(name, text, type = "application/json") {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 // Seconds → "m:ss.s".
 export function formatTime(s) {
   const tenths = Math.floor(s * 10);

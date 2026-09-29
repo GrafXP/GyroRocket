@@ -1,12 +1,14 @@
 import { WORLDS } from "./levels/index.js";
 import { mapRows } from "./sim/level.js";
 import { validateLevel } from "./sim/validate.js";
+import { forgetRun } from "./runs.js";
 
 // The levels made in the editor, kept in localStorage: the list of them
 // (`gyrorocket:mylevels`, [{ id, name, width, height, updated }], last edited
 // first) and each one on its own (`gyrorocket:mylevel:<id>`, { id, created,
 // updated, level }). `level` is a level as in src/levels, plus `look`: which
-// world's colours it borrows.
+// world's colours it borrows. A level's finish is its kept run (runs.js, as
+// "my:<id>"), and goes with it.
 
 const INDEX_KEY = "gyrorocket:mylevels";
 const levelKey = (id) => `gyrorocket:mylevel:${id}`;
@@ -61,6 +63,7 @@ export function deleteLevel(id) {
   try {
     globalThis.localStorage?.removeItem(levelKey(id));
   } catch {}
+  forgetRun(`my:${id}`);
   write(INDEX_KEY, listLevels().filter((l) => l.id !== id));
 }
 

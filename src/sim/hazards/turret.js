@@ -1,4 +1,5 @@
 import { TICK_RATE } from "../rocket.js";
+import { hypot } from "../fmath.js";
 import { solidAt } from "../outline.js";
 
 export const SHOT_RADIUS = 0.45; // m
@@ -8,7 +9,7 @@ const SHOT_LIFE = 10 * TICK_RATE; // long enough to cross a turret's range, slow
 // Whether a turret (level.turrets) can see the point (x, y): within its range,
 // with no rock in between.
 export function canSee(outline, turret, x, y) {
-  const d = Math.hypot(x - turret.x, y - turret.y);
+  const d = hypot(x - turret.x, y - turret.y);
   if (d > turret.range) return false;
   for (let s = MUZZLE; s < d; s += 0.5) {
     if (solidAt(outline, turret.x + ((x - turret.x) * s) / d, turret.y + ((y - turret.y) * s) / d)) return false;
@@ -33,7 +34,7 @@ export function stepTurrets(world, circles) {
       state.charge = -1;
       state.ready = tick + t.reload * TICK_RATE;
       if (!sees) return; // it ducked out of sight: no shot
-      const d = Math.hypot(r.x - t.x, r.y - t.y) || 1;
+      const d = hypot(r.x - t.x, r.y - t.y) || 1;
       const [ux, uy] = [(r.x - t.x) / d, (r.y - t.y) / d];
       world.shots.push({ x: t.x + ux * MUZZLE, y: t.y + uy * MUZZLE, vx: ux * t.speed, vy: uy * t.speed, damage: t.damage, born: tick });
     }
@@ -43,7 +44,7 @@ export function stepTurrets(world, circles) {
     s.x += s.vx / TICK_RATE;
     s.y += s.vy / TICK_RATE;
     if (tick - s.born > SHOT_LIFE || solidAt(outline, s.x, s.y)) return false;
-    if (alive && circles.some((c) => Math.hypot(c.x - s.x, c.y - s.y) < c.r + SHOT_RADIUS)) {
+    if (alive && circles.some((c) => hypot(c.x - s.x, c.y - s.y) < c.r + SHOT_RADIUS)) {
       damage += s.damage;
       return false;
     }

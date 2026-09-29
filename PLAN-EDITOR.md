@@ -323,7 +323,7 @@ a new level, place a gate and switch, connect them with Inspect, adjust a mover
 path, run Check/Autopilot, then Fly and return. Try the sheets in portrait and
 landscape, and reload to check saved settings.
 
-### Phase E3: Replays, and finishing your own level
+### Phase E3: Replays, and finishing your own level ✅ (done)
 
 The sim gets `fmath.js`, and a test fails on `Math.sin`, `Math.cos`, `Math.hypot`,
 `Math.atan2`, `Math.exp`, `Math.pow` or `**` in `src/sim`. The tap that restarts
@@ -354,6 +354,79 @@ they stop landing on the same tick; after a change to the sim on purpose, bump
 - [ ] A run recorded on the phone replays the same in node (`scripts/verify.js`).
 - [ ] The game feels the same with quantized steering.
 - [ ] Editing a finished level clears its finish; renaming it doesn't.
+
+What was built: `src/sim/fmath.js` has the sine and cosine from fdlibm (as in
+musl), within a unit in the last place of V8's, and `hypot` as the square root of
+the sum of squares: plus, minus, times, divide and `Math.sqrt` give the same answer
+on every engine. `test/fmath.test.js` goes further than the plan: of `Math`, the
+sim may only use what's exact everywhere (`abs`, `floor`, `round`, `min`, `max`,
+`sqrt` and the like), and no `**`. A sliding block's phase wraps round its period
+before its cosine, so the angle stays small however long the level runs.
+
+`src/sim/input.js` turns a tick's input into its code, two bytes: the steer in
+127ths as a signed byte, and bits for burn, turning slowly (the keys, at
+`SLOW_TURN_RATE`, now in `rocket.js`), restart and hold (a null steer).
+`advance(world, code)` (`world.js`) is how every run is flown, in the game, the
+autopilot's test flights and replays: it takes the restart bit and the tap after a
+crash (a new press, once `RETRY_AFTER` is up) and keeps the engine off while the
+rocket's down or done. The controls give `{ steer, slow, thrust }`. Every level
+still flies within its tank with the new maths and quantized input, the autopilot's
+times within 0.2 s of before, but for 7-1: 144.8 s instead of 140.4 s (par 145),
+having missed a beat on the way to the red key.
+
+`game.js` records every run from the level's start, a code a tick, until the
+finish; *Restart level* starts a new recording. `src/replay.js` makes a replay of
+it: `{ format, sim, level, finished, ticks, time, crystals, restarts, input }`,
+with `assisted` or `cheated` when the autopilot flew or a dev cheat was on. `input`
+is the steer bytes as changes from the tick before, then the flag bytes, deflated
+(`CompressionStream`, in the browser and in node) and in base64: the autopilot's
+runs come to about 2 KB a minute. `checkReplay` plays one back headless on a fresh
+world and says whether it lands on the exit on its last tick, with the same time,
+crystals and restarts, or why not (another sim version or level, damaged input, a
+cheat).
+
+A level's hash (`src/hash.js`) is the SHA-256 of what's flown, as JSON with its
+keys in order: the map as parsed (so indenting it changes nothing), its things, and
+`fuel`, `dark`, `sky`, `crumble` and `rise`; not the name, par, route or look. It's
+128 bits, as hex. SHA-256 is written out in JS, since `crypto.subtle` is async and
+needs HTTPS, which a phone on the dev server doesn't have. Every built-in level
+keeps its hash through the editor, copied and saved.
+
+`src/runs.js` keeps the best run of each level in localStorage
+(`gyrorocket:run:<id>`, `my:<id>` for my levels): the fastest that counts
+(finished, no autopilot, no cheat), replaced by any run on a changed level or sim.
+The test cave and the big cave keep none. My level is finished while its kept run is
+on the level as it is (`finishOf`): the editor's list says *Finished in 0:42.3*, and
+so does its menu (or how to finish it), and deleting the level forgets its run. The
+results for my level say whether the run finished it.
+
+Watching: the pause menu has *Watch your best run, 0:42.3* when there is one, and
+the results have *Watch*, for the run just flown (the autopilot's too). The game
+flies the level from the start with the run's codes, taking no notice of the
+controls or the cheats; the HUD says what's being watched, the pause menu has *Stop
+watching*, and the replay's results have *Watch again* and *Play*. If a replay
+didn't land on the exit on its tick, its results say so; with `?dev`, they say the
+tick when it did.
+
+To check a phone's run in node: with `?dev`, the results have *Save this run*. On
+the dev server it's posted to `/__runs` (a plugin in `vite.config.js`), which
+writes it to `runs/` in the project (ignored by git), since node can't see the
+phone's downloads; elsewhere it's a download. `npm run verify` plays back every
+run in `runs/`, or the files named, and says how each went; a run carries its level
+id, and my level's run the level itself.
+
+`test/replays/` has the golden replays: the autopilot flying 1-8, 2-6, 3-8, 4-8,
+5-8, 6-8 and 7-4, and 1-6 with a crash, a tap to go again, and a *Restart from
+pad* from the menu. `npm run golden` (`scripts/golden.js`) records them again.
+`test/replay.test.js` fails if one doesn't land on the same tick or was recorded on
+another `SIM_VERSION`, and checks that doctored replays are caught, packing, the
+hash, and which runs are kept.
+
+Checked in node: a smoke test of the play page (a scratch DOM, with the view and
+controls stubbed) flies levels, and checks the run is kept, *Watch* lands on the
+same tick, *Restart from pad* is in the recording, the autopilot's runs aren't
+kept, and my level shows as finished in the editor's list. The checklist above is
+for the phone.
 
 ### Phase E4: The server, and names
 

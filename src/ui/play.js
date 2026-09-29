@@ -9,7 +9,9 @@ import { drawMap } from "./map.js";
 import { levelById, nextLevel, endingOf, EXTRAS } from "../levels/index.js";
 import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
 import { playableLevel } from "../mylevels.js";
-import { html, icon, esc, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { makeReplay, unpackInput, unplayable, counts } from "../replay.js";
+import { loadRun, keepRun, finishOf } from "../runs.js";
+import { html, icon, esc, formatTime, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
 const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
@@ -22,6 +24,11 @@ const TILT_MAX = 60;
 // in the URL, a developer overlay (and every level open). The frame rate display
 // is a debug option in the pause menu, and ?dev shows it too. My levels, from the
 // editor, have ids "my:<id>", and lead back to the editor.
+//
+// Every run is recorded (game.js), and the best one that counts is kept (runs.js):
+// the pause menu can watch it, and the results can watch the run just flown. For
+// my level, the kept run is its finish, which the editor shows. With ?dev, the
+// results can save the run as a file, for scripts/verify.js.
 export function play(el, id) {
   const mine = id.startsWith("my:") ? id.slice(3) : null;
   const dev = new URLSearchParams(location.search).has("dev");
@@ -63,6 +70,7 @@ export function play(el, id) {
   const ending = extra || mine ? null : endingOf(id); // the way out of the core, the end of part one
   // Where the menus lead: the levels, or for my level, back to the editor.
   const back = mine ? { href: `/editor/${mine}`, label: "Back to editor" } : { href: "/levels", label: "Levels" };
+  const runId = mine ? `my:${mine}` : def.id; // where its best run is kept
   const $ = html(
     el,
     `<div class="game" id="game">
@@ -87,10 +95,12 @@ export function play(el, id) {
           <h2>Paused</h2>
           <p class="hint">${esc(title)}</p>
           <button class="big" id="resume">Resume</button>
-          <div class="buttons">
+          <div class="buttons" id="restarts">
             <button id="restart-pad">Restart from pad</button>
             <button id="restart-level">Restart level</button>
           </div>
+          <button id="watch-best" hidden></button>
+          <button id="stop-watch" hidden>Stop watching</button>
           <a class="button" href="${back.href}" data-link>${back.label}</a>
         </section>
         <section>
@@ -115,9 +125,9 @@ export function play(el, id) {
 
       <div class="overlay menu" id="done" hidden>
         <section>
-          <h2>${ending ? ending.title : "Level complete"}</h2>
+          <h2 id="done-title">${ending ? ending.title : "Level complete"}</h2>
           <p class="hint">${esc(title)}</p>
-          ${ending ? `<p>${ending.text}${next ? "" : " That's every level, for now: go back for the stars you missed."}</p>` : ""}
+          ${ending ? `<p id="ending">${ending.text}${next ? "" : " That's every level, for now: go back for the stars you missed."}</p>` : ""}
           <div class="awards" id="awards"></div>
           <dl class="results" id="results"></dl>
         </section>
@@ -131,8 +141,10 @@ export function play(el, id) {
           }
           <div class="buttons">
             <button id="retry">Retry</button>
+            <button id="watch">Watch</button>
             <a class="button" href="${mine ? "/editor" : "/levels"}" data-link>${mine ? "My levels" : "Levels"}</a>
           </div>
+          ${dev ? `<button id="save-run">Save this run</button>` : ""}
         </section>
       </div>
 
@@ -176,6 +188,19 @@ export function play(el, id) {
   const devHud = dev ? createDevHud($("#dev")) : null;
   const fpsEl = $("#fps");
   let fpsShown = 0;
+
+  let watched = null; // the run being watched: { codes, replay, label }
+  let lastRun = null; // the run just finished: { codes, replay (once it's made) }
+  let bestRun = null; // the kept run, if it can be watched: { codes, replay }
+  const kept = extra ? null : loadRun(runId);
+  if (counts(kept) && !unplayable(def, kept)) {
+    unpackInput(kept.input)
+      .then((codes) => {
+        bestRun ??= { codes, replay: kept };
+        syncPauseMenu();
+      })
+      .catch(() => {});
+  }
 
   const game = createGame(gameEl, {
     level,
@@ -231,6 +256,7 @@ export function play(el, id) {
         { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!", laser: "Zapped!", shot: "Shot down!", stalactite: "Hit by falling rock!" }[r.cause] ??
         "Crashed!";
       if (w.done) text = "";
+      else if (watched) text = `Watching ${watched.label}`;
       else if (game?.pilot) text = game.pilot.status;
       else if (performance.now() < lostUntil) text = game.lastPilot.status;
       else if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
@@ -250,6 +276,7 @@ export function play(el, id) {
       hud.message.hidden = !text;
 
       if (w.done && !finished && w.tick - w.endTick >= RESULTS_AFTER) finish(w);
+      else if (watched && !finished && w.tick >= watched.codes.length + RESULTS_AFTER) finish(w); // it should have landed by now
       devHud?.update(w, game);
       if (!fpsEl.hidden && game && game.stats.fps !== fpsShown) {
         fpsShown = game.stats.fps;
@@ -259,11 +286,26 @@ export function play(el, id) {
   });
 
   // The results: time against par, crystals, and the stars, new ones popping in.
+  // Watching a run, the replay's results instead.
   function finish(w) {
     finished = true;
+    $("#done").hidden = false;
+    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = true;
+    $("#next").focus();
+    if (watched) return replayResults(w);
     const time = clock(w);
     const got = crystalCount(w);
     const all = got === level.crystals.length;
+    const run = game.recording();
+    const made = (lastRun = { codes: run.codes, replay: null });
+    $("#watch").hidden = run.cheated; // the cheats aren't in its inputs
+    makeReplay(def, w, run.codes, { cheated: run.cheated }).then((replay) => {
+      made.replay = replay;
+      const isBest = !extra && keepRun(runId, replay);
+      if (isBest) bestRun = { codes: made.codes, replay };
+      if (mine) $("#awards").innerHTML = `<p class="hint">${finishNote(replay, isBest)}</p>`;
+      syncPauseMenu();
+    });
     let result = null;
     if (!extra && !mine && !w.assisted) {
       result = recordRun(progress, def, { time, crystals: all });
@@ -290,13 +332,68 @@ export function play(el, id) {
       <dt>Time</dt><dd>${formatTime(time)}${result?.newBest && result.before[0] ? " <b>New best!</b>" : best !== undefined && !result?.newBest ? ` <small>best ${formatTime(best)}</small>` : ""}</dd>
       ${level.crystals.length ? `<dt>Crystals</dt><dd>${got} of ${level.crystals.length}</dd>` : ""}
       <dt>Restarts</dt><dd>${w.restarts}</dd>`;
-    $("#done").hidden = false;
-    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = true;
-    $("#next").focus();
+  }
+
+  // What a finish of my level means: it's marked finished, with the run kept, if it
+  // counts and is its best.
+  function finishNote(replay, isBest) {
+    if (replay.assisted) return "Flown with the autopilot, so it doesn't count as a finish.";
+    if (replay.cheated) return "Flown with a cheat on, so it doesn't count as a finish.";
+    if (isBest) return `Your level is finished, in ${formatTime(replay.time)}. This run is kept with it.`;
+    const old = finishOf(runId, def);
+    return old ? `Your level's finish stays at ${formatTime(old.time)}, a faster run.` : "Couldn't keep this run: the phone's storage for the game is full.";
+  }
+
+  // A watched run's results. It lands on the exit on the tick it did, or something's wrong.
+  function replayResults(w) {
+    $("#done-title").textContent = "Replay";
+    if ($("#ending")) $("#ending").hidden = true;
+    const { replay } = watched;
+    const ticks = replay?.ticks ?? watched.codes.length;
+    const note = !w.done
+      ? `This replay went wrong: it should have landed on the exit on tick ${ticks}.`
+      : w.endTick !== ticks
+        ? `This replay went wrong: it landed on the exit on tick ${w.endTick}, not ${ticks}.`
+        : dev
+          ? `It landed on the exit on tick ${w.endTick}, as it did.`
+          : "";
+    $("#awards").innerHTML = note ? `<p class="hint">${note}</p>` : "";
+    $("#results").innerHTML = `
+      <dt>Time</dt><dd>${formatTime(clock(w))}</dd>
+      ${level.crystals.length ? `<dt>Crystals</dt><dd>${crystalCount(w)} of ${level.crystals.length}</dd>` : ""}
+      <dt>Restarts</dt><dd>${w.restarts}</dd>`;
+    $("#retry").textContent = "Play";
+    $("#watch").textContent = "Watch again";
+  }
+
+  // Watches a recorded run from the start: { codes, replay, label }.
+  function startWatching(run) {
+    watched = run;
+    game.watch(run.codes);
+    finished = false;
+    $("#done").hidden = true;
+    $("#pause-btn").hidden = $("#map-btn").hidden = false;
+    $("#auto-btn").hidden = true;
+    syncPauseMenu();
+  }
+
+  // Back to playing, from the start.
+  function playAgain() {
+    watched = null;
+    game.restartLevel();
+    finished = false;
+    $("#done").hidden = true;
+    $("#done-title").textContent = ending ? ending.title : "Level complete";
+    if ($("#ending")) $("#ending").hidden = false;
+    $("#retry").textContent = "Retry";
+    $("#watch").textContent = "Watch";
+    $("#watch").hidden = false;
+    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = false;
+    syncPauseMenu();
   }
 
   const toggleAutopilot = () => {
-    if (!finished) game.setAutopilot(!game.pilot);
+    if (!finished && !watched) game.setAutopilot(!game.pilot);
   };
   $("#auto-btn").addEventListener("click", () => {
     toggleAutopilot();
@@ -305,11 +402,26 @@ export function play(el, id) {
   $("#auto-menu").addEventListener("click", toggleAutopilot);
 
   $("#retry").addEventListener("click", () => {
-    game.restartLevel();
-    finished = false;
-    $("#done").hidden = true;
-    $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = false;
+    playAgain();
     document.activeElement?.blur();
+  });
+  $("#watch").addEventListener("click", () => {
+    startWatching(watched ?? { ...lastRun, label: "this run" });
+    document.activeElement?.blur();
+  });
+  // With ?dev: the run as a file, for scripts/verify.js. The dev server writes it
+  // to runs/ in the project (vite.config.js); elsewhere, it's a download.
+  $("#save-run")?.addEventListener("click", async (e) => {
+    const replay = watched ? watched.replay : lastRun?.replay;
+    if (!replay) return;
+    const text = JSON.stringify({ id: def.id, ...(mine && { def }), ...replay });
+    if (import.meta.env?.DEV) {
+      try {
+        const res = await fetch("/__runs", { method: "POST", body: text });
+        if (res.ok) return show(e.target, `Saved as ${(await res.json()).file}`);
+      } catch {}
+    }
+    saveFile(`run-${runId.replace(":", "-")}-${replay.ticks}.json`, text);
   });
 
   // Pausing.
@@ -322,6 +434,13 @@ export function play(el, id) {
     pauseMenu.hidden = false;
     $("#resume").focus();
   };
+  // Restarts while playing; watching, a way back to playing.
+  function syncPauseMenu() {
+    $("#restarts").hidden = $("#auto-menu").hidden = !!watched;
+    $("#stop-watch").hidden = !watched;
+    $("#watch-best").hidden = !!watched || !bestRun;
+    if (bestRun) show($("#watch-best"), `Watch your best run, ${formatTime(bestRun.replay.time)}`);
+  }
   const closePause = () => {
     pauseMenu.hidden = true;
     game.resume();
@@ -351,6 +470,14 @@ export function play(el, id) {
   });
   $("#restart-level").addEventListener("click", () => {
     game.restartLevel();
+    closePause();
+  });
+  $("#watch-best").addEventListener("click", () => {
+    startWatching({ ...bestRun, label: "your best run" });
+    closePause();
+  });
+  $("#stop-watch").addEventListener("click", () => {
+    playAgain();
     closePause();
   });
   const onKey = (e) => {

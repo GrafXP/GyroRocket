@@ -1,5 +1,6 @@
-import { html, icon, esc, go } from "../ui/dom.js";
+import { html, icon, esc, go, saveFile, formatTime } from "../ui/dom.js";
 import { loadLevel, saveLevel, deleteLevel } from "../mylevels.js";
+import { finishOf } from "../runs.js";
 import { buildOutline, setTile as setOutlineTile } from "../sim/outline.js";
 import { MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT } from "../sim/validate.js";
 import { gridFromLevel, levelFromGrid, cloneGrid, resizeGrid, solidOf, charAt, inside, problemOf } from "./grid.js";
@@ -94,6 +95,7 @@ export function editor(el, id) {
       <div class="overlay menu" id="menu" hidden>
         <section>
           <h2>Level</h2>
+          <p class="hint" id="m-finish"></p>
           <button id="m-settings">Settings…</button>
           <button id="m-check">Check</button>
           <button id="m-auto">Autopilot</button>
@@ -544,6 +546,9 @@ export function editor(el, id) {
     $("#m-outline").textContent = `Rock outline: ${session.outline ? "on" : "off"}`;
   };
   $("#menu-btn").addEventListener("click", () => {
+    // Finished, while it's the level that was finished: any change but its name clears it.
+    const finish = finishOf(`my:${id}`, levelFromGrid(session.grid));
+    $("#m-finish").textContent = finish ? `Finished in ${formatTime(finish.time)}.` : "Not finished yet: fly it from the start to the exit, without the autopilot.";
     menu.hidden = false;
     $("#m-close").focus();
   });
@@ -790,11 +795,7 @@ export function editor(el, id) {
         .replace(/[^\w-]+/g, "-")
         .replace(/^-|-$/g, "")
         .toLowerCase() || "level";
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([exportText()], { type: json ? "application/json" : "text/javascript" }));
-    a.download = `${file}.${json ? "json" : "js"}`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    saveFile(`${file}.${json ? "json" : "js"}`, exportText(), json ? "application/json" : "text/javascript");
   });
   $("#export-close").addEventListener("click", () => (exportEl.hidden = true));
 

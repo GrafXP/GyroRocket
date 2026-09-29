@@ -1,4 +1,5 @@
 import { TICK_RATE, GRAVITY } from "../rocket.js";
+import { hypot } from "../fmath.js";
 import { solidAt } from "../outline.js";
 import { polyContact } from "../collide.js";
 
@@ -22,7 +23,7 @@ export const shaking = (s, state, tick) => state.gone < 0 && state.shook >= 0 &&
 // Whether the rocket's centre (x, y) is where a stalactite drops for it.
 export function below(outline, s, x, y) {
   if (Math.abs(x - s.x) >= s.reach || y >= s.tip) return false;
-  const d = Math.hypot(x - s.x, y - s.tip);
+  const d = hypot(x - s.x, y - s.tip);
   for (let k = 0.5; k < d; k += 0.5) {
     if (solidAt(outline, s.x + ((x - s.x) * k) / d, s.tip + ((y - s.tip) * k) / d)) return false;
   }

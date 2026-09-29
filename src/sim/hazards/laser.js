@@ -1,4 +1,5 @@
 import { TICK_RATE } from "../rocket.js";
+import { hypot } from "../fmath.js";
 
 export const BEAM = 0.15; // m: a beam's half-width, for what touches it
 
@@ -17,6 +18,6 @@ export function inLaser(laser, circles, margin = 0) {
   const [dx, dy] = [laser.x1 - laser.x0, laser.y1 - laser.y0];
   return circles.some((c) => {
     const t = Math.max(0, Math.min(1, ((c.x - laser.x0) * dx + (c.y - laser.y0) * dy) / (dx * dx + dy * dy)));
-    return Math.hypot(laser.x0 + dx * t - c.x, laser.y0 + dy * t - c.y) < c.r + BEAM + margin;
+    return hypot(laser.x0 + dx * t - c.x, laser.y0 + dy * t - c.y) < c.r + BEAM + margin;
   });
 }

@@ -2,23 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { levelById } from "../src/levels/index.js";
 import { parseLevel } from "../src/sim/level.js";
-import { createWorld, step, restart, RETRY_AFTER } from "../src/sim/world.js";
+import { createWorld, step, advance } from "../src/sim/world.js";
+import { inputCode } from "../src/sim/input.js";
 import { createPilot } from "../src/autopilot.js";
 import { TICK_RATE, CENTRE_Y } from "../src/sim/rocket.js";
 
 const world = (id) => createWorld(parseLevel(levelById(id)));
 
-// Flies with `pilot` until the level's done, or `seconds` run out, restarting on a
-// tap after a crash as the game does (game.js).
+// Flies with `pilot` until the level's done, or `seconds` run out, as the game
+// does (restarting on its tap after a crash).
 const fly = (w, pilot, seconds = 120) => {
-  let was = false;
-  for (let i = 0; i < seconds * TICK_RATE && !w.done; i++) {
-    const input = pilot.input();
-    const pressed = input.thrust && !was;
-    was = input.thrust;
-    if (w.downTick >= 0 && pressed && w.tick - w.downTick >= RETRY_AFTER) restart(w);
-    step(w, input);
-  }
+  for (let i = 0; i < seconds * TICK_RATE && !w.done; i++) advance(w, inputCode(pilot.input()));
   return w;
 };
 

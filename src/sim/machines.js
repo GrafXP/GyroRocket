@@ -1,4 +1,5 @@
 import { TICK_RATE } from "./rocket.js";
+import { cos, hypot } from "./fmath.js";
 
 // Fans, magnets, movers and crushers (level.fans, .magnets, .movers), all on the
 // level clock like everything else.
@@ -23,7 +24,7 @@ export function fieldAt(level, tick, x, y) {
   }
   for (const m of level.magnets) {
     const [dx, dy] = [m.x - x, m.y - y];
-    const d = Math.hypot(dx, dy);
+    const d = hypot(dx, dy);
     if (d >= m.range || d < 1e-6 || cyclePhase(m, tick) !== "on") continue;
     const a = m.strength * (1 - d / m.range) * (m.push ? -1 : 1);
     ax += (dx / d) * a;
@@ -36,7 +37,7 @@ export function fieldAt(level, tick, x, y) {
 // 1 at `to`. A tick can be fractional.
 export function travel(m, tick) {
   const t = tick / TICK_RATE - m.offset;
-  if (m.kind === "mover") return (1 - Math.cos((2 * Math.PI * t) / m.period)) / 2;
+  if (m.kind === "mover") return (1 - cos((2 * Math.PI * mod(t, m.period)) / m.period)) / 2;
   let s = mod(t, m.rest + m.warn + m.slam + m.hold + m.back);
   if (s < m.rest + m.warn) return 0;
   s -= m.rest + m.warn;

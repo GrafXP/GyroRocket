@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, clock, restart, padUnder, crystalCount, REFUEL_TIME } from "../src/sim/world.js";
+import { createWorld, step, advance, clock, restart, padUnder, crystalCount, REFUEL_TIME, RETRY_AFTER } from "../src/sim/world.js";
+import { inputCode } from "../src/sim/input.js";
 import { TICK_RATE, CENTRE_Y, HULL, TANK } from "../src/sim/rocket.js";
 import { room } from "./helpers.js";
 import { parseLevel } from "../src/sim/level.js";
@@ -183,4 +184,52 @@ test("the dev cheats: no damage, and a tank that never empties", () => {
   assert.notEqual(w.rocket.state, "crashed");
   assert.equal(w.rocket.hull, HULL);
   assert.equal(w.rocket.fuel, TANK);
+});
+
+test("advance: after a crash, a new tap once RETRY_AFTER is up goes back to the checkpoint", () => {
+  const { level } = room();
+  const w = createWorld(level);
+  const go = (input, ticks = 1) => {
+    for (let i = 0; i < ticks; i++) advance(w, inputCode(input));
+  };
+  const crash = () => {
+    go({ thrust: true }, 30);
+    Object.assign(w.rocket, { vy: -30 });
+    go({ thrust: true }, 30);
+    assert.equal(w.rocket.state, "crashed");
+    assert.equal(w.rocket.burning, false, "no burning while it's down");
+  };
+  crash();
+  // A burn held from before the crash isn't a tap.
+  go({ thrust: true }, RETRY_AFTER + 5);
+  assert.equal(w.restarts, 0);
+  go({});
+  go({ thrust: true });
+  assert.equal(w.restarts, 1);
+  assert.equal(w.rocket.state, "landed");
+  assert.equal(w.rocket.burning, false, "the tap that restarts doesn't burn");
+  go({ thrust: true });
+  assert.equal(w.rocket.burning, true);
+  // A tap too soon does nothing.
+  crash();
+  go({});
+  go({ thrust: true });
+  assert.equal(w.restarts, 1);
+  go({}, RETRY_AFTER);
+  go({ thrust: true });
+  assert.equal(w.restarts, 2);
+});
+
+test("advance: the restart input goes back to the checkpoint, but not after the finish", () => {
+  const { level } = room();
+  const w = createWorld(level);
+  advance(w, inputCode({ thrust: true }));
+  advance(w, inputCode({ restart: true }));
+  assert.equal(w.restarts, 1);
+  dropOnto(w, level.pads.find((p) => p.kind === "exit"));
+  for (let i = 0; i < TICK_RATE && !w.done; i++) advance(w, inputCode({}));
+  assert.equal(w.done, true);
+  advance(w, inputCode({ restart: true }));
+  assert.equal(w.restarts, 1);
+  assert.equal(w.done, true);
 });

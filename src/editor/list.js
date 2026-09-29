@@ -1,14 +1,16 @@
 import { html, esc, go } from "../ui/dom.js";
 import { WORLDS, TEST_CAVE, BIG_CAVE, levelById } from "../levels/index.js";
 import { loadProgress, isUnlocked, allUnlocked } from "../progress.js";
-import { listLevels, createLevel, duplicateLevel, deleteLevel, newLevel, copyOfLevel } from "../mylevels.js";
+import { listLevels, loadLevel, createLevel, duplicateLevel, deleteLevel, newLevel, copyOfLevel } from "../mylevels.js";
+import { finishOf } from "../runs.js";
+import { formatTime } from "../ui/dom.js";
 import { validateLevel } from "../sim/validate.js";
 import { levelFromText } from "./text.js";
 
 const FULL = "Couldn't save: the phone's storage for the game is full.";
 
-// The editor's front page, /editor: my levels, a new one, a copy of a built-in
-// level (one that's open), or one pasted in.
+// The editor's front page, /editor: my levels (and which are finished), a new one,
+// a copy of a built-in level (one that's open), or one pasted in.
 export function editorList(el) {
   const progress = loadProgress();
   const open = WORLDS.map((w) => ({ ...w, levels: w.levels.filter((l) => allUnlocked() || isUnlocked(progress, l.id)) })).filter((w) => w.levels.length);
@@ -54,9 +56,10 @@ export function editorList(el) {
     const levels = listLevels();
     $("#mine").innerHTML = levels.length
       ? levels
+          .map((l) => ({ ...l, finish: finishOf(`my:${l.id}`, loadLevel(l.id)?.level ?? { map: "" }) }))
           .map(
             (l) => `<div class="ed-item">
-              <a class="ed-item-main" href="/editor/${l.id}" data-link><b>${esc(l.name || "No name")}</b><small>${l.width} × ${l.height} · ${ago(l.updated)}</small></a>
+              <a class="ed-item-main" href="/editor/${l.id}" data-link><b>${esc(l.name || "No name")}</b><small>${l.width} × ${l.height} · ${ago(l.updated)}${l.finish ? ` · Finished in ${formatTime(l.finish.time)}` : ""}</small></a>
               <a class="button" href="/play/my/${l.id}" data-link>Fly</a>
               <button data-copy="${l.id}">Copy</button>
               <button data-delete="${l.id}" aria-label="Delete ${esc(l.name)}">Delete</button>

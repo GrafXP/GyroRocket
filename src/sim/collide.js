@@ -1,4 +1,5 @@
 import { segmentsNear } from "./outline.js";
+import { hypot } from "./fmath.js";
 
 const near = []; // reused, to keep the hot path free of garbage
 
@@ -42,7 +43,7 @@ export function deepestContact(outline, circles, boxes = []) {
         const ex = c.x - px;
         const ey = c.y - py;
         if (ex * s.nx + ey * s.ny < 0) continue;
-        const d = Math.hypot(ex, ey);
+        const d = hypot(ex, ey);
         if (d >= c.r) continue;
         [depth, nx, ny] = d > 1e-9 ? [c.r - d, ex / d, ey / d] : [c.r, s.nx, s.ny];
       }
@@ -62,7 +63,7 @@ export function deepestContact(outline, circles, boxes = []) {
       const py = Math.max(b.y0, Math.min(b.y1, c.y));
       let depth, nx, ny;
       if (px !== c.x || py !== c.y) {
-        const d = Math.hypot(c.x - px, c.y - py);
+        const d = hypot(c.x - px, c.y - py);
         if (d >= c.r) continue;
         [depth, nx, ny] = [c.r - d, (c.x - px) / d, (c.y - py) / d];
       } else {
@@ -91,14 +92,14 @@ export function polyContact(poly, c) {
     const [ax, ay] = poly[i];
     const [bx, by] = poly[(i + 1) % poly.length];
     const [dx, dy] = [bx - ax, by - ay];
-    const len = Math.hypot(dx, dy);
+    const len = hypot(dx, dy);
     const [nx, ny] = [dy / len, -dx / len]; // outwards
     const d = (c.x - ax) * nx + (c.y - ay) * ny;
     if (d > 0) inside = false;
     if (!nearest || d > nearest.d) nearest = { d, nx, ny };
     const t = Math.max(0, Math.min(1, ((c.x - ax) * dx + (c.y - ay) * dy) / (len * len)));
     const [px, py] = [ax + dx * t, ay + dy * t];
-    const e = Math.hypot(c.x - px, c.y - py);
+    const e = hypot(c.x - px, c.y - py);
     if (!closest || e < closest.d) closest = { d: e, px, py };
   }
   if (inside) {

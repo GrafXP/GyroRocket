@@ -1,6 +1,7 @@
 import { parseLevel, TILE } from "./sim/level.js";
 import { buildOutline } from "./sim/outline.js";
-import { createWorld, step } from "./sim/world.js";
+import { createWorld, advance } from "./sim/world.js";
+import { inputCode } from "./sim/input.js";
 import { TICK_RATE } from "./sim/rocket.js";
 import { createPilot } from "./autopilot.js";
 
@@ -19,7 +20,7 @@ export function flyLevel(def, { maxSeconds = 1800, progress = () => {} } = {}) {
     if (world.done || pilot.failed || world.tick >= limit) break;
     if (world.refuelling) burned = 0;
     const fuel = world.rocket.fuel;
-    step(world, input);
+    advance(world, inputCode(input));
     if (world.rocket.burning && fuel > 0) burned += Math.min(1 / TICK_RATE, fuel);
     longest = Math.max(longest, burned);
     if (pilot.legs.length !== legs || world.tick % 600 === 0) {

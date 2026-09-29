@@ -1,4 +1,5 @@
 import { TICK_RATE } from "../rocket.js";
+import { hypot } from "../fmath.js";
 
 export const FLAME_DAMAGE = 120; // hull a second in the flame: a quick pass hurts, lingering kills
 export const RADIUS = [0.45, 0.75]; // m: the flame's radius at the nozzle and at its tip
@@ -30,7 +31,7 @@ export function armFlame(flame, state, tick, r) {
 function along(flame, x, y) {
   const [dx, dy] = [flame.x1 - flame.x0, flame.y1 - flame.y0];
   const t = Math.max(0, Math.min(1, ((x - flame.x0) * dx + (y - flame.y0) * dy) / (dx * dx + dy * dy)));
-  return { t, d: Math.hypot(flame.x0 + dx * t - x, flame.y0 + dy * t - y) };
+  return { t, d: hypot(flame.x0 + dx * t - x, flame.y0 + dy * t - y) };
 }
 
 export const distanceToFlame = (flame, x, y) => along(flame, x, y).d;

@@ -1,4 +1,5 @@
 import { buildOutline } from "./outline.js";
+import { hypot } from "./fmath.js";
 import { deepestContact } from "./collide.js";
 import { TILE } from "./level.js";
 import { createRocket, step as stepRocket, circlesAt, hurt, TICK_RATE, CENTRE_Y, FOOT_X, HULL, TANK } from "./rocket.js";
@@ -10,7 +11,11 @@ import { stepTurrets } from "./hazards/turret.js";
 import { hangingState, hangingShapes, stepStalactites } from "./hazards/stalactite.js";
 import { crumbleState, crumbleIndex, crackAt, stepCrumbles, restoreCrumbles } from "./hazards/crumble.js";
 import { riseState, triggerRise, stepRise, lavaHeight, inRisingLava } from "./hazards/rise.js";
+import { readInput } from "./input.js";
 
+// Goes up whenever a change to the sim changes how a run goes, so a replay made
+// before it (replay.js) can't be taken for one made after.
+export const SIM_VERSION = 1;
 export const REFUEL_TIME = 1.5; // seconds on a fuel pad to fill an empty tank, or mend a wrecked hull
 export const RETRY_AFTER = TICK_RATE; // ticks after a crash, getting stranded or the finish before a tap goes on
 const STUCK_TICKS = TICK_RATE; // sitting still this long with an empty tank, off the floor, is stranded too
@@ -72,6 +77,7 @@ export function createWorld(level, outline = buildOutline(level)) {
     downTick: -1, // when it crashed or got stranded, until the restart
     refuelling: false, // on a fuel pad, and not full yet
     stillTicks: 0,
+    held: false, // whether the last tick's input burned, to tell a new tap
     cheats: { god: false, fuel: false }, // for the dev overlay
     assisted: false, // the autopilot flew some of it, so it doesn't count
   };
@@ -120,6 +126,23 @@ export function restart(world) {
   world.stillTicks = 0;
 }
 
+// One tick of play, from a tick's input code (input.js): how the game, the
+// autopilot's test flights and replays all run a level, so that a run is its
+// inputs and nothing else. The input's restart goes back to the checkpoint (the
+// pause menu's *Restart from pad*), and so does a new tap on the screen once the
+// rocket has been down (crashed or stranded) for RETRY_AFTER. The engine doesn't
+// burn while it's down, or after the finish.
+export function advance(world, code) {
+  const input = readInput(code);
+  const tapped = input.thrust && !world.held;
+  world.held = input.thrust;
+  const down = world.downTick >= 0;
+  if (!world.done && (input.restart || (down && tapped && world.tick - world.downTick >= RETRY_AFTER))) restart(world);
+  if (down || world.done) input.thrust = false;
+  return step(world, input);
+}
+
+// A tick with `input` as it is: { steer, slow, thrust } (rocket.js).
 export function step(world, input) {
   world.tick++;
   const r = world.rocket;
@@ -140,7 +163,7 @@ export function step(world, input) {
   if (r.state === "landed") carry(world, r, now);
   stepRocket(r, input, world.outline, {
     boxes: boxesAt,
-    boxSpeed: Math.max(0, ...now.map((b) => Math.hypot(b.vx, b.vy))),
+    boxSpeed: Math.max(0, ...now.map((b) => hypot(b.vx, b.vy))),
     field: fieldAt(level, tick, r.x, r.y),
   });
   if (world.startTick < 0 && r.state === "flying") world.startTick = world.tick;
@@ -192,7 +215,7 @@ export function step(world, input) {
   if (world.downTick < 0) {
     if (r.state === "crashed") world.downTick = world.tick;
     else if (r.fuel <= 0 && pad?.kind !== "fuel") {
-      const still = r.state === "landed" || Math.hypot(r.vx, r.vy) < STILL_SPEED;
+      const still = r.state === "landed" || hypot(r.vx, r.vy) < STILL_SPEED;
       world.stillTicks = still ? world.stillTicks + 1 : 0;
       if (r.state === "landed" || world.stillTicks >= STUCK_TICKS) {
         world.stranded = true;
@@ -270,7 +293,7 @@ function openDoors(world) {
     if (state.open || !d.key || !world.keys.includes(d.key)) return;
     const dx = Math.max(d.x0 - x, 0, x - d.x1);
     const dy = Math.max(d.y0 - y, 0, y - d.y1);
-    if (Math.hypot(dx, dy) < OPEN_REACH) Object.assign(state, { open: true, changed: world.tick });
+    if (hypot(dx, dy) < OPEN_REACH) Object.assign(state, { open: true, changed: world.tick });
   });
 }
 
@@ -300,7 +323,7 @@ function see(world) {
   world.seenFrom = c + j * width;
   for (let jj = Math.max(0, j - SEEN_RADIUS); jj <= Math.min(height - 1, j + SEEN_RADIUS); jj++) {
     for (let cc = Math.max(0, c - SEEN_RADIUS); cc <= Math.min(width - 1, c + SEEN_RADIUS); cc++) {
-      if ((cc - c) ** 2 + (jj - j) ** 2 <= SEEN_RADIUS ** 2) world.seen[jj * width + cc] = 1;
+      if ((cc - c) * (cc - c) + (jj - j) * (jj - j) <= SEEN_RADIUS * SEEN_RADIUS) world.seen[jj * width + cc] = 1;
     }
   }
 }
@@ -317,8 +340,8 @@ export const gateTimers = (world) =>
 
 // Whether the rocket's shape comes within CRYSTAL_REACH of point p.
 export function touches(r, p) {
-  if (Math.hypot(r.x - p.x, r.y - p.y) > 6) return false; // too far for any part of it
-  return circlesAt(r.x, r.y, r.angle).some((c) => Math.hypot(c.x - p.x, c.y - p.y) < c.r + CRYSTAL_REACH);
+  if (hypot(r.x - p.x, r.y - p.y) > 6) return false; // too far for any part of it
+  return circlesAt(r.x, r.y, r.angle).some((c) => hypot(c.x - p.x, c.y - p.y) < c.r + CRYSTAL_REACH);
 }
 
 export const crystalCount = (world) => world.got.filter((t) => t >= 0).length;
