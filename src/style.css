@@ -656,25 +656,21 @@ h2.part {
   margin: 3px 0;
 }
 
-/* The ?dev overlay. */
-.dev {
-  position: absolute;
-  left: calc(8px + env(safe-area-inset-left, 0px));
-  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-  margin: 0;
-  padding: 6px 8px;
-  font: 11px/1.4 ui-monospace, monospace;
-  color: #e6e8ee;
-  background: rgb(0 0 0 / 0.55);
-  border-radius: 8px;
-  pointer-events: none;
-}
-
-/* The frame rate display, under the buttons at the top left. */
-.fps {
+/* The frame rate display, and the ?dev overlay under it, below the buttons at the
+   top left: most levels start at the bottom left, where they'd hide the rocket. */
+.debug {
   position: absolute;
   left: calc(12px + env(safe-area-inset-left, 0px));
   top: calc(62px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.fps,
+.dev {
   margin: 0;
   padding: 6px 8px;
   font: 11px/1.4 ui-monospace, monospace;

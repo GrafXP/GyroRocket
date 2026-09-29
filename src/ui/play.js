@@ -87,8 +87,10 @@ export function play(el, id) {
         <button class="icon-btn" id="fs"></button>
       </div>
       <div class="message" id="message"></div>
-      <pre class="dev" id="dev" hidden></pre>
-      <pre class="fps" id="fps" hidden><b>… fps</b></pre>
+      <div class="debug">
+        <pre class="fps" id="fps" hidden><b>… fps</b></pre>
+        <pre class="dev" id="dev" hidden></pre>
+      </div>
 
       <div class="overlay menu" id="pause" hidden>
         <section>
@@ -527,7 +529,7 @@ export function play(el, id) {
   syncFps();
 
   if (devHud) {
-    gameEl.querySelector("canvas").addEventListener("pointermove", devHud.onPointer(game));
+    gameEl.querySelector(":scope > canvas").addEventListener("pointermove", devHud.onPointer(game)); // the game's, not the map's
     window.game = game; // to poke at from the console
   }
 
