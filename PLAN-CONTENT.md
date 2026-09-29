@@ -203,13 +203,18 @@ with the tightest tanks: the world tests all of it. 10-3 and 10-6 are dark.
    combines, where the pads, keys, switches and crystals go, and which way the route
    runs. A world's eight sketches are done together before any map, so the world
    builds up to its test and no two levels repeat an idea.
-2. **Build the map.** In text, like worlds 1–6 (with a carving script for ragged
-   walls where it helps, as world 1 had), or in the editor on the phone and exported
-   as a level module into `src/levels/`.
-3. **Check it.** `npm test` parses it, runs `checkLevel` and flies it with the
-   autopilot; `npm run fly -- 7-3` prints its legs and suggests a tank and par. The
-   tank is the world's ratio times the longest leg, and the par is the autopilot's
-   time rounded up to 5 s.
+2. **Build the map.** With a building script in `scripts/levels/`, one per level
+   (`7-1.js`…), which draws it in rectangles of rock and air with pads, things and
+   ragged edges (`grid.js`), and writes it as a plain text map to `src/levels/`,
+   with a picture of it in `previews/`: `node scripts/levels/8-1.js`. Change the
+   script and run it again, rather than editing the map by hand. (Or in the editor
+   on the phone, exported as a level module into `src/levels/`.)
+3. **Check it.** `node scripts/levels/check.js 8-1` parses it, runs `checkLevel`,
+   flies it with the autopilot, and prints its legs, the stretches between pads,
+   the big-level rules and a tank and par to set; `trace.js` shows where the
+   autopilot was when it gave up, and `render.js` runs the render code over it.
+   `npm test` does the same checks for every level. The tank is the world's ratio
+   times the longest leg, and the par is the autopilot's time rounded up to 5 s.
 4. **Fly it on the phone.** With `?dev` for the timings between pads. Every section
    should be doable in a few tries, and the level as a whole in one sitting. Pars
    are tightened towards what a good run does, as in worlds 1–6.

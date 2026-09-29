@@ -25,3 +25,6 @@ dist-ssr
 
 # Runs saved from the phone with ?dev, for npm run verify
 runs
+
+# Pictures of levels from scripts/levels/
+previews
