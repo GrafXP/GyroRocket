@@ -351,7 +351,7 @@ they stop landing on the same tick; after a change to the sim on purpose, bump
 `SIM_VERSION` and record them again.
 
 - [ ] A run watched back lands exactly as it did, on the phone and in node.
-- [ ] A run recorded on the phone replays the same in node (`scripts/verify.js`).
+- [x] A run recorded on the phone replays the same in node (`scripts/verify.js`): 6-8 by hand, 5,267 ticks.
 - [ ] The game feels the same with quantized steering.
 - [ ] Editing a finished level clears its finish; renaming it doesn't.
 
