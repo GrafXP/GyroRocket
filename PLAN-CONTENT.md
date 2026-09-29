@@ -360,7 +360,7 @@ way and never over par.
 Levels can be copied into the editor with world 7's look: `LOOKS` (`validate.js`)
 is seven, and goes up with each world.
 
-### Phase C3: World 8, The Vaults
+### Phase C3: World 8, The Vaults ✅ (done)
 
 The eight levels above. Finding the way is the skill, so the map and sight lines
 matter more than ever: in the dark levels pads, doors and keys must glow enough to
@@ -371,6 +371,44 @@ turret can see it (dodging while it waits), and long routes with four keys.
 - [ ] No branch is an empty dead end, and no hazard has to be flown twice.
 - [ ] The dark levels are hard to find your way round, not hard to see what hurts you.
 - [ ] Turrets can always be dodged, even while waiting on a laser or a gate.
+
+What was built: the Vaults, world 8, with green-grey rock and teal edges. Each
+level's header comment lists its sections, and each has a building script in
+`scripts/levels/` (the world 7 ones moved there too), which writes it as a
+plain text map.
+
+| Level | Name        | Size      | Autopilot | Par   | Tank | Pads | Sections                                                    |
+| ----- | ----------- | --------- | --------- | ----- | ---- | ---- | ----------------------------------------------------------- |
+| 8-1   | Antechamber | 160 × 90  | 121 s     | 125 s | 21 s | 4    | cellar, strongbox, the way back, the way out                |
+| 8-2   | Alarm       | 180 × 80  | 140 s     | 140 s | 27 s | 3    | lobby, gallery, yellow vault, lower passage, exit           |
+| 8-3   | Four keys   | 170 × 112 | 232 s     | 235 s | 22 s | 6    | a spoke per key off the hub, then up to the exit            |
+| 8-4   | Night watch | 190 × 84  | 98 s      | 100 s | 23 s | 4    | gatehouse, watch hall, red door, gallery, timed gate        |
+| 8-5   | Clockwork   | 140 × 80  | 114 s     | 115 s | 27 s | 2    | three clocks: a switch, beams, and its gate                 |
+| 8-6   | Strongroom  | 170 × 96  | 115 s     | 115 s | 23 s | 3    | way in, outer vault, airlock, inner vault, way out          |
+| 8-7   | Labyrinth   | 168 × 94  | 118 s     | 120 s | 26 s | 4    | a maze of 24 rooms: two keys at dead ends, the exit at a third |
+| 8-8   | The vaults  | 200 × 120 | 257 s     | 260 s | 24 s | 8    | eight, from the levels before it, for all four keys         |
+
+Tanks are 1.3× the longest burn between refills, and pars the autopilot's time
+rounded up to 5 s, for C6 to tighten. 8-4 to 8-7 are quicker than the table's 2
+minutes for this world, and 8-5 is narrower than its 160 columns: they're dense
+rather than long, which C6 can change if they feel slight. 8-8 is the longest
+level so far. Every switch in the world turns beams off for good, except the
+timed gates of 8-4, 8-5 and 8-8. Where a key's branch is flown back, the way
+back is different, or its beams are switched off, or its rock has fallen.
+
+The autopilot needed no changes; the levels did, three ways, which will hold for
+worlds 9 and 10. Flame walls across a vertical shaft less than about 16 m apart
+are crossed as one, since the rocket's height spans them, and two flames that are
+never off together can't be: switch 1 in 8-2 moved from the top of a shaft to the
+end of a level passage. A block whose full reach leaves a gap the rocket fits
+with no margin at all is routed under, at speed, and the rocket's lean scrapes its
+feet: presses reach the floor. And a block sliding smoothly across a shaft is
+clear for too short a time to drop through: the vault doors of 8-6 and 8-8 are
+crushers, resting open for 4.5 s of a 10 s beat. The autopilot dodges turrets'
+shots on its own (19 of 19 in 8-4's hall; one hit each in 8-2 and 8-8). It makes
+8-5's timed gates with 3.4–4.8 s to spare, and 8-8's with 7.4 s.
+
+Levels can be copied into the editor with world 8's look (`LOOKS` is eight).
 
 ### Phase C4: World 9, Fault line
 

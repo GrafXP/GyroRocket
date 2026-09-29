@@ -17,6 +17,9 @@ import zlib from "node:zlib";
 import { parseLevel } from "../../src/sim/level.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
+// The characters a map can give things: the letters and digits that don't mean
+// something else (level.js).
+const LABELS = "acdefhijklmnopqstuwxzACDHIJKLMNOPQTUVWXZ0123456789";
 
 export class Grid {
   constructor(w, h) {
@@ -65,6 +68,16 @@ export class Grid {
     if (this.things[ch] && JSON.stringify(this.things[ch]) !== JSON.stringify(spec)) throw new Error(`thing ${ch} set up twice`);
     this.things[ch] = spec;
     return ch;
+  }
+  // The character for a thing with these settings: the one already given the same
+  // settings, or the next free one, so copies share it (a map names at most 50).
+  label(spec) {
+    const json = JSON.stringify(spec);
+    const found = Object.keys(this.things).find((ch) => JSON.stringify(this.things[ch]) === json);
+    if (found) return found;
+    const free = [...LABELS].find((ch) => !this.things[ch]);
+    if (!free) throw new Error("no characters left for things");
+    return this.thing(free, spec);
   }
   protect(c0, r0, c1, r1) {
     this.keep.push([c0, r0, c1, r1]);

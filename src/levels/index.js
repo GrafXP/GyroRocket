@@ -54,6 +54,14 @@ import l7_5 from "./7-5.js";
 import l7_6 from "./7-6.js";
 import l7_7 from "./7-7.js";
 import l7_8 from "./7-8.js";
+import l8_1 from "./8-1.js";
+import l8_2 from "./8-2.js";
+import l8_3 from "./8-3.js";
+import l8_4 from "./8-4.js";
+import l8_5 from "./8-5.js";
+import l8_6 from "./8-6.js";
+import l8_7 from "./8-7.js";
+import l8_8 from "./8-8.js";
 import testCave from "./testcave.js";
 import bigCave from "./bigcave.js";
 
@@ -105,6 +113,13 @@ export const WORLDS = [
     part: 2,
     colors: { face: 0x34302c, wall: 0x433d37, rim: 0xc8a050, back: 0x100e0c, crumble: 0x7a6a5a, cracks: 0xffa040 },
     levels: [l7_1, l7_2, l7_3, l7_4, l7_5, l7_6, l7_7, l7_8],
+  },
+  {
+    name: "The Vaults",
+    about: "Sealed vaults deep in the rock, and what was left to guard them: find your way in.",
+    part: 2,
+    colors: { face: 0x36403d, wall: 0x44504c, rim: 0x5cc4b4, back: 0x0b1110, crumble: 0x84928c, cracks: 0x50e0c8 },
+    levels: [l8_1, l8_2, l8_3, l8_4, l8_5, l8_6, l8_7, l8_8],
   },
 ].map((world, w) => ({
   ...world,

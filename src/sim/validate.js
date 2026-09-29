@@ -12,7 +12,7 @@ export const MIN_WIDTH = 16;
 export const MIN_HEIGHT = 12;
 export const MAX_THINGS = 60;
 export const MAX_NAME = 40;
-export const LOOKS = 7; // one per world: its rock colours and background
+export const LOOKS = 8; // one per world: its rock colours and background
 
 const number = (min, max) => ({ type: "number", min, max });
 const whole = (min, max) => ({ type: "whole", min, max });
