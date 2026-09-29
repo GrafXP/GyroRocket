@@ -20,15 +20,21 @@ or in between them.
   `SIM_VERSION` never has to go up for a level. The only code this plan touches is
   the autopilot, the level tests, the levels page and the ending.
 - **Each world has a job.** Every new world mixes many elements, but leans on a few
-  and tests one skill: world 7 tests timing, world 8 finding the way, world 9 flying
-  under pressure, and world 10 all of it. That keeps four worlds of "everything" from
-  feeling the same.
+  and tests one skill: world 7 tests timing, world 8 finding the way, world 9
+  reactions, under pressure, and world 10 all of it, with the quickest reactions
+  in the game. That keeps four worlds of "everything" from feeling the same.
 - **A big level is a chain of sections.** A section is one set piece, 20–45 s of
-  flying, built around two or three elements together (flame jets across a fan
-  column; turrets covering a timed gate). Sections are joined by quieter stretches,
-  and there's a fuel pad before every hard section. Dying costs one section, never
-  the whole level. Each level file's header comment lists its sections in order,
-  which serves as the level's plan and helps anyone tuning it later.
+  flying (10–25 s in worlds 9 and 10, which are denser), built around two or three
+  elements together (flame jets across a fan column; turrets covering a timed
+  gate). Sections are joined by quieter stretches, and there's a fuel pad before
+  every hard section. Dying costs one section, never the whole level. Each level
+  file's header comment lists its sections in order, which serves as the level's
+  plan and helps anyone tuning it later.
+- **Worlds 9 and 10 get harder by reaction.** Worlds 7 and 8 turned out to test
+  dexterity: flying a clean line on a beat you can learn. Worlds 9 and 10 pack
+  things closer, tighten the timing, and lean on hazards that go off because of
+  you, so you have to see and react, not just remember. How, with targets to
+  measure against, is in *Harder by reaction* below.
 - **Bigger levels, closer pads.** The levels are two to four times the size of the
   world 6 levels, but no leg between pads is longer than 45 s of the autopilot's
   flying (a player does it faster). A four-minute level has six to ten pads.
@@ -59,14 +65,15 @@ or in between them.
 | ----- | ---------- | --------------- | ---------------- | -------- | -------- | ------------- | ------------- |
 | 7     | Foundry    | timing          | 140–200 × 60–100 | 4–8      | 1½–4 min | 1.3×          | 8 m           |
 | 8     | The Vaults | finding the way | 160–200 × 80–120 | 5–9      | 2–4½ min | 1.3×          | 8 m           |
-| 9     | Fault line | pressure        | 100–160 × 100–150 | 5–9     | 2–4½ min | 1.25×         | 7 m           |
-| 10    | The Heart  | everything      | up to 200 × 150  | 6–10     | 2½–5 min | 1.2×          | 7 m           |
+| 9     | Fault line | reactions       | 100–160 × 100–150 | 5–9     | 2–4½ min | 1.25×         | 7 m           |
+| 10    | The Heart  | everything, fast | up to 200 × 150 | 6–10     | 2½–5 min | 1.2×          | 7 m           |
 
 As in `PLAN.md`, these are starting points to tune by playing. "Tank vs route" is
 the tank against the fuel the autopilot burns on the longest leg between pads, and
 "Par" is the autopilot's time rounded up to 5 s. Gaps get no narrower than in world
 6: tilt isn't precise enough for less, and these worlds get harder by combining
-elements and by length, not by squeezing.
+elements, by length and, in worlds 9 and 10, by density and timing, not by
+squeezing.
 
 What each world uses (**lead**: in most levels, the world's character; *some*: in a
 few levels; few: once or twice; —: not at all):
@@ -124,6 +131,98 @@ runs). Big levels add these:
   cycles, wide gaps, pads close together, a reminder of the elements the world
   leans on. The eighth is the longest level so far and the world's test.
 
+## Harder by reaction
+
+Worlds 7 and 8 were played through on the phone (September 2026). They play well,
+but they test dexterity more than reactions: flying a known line cleanly, on a
+beat that can be learned. The numbers say the same. Nothing in world 7 reacts to
+the rocket: every hazard fires on a fixed 5 s beat. World 8 is sparse, with three
+quarters of its route clear of anything. So worlds 9 and 10 get harder another
+way: things packed closer, shorter gaps in time, and more that goes off because
+of you, so you have to read it and react rather than learn it.
+
+**How it's measured.** Along the autopilot's route (not counting where it waits),
+a hazard is *passed* when the route comes within 6 m of what it covers: a flame's
+or a beam's length, a blob's throw, a block's or crusher's whole travel, the column
+under a stalactite, a patch of crumbling rock, a cycling fan's column, the strong
+part of a magnet's pull (within 60% of its range), or a turret within 24 m. The
+route is *quiet* where nothing is that close. *Triggered* hazards are the ones
+whose timing follows the rocket's: stalactites, crumbling rock, flames that fire
+when you come near, and turrets. A *window* is how long a cycling hazard is clear:
+its off time less its warning.
+
+| World        | Passed per 100 m | Quiet route | Triggered | Shortest window | Shortest warning | Beat  |
+| ------------ | ---------------- | ----------- | --------- | --------------- | ---------------- | ----- |
+| 6 Core       | 2.4 (0–4.3)      | 58%         | 88%       | 1.5 s           | 0.5 s            | —     |
+| 7 Foundry    | 2.5 (1.3–3.7)    | 53%         | none      | 1.9 s           | 0.5 s            | 5 s   |
+| 8 The Vaults | 1.1 (0.8–1.3)    | 74%         | 21%       | 2.7 s           | 0.5 s            | 5 s   |
+| 9 Fault line | 4 or more        | 40% at most | half      | 1.5 s           | 0.5 s            | 3–4 s |
+| 10 The Heart | 6 or more        | 25% at most | half      | 1.2 s           | 0.4 s            | 3 s   |
+
+Worlds 6–8 are measured, over each world's route as a whole (the range is its
+levels). Worlds 9 and 10 are targets for levels 2–8 of each; the first level is a
+way back in, at about world 7's density. Like the other tables, they're starting
+points to tune by playing.
+
+World 9 is where reactions take over: half of what you pass goes off because of
+you, and quiet stretches are short. World 10 is very hard: the densest levels,
+windows and warnings at the floors, and it's as reactive as world 9 while it mixes
+in every cycle in the game, so a section asks you to hold a rhythm and react at
+the same time.
+
+**What makes a section need reactions.** All of it is in the game already, so
+there are still no sim changes:
+
+- **Things that go off because of you.** Stalactites drop as you pass under them,
+  rock crumbles where you touch it, flames set to `near` fire as you come close,
+  turrets aim where you are, and rising lava and timed gates start when you take a
+  key or land on a switch. Their timing follows yours, so it can't be learned as a
+  beat: you see it and react.
+- **Denser.** Something to deal with every few seconds, and short ways between
+  sections: rows of stalactites, crumbling floors under flames, turrets over
+  cycles.
+- **Tighter timing.** Faster beats (3–4 s instead of 5), shorter windows, and two or
+  three cycles meeting, so the gap where they're all clear is shorter than any one
+  of them. Cycles that meet are still tuned together, so the gap comes round
+  regularly.
+- **Shorter warnings,** down to the floors below, and faster turret shots (up to
+  9 m/s, from 6).
+- **Darkness,** where you only see a hazard when your headlight finds it (9-6,
+  10-3, 10-6).
+
+**What keeps it fair:**
+
+- **Room to react.** Where you have to react, the way is at least 8 m wide, so the
+  hard part is when to go, not threading a slot while dodging. Narrow gaps and
+  quick reactions don't come together, as that's dexterity again. The narrowest
+  gaps stay in stretches that are only about flying.
+- **Floors.** No warning shorter than 0.4 s and no window shorter than 1 s: less
+  can't be reacted to on a phone you tilt to steer. Every triggered hazard still
+  warns before it hurts: it shakes, cracks, glows or winds up.
+- **Seen in time.** What you have to react to is on screen when its warning starts.
+  A turret over a dense section sits close enough to be seen, not off the edge of
+  the screen in portrait.
+- **Short sections, pads between.** A dense section is 10–25 s of a good run, with
+  a pad either side. Reactions fail more often than a learned line does, so trying
+  again has to be quick. No leg is longer than 45 s of the autopilot's flying, as
+  before.
+- **Breathers stay.** The density is inside the sections. After one comes a pad and
+  room to look around, but not a long empty passage.
+
+**The autopilot** will find this harder than people do, and the rule stays: fix
+the autopilot, not the level. It knows every schedule exactly, so it can go at
+speed and set off before a gap opens, where it now waits for a gap it can cross at
+6 m/s with time to spare. Likely work: windows of 1.2–1.5 s, a row of stalactites
+without stopping under each, and dodging shots while it crosses a cycle. It waits
+out triggered hazards, so its times will be slow, and pars for these worlds come
+from real runs more than from the autopilot (C6).
+
+**Checking it.** `check.js` reports each level's hazards passed per 100 m, quiet
+share, triggered share, and shortest window and warning along its route, and the
+tables in C4 and C5 record them with the size, par and tank. `keepsToBigRules`
+checks the floors in part two, on each thing's own settings: no warning under
+0.4 s, no window under 1 s.
+
 ## The levels
 
 Names, ideas and main elements; the sections and their details are worked out when
@@ -165,33 +264,36 @@ dark.
 ### World 9: Fault line
 *Where the rock is still moving.* Pale ash-grey rock with orange cracks. Mostly
 tall levels where the rock falls, gives way and fills with lava, and what's gone
-doesn't come back: the world tests flying under pressure. 9-6 is dark.
+doesn't come back: the world tests reactions, under pressure. Most of what's
+dangerous goes off because of you, and this is where reacting takes over from
+remembering a line. 9-6 is dark.
 
 | Level | Name            | Idea                                                                                    |
 | ----- | --------------- | --------------------------------------------------------------------------------------- |
 | 9-1   | Tremor          | A wide warm-up: stalactites, crumbling bridges over lava, a fan lifting you up a shaft. |
 | 9-2   | Vents           | Fans blow up shafts lined with stalactites: set them falling, then ride the draught up. |
 | 9-3   | Landslide       | A long way down through crumbling floors over blob pools; the way back up is gone, so every pad is a step forward. |
-| 9-4   | Shifting ground | Moving slabs slide across the shaft and carry you up, under stalactites and past flames. |
+| 9-4   | Shifting ground | Moving slabs slide across the shaft and carry you up, under stalactites that drop as you ride past and flames that fire as you come near. |
 | 9-5   | The rift        | A huge crack: flamethrowers fire up its walls in a wave, stalactites hang over it, and the only ledges crumble. |
 | 9-6   | Aftershock      | Dark: stalactites and crumbling rock you only see in your headlight, and the shaking gives them away. |
-| 9-7   | Lava tube       | A long climb up a sloping tube with the lava rising behind, and timed gates to open on the way. |
-| 9-8   | The fault       | The world's test: zigzag down one side of the fault and up the other; a switch at the bottom wakes the lava. |
+| 9-7   | Lava tube       | A long climb up a sloping tube with the lava rising behind: flames that fire as you come near, crumbling plugs, and timed gates to open on the way. |
+| 9-8   | The fault       | The world's test: zigzag down one side of the fault and up the other, under falling rock all the way; a switch at the bottom wakes the lava. |
 
 ### World 10: The Heart
 *The bottom of everything, where all the caves meet.* Deep violet rock with
 crystal-bright edges. Every level mixes elements from at least four earlier worlds,
-with the tightest tanks: the world tests all of it. 10-3 and 10-6 are dark.
+with the tightest tanks, the most packed sections and the shortest warnings: the
+hardest world, testing all of it at speed. 10-3 and 10-6 are dark.
 
 | Level | Name               | Idea                                                                              |
 | ----- | ------------------ | --------------------------------------------------------------------------------- |
 | 10-1  | Threshold          | The way in: one section from each world in order, mine to core, a reminder of everything. |
-| 10-2  | Firing line        | Turrets cover flame waves over lava: dodge the shots without losing the flames' rhythm. |
-| 10-3  | Undertow           | Dark: fans and magnets pushing different ways at once, and crushers where they meet. |
+| 10-2  | Firing line        | Turrets with fast shots cover flame waves over lava: dodge the shots without losing the flames' rhythm. |
+| 10-3  | Undertow           | Dark: fans and magnets pushing different ways at once, crushers where they meet, and stalactites you only see in your headlight. |
 | 10-4  | Keyring            | All four keys, each behind a set piece from a different world, in any order.      |
-| 10-5  | Pressure           | One switch starts a timed gate and the rising lava together, and a long climb follows. |
+| 10-5  | Pressure           | One switch starts a timed gate and the rising lava together, and a long climb follows through crumbling rock and flames that fire as you come near. |
 | 10-6  | Deep night         | Dark, and the longest yet: every hazard in the game, with pads glowing close together. |
-| 10-7  | The long hall      | One 200-column hall with every kind of hazard in a row and pads between: a race for par. |
+| 10-7  | The long hall      | One 200-column hall with every kind of hazard in a row, most of them set off by you, and pads between: a race for par. |
 | 10-8  | Heart of the world | The finale: down into the heart, where a key wakes the lava, then all the way up through every world's caves to the sky. |
 
 10-8 is the biggest level in the game (200×150) and the only one in part two with
@@ -211,7 +313,8 @@ with the tightest tanks: the world tests all of it. 10-3 and 10-6 are dark.
    on the phone, exported as a level module into `src/levels/`.)
 3. **Check it.** `node scripts/levels/check.js 8-1` parses it, runs `checkLevel`,
    flies it with the autopilot, and prints its legs, the stretches between pads,
-   the big-level rules and a tank and par to set; `trace.js` shows where the
+   the big-level rules, a tank and par to set and, from C4, how dense and quick it
+   is (*Harder by reaction*); `trace.js` shows where the
    autopilot was when it gave up, and `render.js` runs the render code over it.
    `npm test` does the same checks for every level. The tank is the world's ratio
    times the longest leg, and the par is the autopilot's time rounded up to 5 s.
@@ -419,9 +522,22 @@ are saved at each pad, so a pad the lava will soon reach is placed with time to
 leave it. Likely autopilot work: stalactites in a fan's column, and keeping ahead
 of the lava on long climbs.
 
+Reactions are what's new. Before any level, `check.js` gets the report from
+*Harder by reaction* (hazards passed per 100 m, quiet and triggered shares,
+shortest window and warning) and `keepsToBigRules` its floors, and the report is
+run over worlds 7 and 8 to check it gives the numbers in that section's table.
+World 9's levels aim for its row there: half of what you pass set off by you,
+denser than any level so far, and windows down to 1.5 s. More autopilot work
+comes with that: windows of 1.5 s, and rows of stalactites without stopping under
+each one.
+
 - [ ] Restarting from any pad gives a fair chance, never a lost cause.
 - [ ] One-way drops are visible as one-way before you take them.
 - [ ] Rising lava feels like a chase, not a wall that catches you out.
+- [ ] It plays as a test of reactions: you die to something you saw too late, not
+      to a wall you steered into.
+- [ ] Every warning can be reacted to, and nothing you have to react to starts off
+      screen.
 
 ### Phase C5: World 10, The Heart, and the ending
 
@@ -430,7 +546,15 @@ each level is a test of the whole game, and 10-8 the biggest. Its results say
 you've flown to the heart of the world and back, and the levels page marks part two
 as done when it is.
 
+This is the hardest world, and the one with the most reacting to do. Its levels
+aim for its row in *Harder by reaction*: denser than world 9, as much set off by
+you, windows of 1.2 s and warnings of 0.4 s, at the floors. Every section asks you
+to keep a rhythm and react at the same time. Likely autopilot work: windows of
+1.2 s, and dodging fast shots while it crosses a cycle.
+
 - [ ] Every level feels like a mix of the whole game, not of one world.
+- [ ] It's clearly harder than world 9, and the difficulty comes from the speed of
+      it, not from narrow gaps or unfair surprises.
 - [ ] 10-8 is long and hard but fair, and feels like the end of the game.
 - [ ] Every pad-to-pad stretch in world 10 can be flown in a few tries.
 
@@ -442,6 +566,8 @@ compared to the ones round it. Update the tables here with each level's size,
 autopilot time, par, tank and legs, as `PLAN.md` does for world 1.
 
 - [ ] Worlds 7–10 get harder smoothly, with no wall between them.
+- [ ] Worlds 9 and 10 feel like tests of reaction, and world 10 like the hardest
+      thing in the game.
 - [ ] Each world feels different from the others, not just "everything again".
 - [ ] Beating par takes a good run, and three stars on every level is a real goal.
 
