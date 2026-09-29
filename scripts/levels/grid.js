@@ -8,6 +8,7 @@
 //   node scripts/levels/7-1.js          writes src/levels/7-1.js and previews/7-1.png
 //   node scripts/levels/check.js 7-1    checks it, flies it, suggests a tank and par
 //   node scripts/levels/trace.js 7-1    where the autopilot was before it gave up
+//   node scripts/levels/flight.js 7-1   its hits, turret shots, and time left at timed gates
 //   node scripts/levels/render.js 7-1   runs the render code over it, in node
 //
 // The grid is in editor coordinates: c from the left, r from the top, from 0.
