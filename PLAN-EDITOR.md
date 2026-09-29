@@ -6,7 +6,9 @@ build a level, fly it, and keep it on the phone. Then the server: post a level f
 everyone to play, browse other people's levels by rating or age, rate them, and
 post your times to a leaderboard, for the built-in levels as well as shared ones.
 Before a level can be posted, you have to finish it yourself, and the run that did
-it is posted with it as proof, which other players' phones check.
+it is posted with it as proof, which other players' phones check. And every phone
+that's online sends anonymous statistics, so you can see how far players get and
+where the levels are hard.
 
 It builds on phases 0–8 of `PLAN.md`: the level format, the parser and its checks,
 the deterministic sim, the play page and the autopilot. Phase 9 (game feel) doesn't
@@ -79,6 +81,11 @@ no cron on the server.
 - **Small and closed.** The server takes JSON, keeps it in a database and gives it
   back, and nothing else: no uploads, no images, no HTML, no cookies, no passwords,
   no admin pages. What's left is locked down as in *Security*, below.
+- **Statistics without people.** The phones send counts (runs started and
+  finished, crashes, time played, how far they've got) with nothing in them that
+  says who: no token, no name, no device, no time finer than the day, and the
+  server only adds them to daily totals. So they aren't personal data, and they
+  stay out of everything else the server keeps (E7).
 - **The game works without the server.** Built-in levels and the editor never wait
   for the network. Shared levels you've played are cached so they play offline,
   and a time that couldn't be posted is kept and posted later.
@@ -122,10 +129,12 @@ src/
     player.js      the token, the name, the transfer code
     outbox.js      times waiting to be posted
     checker.js     checks other players' runs in a worker, in the background
+    stats.js       anonymous counts, added up while you play and sent after a run
   ui/
     community.js   the sorted lists, an author's levels, a shared level's page
     scores.js      leaderboards, on the results sheet and the level page
     ratings.js     rating a level, and showing its ratings
+    stats.js       /stats: the statistics, for a trusted player
 scripts/
   verify.js        checks runs: files, or tasks from the server as a trusted player
   seed.js          the built-in levels' ids and hashes, for the server
@@ -134,7 +143,7 @@ server/
   public/          goes in the web root next to dist/
     api/index.php  the one entry point: routes /api/… to handlers
     .htaccess      /api/ to index.php, everything else not a file to index.html; headers
-  lib/             db, http, players, levels, scores, checks, ratings, limits, validate, thumbnails
+  lib/             db, http, players, levels, scores, checks, ratings, stats, limits, validate, thumbnails
   data/builtin.json  the built-in levels' ids and hashes, written by seed.js
   schema.sql       tables, and migrations/ after the first, run by hand
   admin.sql        saved queries for moderating in phpMyAdmin
@@ -187,7 +196,8 @@ database, gives it back, and does nothing else.
   the site, and the one inline theme script by its hash; no frames, no plugins,
   connections only to the site) and HSTS.
 - **Limits.** Every write has a rate limit, per player and per IP: new players,
-  names, levels, times, ratings, reports and checks. IPs are only kept as an HMAC
+  names, levels, times, ratings, reports and checks, and per IP alone the
+  statistics, the one write that takes no token (E7). IPs are only kept as an HMAC
   with a server secret, and forgotten after a day. Lists come 20 at a time, to a
   set depth. There's no cron, so old rows are pruned now and then by ordinary
   requests.
@@ -513,6 +523,12 @@ Players: `POST /api/players` makes one and returns its token; `GET`/`PATCH
 name, times, ratings and levels. `GET /api/health` says the API and sim version,
 so an old cached copy of the game can say "update to post".
 
+A player's name, levels, times and ratings are personal data, so Help gets a
+privacy section: what's kept for a player and why, the hashed IPs kept a day for
+the rate limits, and the anonymous statistics (E7). The profile can show you
+everything kept about you (`GET /api/players/me/data`, as JSON to save), and
+*Forget me* deletes it.
+
 The client: `net/api.js`, and a Profile page (from Home and the pause menu's
 settings): pick a name, see the code to move it to another phone, type in a code
 from one, forget me. The game still starts and plays with the server down.
@@ -641,6 +657,72 @@ average of all levels, so one rating of 5 doesn't beat forty that average 4.6.
 - [ ] Rating takes a couple of taps, and finishers' ratings are told apart from the rest at a glance.
 - [ ] The sorted lists put the levels in an order players would agree with.
 
+### Phase E7: Statistics
+
+Anonymous numbers from every phone that's online, to see how far players get and
+where the levels are hard. It needs only E4 and `seed.js`'s list of built-in levels
+(from E6, or brought forward), so it can come any time after E4, and the sooner it
+comes, the more it helps tune worlds 7–10 (C6).
+
+**What's counted,** for each built-in level, per day:
+
+- runs *started* and *finished*, and *first finishes*: the first time this phone
+  finished the level, which the game already knows, as it only keeps a level in
+  its progress once it's finished. First finishes, level by level, are how far
+  players get: how many made it past 1-1, past 1-2, and so on.
+- *crashes*, by what did it (rock, lava, flame, crusher, laser, shot, falling
+  rock), *restarts from a pad*, and runs *left* without finishing.
+- *seconds played*; for finishes, the time against par (under it, up to half as
+  long again, or slower) and all the crystals or not; and stars earned for the
+  first time.
+- runs flown with the autopilot.
+
+And where players crash: per level, in cells of 10×10 tiles, for a heat map over
+the level. Counts are kept for each version of a level (the first 8 characters of
+its hash), so a level changed in tuning starts its numbers again; the funnel goes
+by level id.
+
+**How it stays anonymous:**
+
+- The phone adds the counts up in memory while you play, and sends them when a run
+  ends or the app goes into the background (`navigator.sendBeacon`): numbers by
+  level, and nothing else. No player token, no name, no device or browser details,
+  nothing from the phone's storage. Offline, they're dropped, not kept for later.
+- Nothing is stored on the phone for statistics: *first* comes from the progress
+  the game keeps anyway.
+- The server only adds the numbers to totals by day, level and name of count
+  (`INSERT … ON DUPLICATE KEY UPDATE value = value + ?`). There's no row per run
+  or per phone, so nobody's play can be pieced back together, and no IP, token or
+  time of day is stored with them. The rate limit on this endpoint uses the same
+  hashed IP as the rest of the API, kept a day and never joined to the numbers.
+- *Forget me* leaves the statistics alone, as nothing in them was yours.
+- The settings have *Send anonymous statistics*, on unless turned off, and the
+  privacy section in Help says exactly what's sent.
+- The host's own access log is the one place an IP still turns up: keep it short,
+  or anonymised, in the host's settings.
+
+Anonymous data isn't personal data under the GDPR. Whether sending it needs
+consent under the ePrivacy rules (the cookie law) is less clear-cut, even with
+nothing stored on the phone for it, which is what the switch and the note are
+for; it's worth a look by someone who knows the law before it goes live.
+
+**What the server takes:** level ids from `builtin.json`, names of counts from a
+fixed list, and whole numbers under caps for one batch (a batch is 4 KB at most).
+A script can add noise, but can't break anything or reach anything else, and bad
+totals can be cleaned up in the database.
+
+**Seeing them:** `/stats`, a page in the game for a trusted player (you): the
+funnel (how many players finished each level for the first time), and for each
+level its runs, finish rate, crashes and what caused them, time against par,
+autopilot use and the crash map; for the last 7 days, 30 days, or all time. It
+reads `GET /api/stats`, whose totals the server works out at most every ten
+minutes.
+
+- [ ] A request from the game carries nothing that could say who sent it (checked in the browser's network tab).
+- [ ] With the switch off, nothing is sent.
+- [ ] The funnel shows how far players get, and matches what a test phone did.
+- [ ] The crash map points at the spots that feel hardest.
+
 ## Settled before E4
 
 1. **No node on the server.** It's plain PHP, so other players' phones check the
@@ -657,6 +739,7 @@ average of all levels, so one rating of 5 doesn't beat forty that average 4.6.
 7. **Anyone who's played a level can rate it,** in two tiers: players who finished
    it, and players who only played it.
 8. **No search:** sorted lists, and an author's levels.
+9. **Statistics are anonymous:** counts only, with nothing that says who (E7).
 
 ## Later
 
