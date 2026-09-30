@@ -65,7 +65,7 @@ or in between them.
 | ----- | ---------- | --------------- | ---------------- | -------- | -------- | ------------- | ------------- |
 | 7     | Foundry    | timing          | 140–200 × 60–100 | 4–8      | 1½–4 min | 1.3×          | 8 m           |
 | 8     | The Vaults | finding the way | 160–200 × 80–120 | 5–9      | 2–4½ min | 1.3×          | 8 m           |
-| 9     | Fault line | reactions       | 100–160 × 100–150 | 5–9     | 2–4½ min | 1.25×         | 7 m           |
+| 9     | Fault line | reactions       | 100–160 × 100–150 | 5–9     | 2½–6½ min | 1.25×        | 7 m           |
 | 10    | The Heart  | everything, fast | up to 200 × 150 | 6–10     | 2½–5 min | 1.2×          | 7 m           |
 
 As in `PLAN.md`, these are starting points to tune by playing. "Tank vs route" is
@@ -157,14 +157,21 @@ clear halfway up its throw).
 | 6 Core       | 2.6 (0–4.7)      | 77%         | 89%       | 1.5 s           | 0.5 s            | —     |
 | 7 Foundry    | 2.6 (1.2–3.7)    | 52%         | none      | 1.9 s           | 0.5 s            | 5 s   |
 | 8 The Vaults | 1.3 (0.8–1.6)    | 74%         | 29%       | 2.7 s           | 0.5 s            | 5 s   |
-| 9 Fault line | 4 or more        | 40% at most | half      | 1.5 s           | 0.5 s            | 3–4 s |
-| 10 The Heart | 6 or more        | 25% at most | half      | 1.2 s           | 0.4 s            | 3 s   |
+| 9 Fault line | 8 or more        | 25% at most | half      | 1.5 s           | 0.5 s            | 3–4 s |
+| 10 The Heart | 11 or more       | 15% at most | half      | 1.2 s           | 0.4 s            | 3 s   |
 
 Worlds 6–8 are measured, over each world's route as a whole (the range is its
 levels), by `scripts/levels/reaction.js` since C4; a rougher first count had world
 6's route 58% quiet. Worlds 9 and 10 are targets for levels 2–8 of each; the first level is a
-way back in, at about world 7's density. Like the other tables, they're starting
-points to tune by playing.
+way back in, lighter than the rest. Like the other tables, they're starting
+points to tune by playing, and world 9's already has been: built first to 4 or
+more and 40% quiet, it played well on the phone but was too sparse, and was
+rebuilt at twice the density (C4). World 10 has to be denser still.
+
+Density is easiest to reach across a room and hardest up a shaft. What you set
+off needs room before it to stop in, so flames across a shaft come 12 m apart at
+the least, and a shaft tops out at about 7–8 hazards per 100 m where a crossing
+reaches 12–15. A level's number is mostly how much of it is crossings.
 
 World 9 is where reactions take over: half of what you pass goes off because of
 you, and quiet stretches are short. World 10 is very hard: the densest levels,
@@ -544,7 +551,8 @@ each one.
 What was built: first the report. `scripts/levels/reaction.js` measures a level,
 or whole worlds (`node scripts/levels/reaction.js 7 8`), along the autopilot's
 route as *Harder by reaction* says, and with `--quiet` lists where the route is
-quiet, to know where a level needs more. `check.js` prints it for the level it
+quiet, to know where a level needs more (and with `--legs`, since the rebuild,
+gives each leg's numbers). `check.js` prints it for the level it
 flies. It measures from the rocket's shape, which gives worlds 7 and 8 the numbers
 in the table above to within 0.2 hazards per 100 m and a percentage point of quiet
 (8's triggered share comes out 29%, not 21%). Blobs' windows are taken halfway up
@@ -558,39 +566,61 @@ through, not only across.
 Then Fault line, world 9, with ash-grey rock and orange cracks, each level with
 its building script:
 
-| Level | Name            | Size      | Autopilot | Par   | Tank | Pads | Sections                                                  |
-| ----- | --------------- | --------- | --------- | ----- | ---- | ---- | --------------------------------------------------------- |
-| 9-1   | Tremor          | 140 × 100 | 108 s     | 110 s | 19 s | 4    | gallery, drop, upper deck, lava hall, updraft, way out    |
-| 9-2   | Vents           | 110 × 140 | 95 s      | 100 s | 16 s | 4    | three vents, with a crossing between each and the next    |
-| 9-3   | Landslide       | 130 × 140 | 121 s     | 125 s | 23 s | 4    | three crumbling floors, each into a chamber, and the bottom |
-| 9-4   | Shifting ground | 120 × 130 | 131 s     | 135 s | 23 s | 4    | lift shaft, slip, upper shaft                             |
-| 9-5   | The rift        | 100 × 140 | 128 s     | 130 s | 24 s | 4    | down one rift, along its floor, up the other              |
-| 9-6   | Aftershock      | 140 × 110 | 137 s     | 140 s | 27 s | 3    | tunnel, lava cave, updraft, top gallery                   |
-| 9-7   | Lava tube       | 160 × 120 | 145 s     | 150 s | 27 s | 4    | climb, tube, climb, upper tube, climb                     |
-| 9-8   | The fault       | 160 × 150 | 248 s     | 250 s | 29 s | 8    | ten, one from each level before it                        |
+| Level | Name            | Size      | Autopilot | Par   | Tank | Pads | Sections                                                    |
+| ----- | --------------- | --------- | --------- | ----- | ---- | ---- | ----------------------------------------------------------- |
+| 9-1   | Tremor          | 140 × 100 | 165 s     | 165 s | 24 s | 5    | gallery, drop, upper deck, lava hall, updraft, way out      |
+| 9-2   | Vents           | 110 × 140 | 191 s     | 195 s | 22 s | 6    | three vents, with a crossing between each and the next      |
+| 9-3   | Landslide       | 130 × 140 | 193 s     | 195 s | 25 s | 5    | three crumbling floors, each into a chamber, and the bottom |
+| 9-4   | Shifting ground | 120 × 130 | 199 s     | 200 s | 28 s | 5    | lift shaft, slip, upper shaft, top gallery                  |
+| 9-5   | The rift        | 100 × 140 | 252 s     | 255 s | 29 s | 6    | down one rift, along its floor, up the other                |
+| 9-6   | Aftershock      | 140 × 110 | 235 s     | 240 s | 23 s | 8    | tunnel, lava cave, updraft, top gallery                     |
+| 9-7   | Lava tube       | 160 × 120 | 193 s     | 195 s | 24 s | 6    | climb, tube, climb, upper tube, climb                       |
+| 9-8   | The fault       | 160 × 150 | 392 s     | 395 s | 27 s | 13   | ten, one from each level before it                          |
 
-| Level | Passed per 100 m | Quiet | Triggered | Shortest window | Shortest warning |
-| ----- | ---------------- | ----- | --------- | --------------- | ---------------- |
-| 9-1   | 3.4              | 41%   | 83%       | 2.8 s           | 0.7 s            |
-| 9-2   | 4.3              | 38%   | 67%       | 1.5 s           | 0.5 s            |
-| 9-3   | 6.1              | 31%   | 62%       | 1.5 s           | 0.5 s            |
-| 9-4   | 4.8              | 29%   | 75%       | 1.5 s           | 0.5 s            |
-| 9-5   | 4.5              | 37%   | 57%       | 1.8 s           | 0.5 s            |
-| 9-6   | 6.1              | 29%   | 81%       | 1.5 s           | 0.5 s            |
-| 9-7   | 5.1              | 37%   | 83%       | 1.5 s           | 0.5 s            |
-| 9-8   | 4.8              | 39%   | 67%       | 1.5 s           | 0.5 s            |
-| World | 4.8              | 36%   | 71%       | 1.5 s           | 0.5 s            |
+| Level | Hazards | Passed per 100 m | Quiet | Triggered | Shortest window | Shortest warning |
+| ----- | ------- | ---------------- | ----- | --------- | --------------- | ---------------- |
+| 9-1   | 61      | 7.1              | 24%   | 91%       | 2.0 s           | 0.5 s            |
+| 9-2   | 56      | 8.6              | 22%   | 80%       | 1.5 s           | 0.5 s            |
+| 9-3   | 84      | 11.8             | 15%   | 62%       | 1.5 s           | 0.5 s            |
+| 9-4   | 59      | 10.0             | 13%   | 81%       | 1.5 s           | 0.5 s            |
+| 9-5   | 91      | 10.5             | 8%    | 86%       | 1.5 s           | 0.5 s            |
+| 9-6   | 83      | 10.6             | 13%   | 77%       | 1.5 s           | 0.5 s            |
+| 9-7   | 62      | 10.0             | 17%   | 81%       | 1.5 s           | 0.5 s            |
+| 9-8   | 110     | 8.3              | 26%   | 70%       | 1.5 s           | 0.5 s            |
+| World | 606     | 9.4              | 18%   | 77%       | 1.5 s           | 0.5 s            |
 
-Tanks are 1.25× the longest burn between refills and pars the autopilot's time
-rounded up to 5 s, for C6. The world passes twice as many hazards per 100 m as
-world 7, with a third of its route quiet, which meets its row in *Harder by
-reaction* but for the triggered share: seven in ten of the hazards passed go off
-because of you, not half, as stalactites (quick ones, shaking for 0.5 s once
-you're within 6 m) and flames that fire as you come near are most of it. The
-cycles keep a 4 s beat, 9-1's a 5 s one. 9-1 and 9-2 are shorter than the
-worlds table's 2 minutes, being dense. The lava in 9-7 rises from its key at
-1.2 m/s and in 9-8 from its switch at 2.5 m/s, up to just below the top of the
-vents: the autopilot keeps 23 to 86 m ahead of it at every pad.
+*Hazards* is how many there are in the level as the report counts them (a patch
+of crumbling rock is one), and the rest is along the autopilot's route.
+
+The world was built twice. As first built it met its row in *Harder by
+reaction* as it stood then: 288 hazards, 4.8 passed per 100 m and 36% of the
+route quiet, twice world 7's density. Played on the phone, the levels were good
+but too sparse, with too little to react to, so each was rebuilt on the same
+plan with twice the hazards, most of them on the way rather than beside it:
+
+- **Stalactites fall in front of you.** Where the roof is high they shake once
+  you're within 9 m of being under them (11 m over 9-3's bottom chamber), not 6:
+  with 6, a rocket going at speed was past before they came down, so a row of
+  them was only something to fly under fast.
+- **Shafts are narrower** (9 to 11 tiles, from 13 to 15) where what was on their
+  walls sat too far from the way up to matter, and **flames right across them**,
+  12 m apart on alternate walls, fire as you come near. The vents they cross blow
+  a little weaker than gravity (9 m/s²), so you can hold still under a flame.
+- **Crossings are packed**: rows of stalactites every 3 tiles, blobs every 4 to 5,
+  flames from the roof down to the lava that fire as you come near, crumbling
+  floors over lava.
+- **More pads**, 54 in the world instead of 35, as the sections got harder: no
+  stretch between them is over 45 s of the autopilot's flying.
+
+The autopilot takes 60% longer than before, 1,820 s for the world against
+1,113, as it stops for everything it sets off, so its pars are roomier than
+ever and C6 has them to set from real runs. Tanks are 1.25× the longest burn
+between refills. The cycles keep a 4 s beat, 9-1's a 5 s one. The lava in 9-7
+rises from its key at 1 m/s (from 1.2) with its gates open 26 s and 24 s (from
+22 and 13), and in 9-8 from its switch at 1.3 m/s (from 2.5), up to just below
+the top of the vents: the autopilot keeps 16 to 86 m ahead of it at every pad,
+and goes through the gates with 4.9 and 5.2 s to spare. The levels changed; the
+autopilot didn't, and worlds 1–8 are as they were.
 
 The autopilot needed more work, all of it for reactions:
 
@@ -634,6 +664,26 @@ What the levels taught, for world 10:
   into it.
 - **Slabs across a shaft need a side to pass on**: nothing on the walls that pushes
   the way into the middle of their travel.
+
+And the rebuild, packing them closer:
+
+- **Every flame that fires as you come near in a shaft rests 2 s**, even one only
+  half across that you pass at its tip. None across a vent stronger than
+  gravity, which carries you up into it; in a vent of 9 m/s² you slow at under
+  1 m/s² with the engine off, so its flames are 13 rows apart, not 6.
+- **Stalactites up a straight shaft** are set off from far below, where you
+  can't see them, and fall long before you get there, onto whatever's under
+  them. Up shafts, flames do that job, or stalactites in pockets in the walls
+  that shake only within 3 m. One that shatters on crumbling rock cracks it.
+- **What comes after a flame or blob** that you set off needs 5 tiles between
+  them in the direction you're going; a stalactite right over a blob works as a
+  pair. A flame from the roof that fires as you come near reaches the floor or
+  the lava, or it's simply flown under.
+- **Slabs across a shaft need 12 tiles of it**: at 10, the side a slab leaves is
+  clear too briefly.
+- **The report reads shafts long**: the autopilot's creeping up to what it sets
+  off, and backing away, counts as route, so a shaft of flames 12 m apart comes
+  out at about 7–8 per 100 m.
 
 Levels can be copied into the editor with world 9's look (`LOOKS` is nine).
 

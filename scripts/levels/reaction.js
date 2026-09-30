@@ -4,6 +4,7 @@
 //   node scripts/levels/reaction.js 9-3     one level
 //   node scripts/levels/reaction.js 7 8     whole worlds, level by level and in all
 //   node scripts/levels/reaction.js 9-3 --quiet   and where its route is quiet
+//   node scripts/levels/reaction.js 9-3 --legs    and how dense each leg is
 //
 // A hazard is *passed* when the rocket's shape comes within NEAR metres of what
 // it covers: a flame's or a beam's length, a blob's throw, the whole travel of a
@@ -231,19 +232,38 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
   const { WORLDS, levelById } = await import("../../src/levels/index.js");
   const { parseLevel } = await import("../../src/sim/level.js");
   const { flyLevel } = await import("../../src/autofly.js");
-  const measure = (def) => {
-    const watch = watchReaction(parseLevel(def));
-    const { failed } = flyLevel(def, { each: watch.tick });
-    return { ...watch.report(), failed };
+  // The level's report, and with `byLeg` one for each leg too.
+  const measure = (def, byLeg) => {
+    const level = parseLevel(def);
+    const watch = watchReaction(level);
+    const legs = [];
+    let leg = watchReaction(level);
+    const { failed, legs: flown } = flyLevel(def, {
+      each: (world) => {
+        watch.tick(world);
+        if (byLeg) leg.tick(world);
+      },
+      progress: ({ legs: done }) => {
+        if (!byLeg || done.length === legs.length) return;
+        legs.push(leg.report());
+        leg = watchReaction(level);
+      },
+    });
+    if (byLeg && legs.length < flown.length) legs.push(leg.report());
+    return { ...watch.report(), failed, legs: legs.map((report, i) => ({ name: flown[i].name, seconds: flown[i].seconds, report })) };
   };
   const showQuiet = process.argv.includes("--quiet");
-  for (const arg of process.argv.slice(2).filter((a) => a !== "--quiet")) {
+  const showLegs = process.argv.includes("--legs");
+  for (const arg of process.argv.slice(2).filter((a) => !a.startsWith("--"))) {
     const world = /^\d+$/.test(arg) ? WORLDS[Number(arg) - 1] : null;
     const defs = world ? world.levels : [levelById(arg)];
     if (!defs[0]) throw new Error(`no level or world ${arg}`);
     const reports = defs.map((def) => {
-      const report = measure(def);
+      const report = measure(def, showLegs);
       console.log(`${def.id} ${def.name.padEnd(18)} ${describe(summary([report]))}${report.failed ? ` (FAILED: ${report.failed})` : ""}`);
+      if (showLegs) {
+        for (const l of report.legs) console.log(`  ${l.name.padEnd(24)} ${l.seconds.toFixed(1).padStart(5)} s  ${describe(summary([l.report]))}`);
+      }
       if (showQuiet) {
         for (const q of report.stretches.filter((q) => q.metres >= 5)) console.log(`  quiet ${Math.round(q.metres)} m, from row ${q.from.r}, column ${q.from.c} to row ${q.to.r}, column ${q.to.c}`);
       }
