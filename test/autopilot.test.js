@@ -103,3 +103,107 @@ test("it waits out stalactites, and breaks through crumbling rock only where it 
     if (name === "trapdoor") assert.equal(w.crumbles.filter((c) => c.fell >= 0).length, 6, "it broke the lump too");
   }
 });
+
+// Flies a level made of `map` and `things` with the autopilot, without restarts:
+// { w, pilot, seconds }.
+const flyMap = (name, map, things = {}, limit = 90) => {
+  const w = createWorld(parseLevel({ name, map, things, fuel: 30 }));
+  const pilot = createPilot(w, { restart: false });
+  for (let i = 0; i < limit * TICK_RATE && !w.done && !pilot.failed; i++) step(w, pilot.input());
+  return { w, pilot, seconds: w.tick / TICK_RATE };
+};
+
+test("under a row of stalactites it flies on through, not stopping at each, where none would hit it", () => {
+  const { w, pilot, seconds } = flyMap(
+    "row",
+    `
+    ##################################################
+    #.....!...!...!...!...!...!...!...!..............#
+    #................................................#
+    #................................................#
+    #................................................#
+    #................................................#
+    #................................................#
+    #.SSS.........................................EEE#
+    ##################################################`,
+  );
+  assert.equal(w.done, true, pilot.failed);
+  assert.equal(w.rocket.hull, 100, "hurt");
+  assert.ok(seconds < 30, `${seconds.toFixed(1)} s`);
+  assert.ok(w.stalactites.every((s) => s.shook > 0), "it didn't set them all off");
+});
+
+test("it sets off a flame that fires as it comes near, from out of its way, and crosses while it rests", () => {
+  const { w, pilot } = flyMap(
+    "near",
+    `
+    #######1#######1#######1###########
+    #.................................#
+    #.................................#
+    #.................................#
+    #.................................#
+    #.................................#
+    #.................................#
+    #.SSS.........................EEE.#
+    ###################################`,
+    { 1: { kind: "flame", facing: "down", mode: "near", length: 7, on: 1, off: 1.5, warn: 0.5, reach: 5 } },
+  );
+  assert.equal(w.done, true, pilot.failed);
+  assert.equal(w.rocket.hull, 100, "burned");
+});
+
+test("it goes under a blob thrown high while the blob's up out of its way", () => {
+  // Low over the lava, it's only in the blob's way at the start and end of each
+  // throw: waiting for the blob to be down for long enough, it would never go.
+  const { w, pilot } = flyMap(
+    "blob",
+    `
+    ##############################
+    #............................#
+    #............................#
+    #............................#
+    #............................#
+    #............................#
+    #............................#
+    #............................#
+    #.SSS...................EEE..#
+    ##############1###############`,
+    { 1: { kind: "blob", height: 8, period: 5 } },
+  );
+  assert.equal(w.done, true, pilot.failed);
+});
+
+test("up a shaft that a slab slides across, it passes at the side, where the slab is gone half the time", () => {
+  // Straight up the middle, from the start to the exit, the slab is always in
+  // the way.
+  const { w, pilot } = flyMap(
+    "slab",
+    `
+    ################
+    #..............#
+    #..............#
+    #..............#
+    #.EEE..........#
+    #####..........#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #aaaaaaa.......#
+    #aaaaaaa.......#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #..............#
+    #.....SSS......#
+    ################`,
+    { a: { kind: "mover", to: [7, 0], period: 8 } },
+  );
+  assert.equal(w.done, true, pilot.failed);
+  assert.equal(w.rocket.hull, 100, "hurt");
+});

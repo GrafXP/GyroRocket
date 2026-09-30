@@ -10,6 +10,7 @@
 //   node scripts/levels/trace.js 7-1    where the autopilot was before it gave up
 //   node scripts/levels/flight.js 7-1   its hits, turret shots, and time left at timed gates
 //   node scripts/levels/render.js 7-1   runs the render code over it, in node
+//   node scripts/levels/reaction.js 9-1 how dense and quick it is along the route
 //
 // The grid is in editor coordinates: c from the left, r from the top, from 0.
 import { writeFileSync, mkdirSync } from "node:fs";

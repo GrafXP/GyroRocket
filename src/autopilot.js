@@ -1,13 +1,13 @@
 import { KEY_COLORS, TILE } from "./sim/level.js";
-import { deepestContact } from "./sim/collide.js";
+import { deepestContact, polyContact } from "./sim/collide.js";
 import { buildOutline, setTile, solidAt } from "./sim/outline.js";
 import { circlesAt, CENTRE_Y, GRAVITY, THRUST, DRAG, MAX_LEAN, TICK_RATE } from "./sim/rocket.js";
 import { padUnder, switched, RETRY_AFTER } from "./sim/world.js";
-import { flamePhase, inFlame, distanceToFlame } from "./sim/hazards/flame.js";
-import { blobAt } from "./sim/hazards/blob.js";
+import { flamePhase, inFlame } from "./sim/hazards/flame.js";
+import { blobAt, BLOB_RADIUS } from "./sim/hazards/blob.js";
 import { fieldAt, moverBox } from "./sim/machines.js";
 import { laserPhase, inLaser } from "./sim/hazards/laser.js";
-import { hangingShapes } from "./sim/hazards/stalactite.js";
+import { hangingShapes, below, stalactiteShape } from "./sim/hazards/stalactite.js";
 import { lavaHeight } from "./sim/hazards/rise.js";
 
 // A cautious autopilot: given a level in play (sim/world.js), it gives the input
@@ -30,11 +30,13 @@ import { lavaHeight } from "./sim/hazards/rise.js";
 // schedule shows a gap long enough to get across; then it goes, and doesn't change
 // its mind. Hazards too close together to wait between, it crosses as one, when
 // all of them have a gap. If there's a way round the ground a block covers, it
-// takes that instead, or else it keeps clear of where crushers rest. Under a
-// stalactite, it edges forward until the stalactite shakes, backs off, and goes
-// once it has fallen. If crumbling rock is in the way, and there's no way round,
-// it edges up to it until it cracks, backs off, and goes through once it has
-// fallen away.
+// takes that instead, or else it keeps clear of where crushers rest. A flame that
+// fires as it comes near, it edges up to until it fires, and crosses while it
+// rests. Under stalactites, it works out when each will be set off and fall, and
+// flies on through at crossing speed if none would hit it; otherwise it edges
+// forward until the first shakes, backs off, and goes once it has fallen. If
+// crumbling rock is in the way, and there's no way round, it edges up to it until
+// it cracks, backs off, and goes through once it has fallen away.
 
 const MAX_SPEED = 9; // m/s it flies at, at most
 const BRAKE = 3; // m/s² it plans to slow down at
@@ -49,6 +51,7 @@ const CROSS_SPEED = 6; // m/s it crosses a hazard at, and slows to as it comes u
 const LINK = 4; // m between two hazards it needs to wait between them
 const SPARE = 0.25; // s either side of a hazard's burning that it counts as burning too
 const CREEP = 1.2; // m/s it edges forward at to set off a stalactite, or crack crumbling rock
+const FALL_MARGIN = 0.5; // m it keeps from a falling stalactite, as it works out where they'll fall
 const LAVA_MARGIN = 1.5; // m its feet keep above rising lava, where it plans its path…
 const PLAN_SPEED = 4; // …by the time it gets there, going at about this, m/s, waits and all
 const LAVA_WARNING = 3; // s before rising lava would reach it that it leaves a pad
@@ -169,13 +172,16 @@ function steer(world, leg) {
   const padX = stop.pad && (stop.pad.x0 + stop.pad.x1) / 2;
 
   // The next hazard on the path: wait short of it until it's safe to cross, then go.
-  const zone = zones.find((z) => z.to >= at);
+  const zone = zones.find((z) => z.to >= at && !fallen(z));
   const ahead = zone ? zone.from - at : Infinity;
   // It goes only if it can cross the hazards after this one that it couldn't
-  // stop short of, too.
+  // stop short of, too, and no stalactite would come down on it on the way.
   const run = zone ? linked(zones, zone, at) : [];
-  const clear = () => run.every((z) => safeToCross(world, z, Math.max(0, z.from - at)));
-  if (zone && !zone.go && (zone.from === 0 || (ahead <= APPROACH && clear()))) for (const z of run) z.go = true;
+  const clear = () => run.every((z) => safeToCross(world, z, Math.max(0, z.from - at))) && fallsClear(world, path, at, run);
+  // Under stalactites, it decides further back, so as not to slow down for them
+  // if it can fly on through.
+  const decide = zone?.stalactite ? APPROACH + 8 : APPROACH;
+  if (zone && !zone.go && (zone.from === 0 || (ahead <= decide && clear()))) for (const z of run) z.go = true;
   const wait = zone && !zone.go && ahead <= APPROACH;
   // Across at crossing speed, but through a hole in crumbling rock with care.
   const crossing = zone && zone.go && !zone.crumble && ahead <= APPROACH && zone.to < path.length - 3;
@@ -187,11 +193,11 @@ function steer(world, leg) {
   // Slowing, to creep up to a stalactite or crumbling rock: as fast as it can
   // still brake to CREEP a little short of it (gently: leaning back to brake
   // swings the feet forward).
-  const creep = zone && untouched(zone) ? CREEP + Math.sqrt(2 * (BRAKE / 2) * Math.max(0, ahead - 3.5)) : Infinity;
-  if (wait && untouched(zone)) {
-    // A stalactite that hasn't been set off, or crumbling rock not cracked yet:
-    // edge on until it shakes, or cracks (keeping close to the path, to come
-    // down where the hole will be).
+  const creep = zone && !zone.go && untouched(zone, world.tick) ? CREEP + Math.sqrt(2 * (BRAKE / 2) * Math.max(0, ahead - 3.5)) : Infinity;
+  if (wait && untouched(zone, world.tick)) {
+    // A stalactite or "near" flame that hasn't been set off, or crumbling rock
+    // not cracked yet: edge on until it shakes, fires or cracks (keeping close to
+    // the path, to come down where the hole will be).
     const [tx, ty] = path[Math.min(path.length - 1, at + (zone.crumble ? 2 : LOOK))];
     const d = Math.hypot(tx - r.x, ty - r.y) || 1;
     [vx, vy] = [((tx - r.x) / d) * Math.min(creep, CROSS_SPEED), ((ty - r.y) / d) * Math.min(creep, CROSS_SPEED)];
@@ -239,24 +245,28 @@ function steer(world, leg) {
 
 // Zone `first` and the ones after it that it can't stop between, once it's going
 // (it's at `at` along the path): each starting less than LINK metres after the
-// ones before end. Stalactites and crumbling rock it deals with one at a time.
+// ones before end. Crumbling rock it deals with one piece at a time.
 function linked(zones, first, at) {
   const run = [first];
-  if (first.stalactite || first.crumble) return run;
+  if (first.crumble) return run;
   let end = first.to;
   for (const z of zones) {
-    if (z === first || z.to < at || z.from < first.from) continue;
-    if (z.stalactite || z.crumble || z.from - end >= LINK) break;
+    if (z === first || z.to < at || z.from < first.from || fallen(z)) continue;
+    if (z.crumble || z.from - end >= LINK) break;
     run.push(z);
     end = Math.max(end, z.to);
   }
   return run;
 }
 
-// Whether a zone's stalactite hasn't been set off, or its crumbling rock is still
-// standing and none of it has cracked.
-function untouched({ stalactite, state, crumble, states }) {
+// Whether a zone's stalactite has come down: there's nothing there any more.
+const fallen = (z) => z.stalactite && z.state.gone >= 0;
+
+// Whether a zone's stalactite hasn't been set off, its "near" flame is waiting
+// to be, or its crumbling rock is still standing and none of it has cracked.
+function untouched({ stalactite, flame, state, crumble, states }, tick) {
   if (stalactite) return state.shook < 0;
+  if (flame?.mode === "near") return idle(flame, state, tick);
   if (!crumble) return false;
   const standing = crumble.filter((i) => states[i].fell < 0);
   return standing.length > 0 && standing.every((i) => states[i].cracked < 0);
@@ -399,7 +409,7 @@ export function findPath(world, [x0, y0], [x1, y1], boxes, outline = world.outli
   // The lowest the rocket's centre can be, `steps` metres along the path.
   const { rise } = level;
   const soon = rise && world.rise.from >= 0 ? Math.max(0, (world.rise.from - world.tick) / TICK_RATE) : Infinity;
-  const lava = (steps) => lavaHeight(world) + LAVA_MARGIN + CENTRE_Y + (rise ? rise.speed * Math.max(0, steps / PLAN_SPEED - soon) : 0);
+  const lava = (steps) => (rise ? Math.min(rise.to, lavaHeight(world) + rise.speed * Math.max(0, steps / PLAN_SPEED - soon)) : lavaHeight(world)) + LAVA_MARGIN + CENTRE_Y;
   const walls = level.flames.filter((f) => f.mode === "always");
   const beams = level.lasers.filter((l, i) => l.mode === "always" && !world.lasers[i].open);
   const gales = level.fans.filter(tooStrong);
@@ -601,19 +611,32 @@ function reachBox(h) {
 // How far the rocket reaches from its centre, upright, and a little more.
 const ROCKET_REACH = Math.max(...circlesAt(0, 0, 0).map((c) => Math.hypot(c.x, c.y) + c.r)) + PASSING + 1;
 
-// For findPath: 1 at each point of its grid where the rocket would be in reach of
-// a hazard it would have to wait for. Points are (x0 + gx, y0 + gy) for gx from
-// gx0, cols of them, and gy from gy0, rows of them.
+// For findPath: at each point of its grid, how bad it is to be there: 0 out of
+// reach of any hazard it would have to wait for, 1 in reach of one, and more in
+// reach of a moving block that's there for more than half its cycle (up to
+// 1 + BLOCKED, for all of it), so that it passes a block where it's clear for
+// long enough, as at the side of a shaft a slab slides across.
+// Points are (x0 + gx, y0 + gy) for gx from gx0, cols of them, and gy from gy0,
+// rows of them.
+const BLOCKED = 4;
+const SAMPLES = 16; // times through a block's cycle it looks at
 function hazardGrid(world, x0, y0, gx0, gy0, cols, rows) {
   const grid = new Uint8Array(cols * rows);
   for (const h of passingHazards(world)) {
     const b = reachBox(h);
     const [ga, gb] = [Math.max(gx0, Math.ceil(b.x0 - ROCKET_REACH - x0)), Math.min(gx0 + cols - 1, Math.floor(b.x1 + ROCKET_REACH - x0))];
     const [ha, hb] = [Math.max(gy0, Math.ceil(b.y0 - ROCKET_REACH - y0)), Math.min(gy0 + rows - 1, Math.floor(b.y1 + ROCKET_REACH - y0))];
+    const m = h.mover;
+    const cycle = m && (m.kind === "mover" ? m.period : m.rest + m.warn + m.slam + m.hold + m.back) * TICK_RATE;
+    const boxes = m ? Array.from({ length: SAMPLES }, (_, i) => moverBox(m, (i * cycle) / SAMPLES)) : null;
     for (let gy = ha; gy <= hb; gy++) {
       for (let gx = ga; gx <= gb; gx++) {
         const k = (gy - gy0) * cols + (gx - gx0);
-        if (!grid[k] && touches(h, circlesAt(x0 + gx, y0 + gy, 0))) grid[k] = 1;
+        if (grid[k] > BLOCKED) continue;
+        const circles = circlesAt(x0 + gx, y0 + gy, 0);
+        if (!touches(h, circles)) continue;
+        const share = boxes ? boxes.filter((box) => inBox(box, circles)).length / SAMPLES : 0;
+        grid[k] = Math.max(grid[k], share > 0.5 ? 1 + Math.floor(BLOCKED * share) : 1);
       }
     }
   }
@@ -683,10 +706,9 @@ const inColumn = (blob, circles) =>
 // zone already allows for the rocket's size.)
 function safeToCross(world, zone, ahead) {
   const r = world.rocket;
-  if (zone.flame?.mode === "near" && zone.state.fired < 0) {
-    // Not set off yet: go on until it's in reach, which sets it off; then wait.
-    return distanceToFlame(zone.flame, r.x, r.y) > zone.flame.reach;
-  }
+  if (zone.stalactite) return true; // fallsClear works it out
+  // A "near" flame that isn't firing or resting: set it off first (untouched).
+  if (zone.flame?.mode === "near" && idle(zone.flame, zone.state, world.tick)) return false;
   // From a hover it takes about half a second to get up to speed; allow for it
   // crossing 15% slower than it means to.
   const speed = Math.min(CROSS_SPEED, Math.hypot(r.vx, r.vy));
@@ -698,6 +720,58 @@ function safeToCross(world, zone, ahead) {
   }
   return true;
 }
+
+// Whether the rocket can fly on along `path` from point `at` through the zones of
+// `run` at crossing speed without one of their stalactites coming down on it: as
+// the sim has it, those not set off yet shake once it's below them and in reach,
+// then drop, and those that have, fall on. It allows for going a little slower
+// than it means to.
+function fallsClear(world, path, at, run) {
+  const near = run.filter((z) => z.stalactite && !fallen(z)).map((z) => ({ s: z.stalactite, state: z.state, floor: z.floor }));
+  if (!near.length) return true;
+  const end = run.at(-1).to;
+  const r = world.rocket;
+  const v0 = Math.hypot(r.vx, r.vy);
+  const now = world.tick;
+  // (Steps along the path are a metre, or √2 on a diagonal.)
+  const step = (i) => Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]);
+  return [1, 0.8].every((pace) => {
+    const falls = near.map(({ s, state, floor }) => ({ s, floor, shook: state.shook, drop: state.drop, vy: state.vy }));
+    let [d, k, v] = [0, at, v0];
+    for (let t = 1; k < end && t <= 6 * TICK_RATE; t++) {
+      // Towards crossing speed as steer() drives it, and on along the path.
+      v += (CROSS_SPEED * pace - v) * (2.5 / TICK_RATE);
+      d += v / TICK_RATE;
+      while (k < end && d >= step(k)) [d, k] = [d - step(k), k + 1];
+      const [[xa, ya], [xb, yb]] = [path[k], path[Math.min(end, k + 1)]];
+      const part = k < end ? d / step(k) : 0;
+      const [x, y] = [xa + (xb - xa) * part, ya + (yb - ya) * part];
+      const tick = now + t;
+      const circles = circlesAt(x, y, 0).map((c) => ({ ...c, r: c.r + FALL_MARGIN }));
+      for (const f of falls) {
+        if (f.gone) continue;
+        if (f.shook < 0) {
+          if (below(world.outline, f.s, x, y)) f.shook = tick;
+          continue;
+        }
+        if (tick - f.shook < f.s.warn * TICK_RATE) continue;
+        f.vy += GRAVITY / TICK_RATE;
+        f.drop += f.vy / TICK_RATE;
+        if (f.s.tip - f.drop <= f.floor) {
+          f.gone = true;
+          continue;
+        }
+        const { poly } = stalactiteShape(f.s, f.drop);
+        if (circles.some((c) => polyContact(poly, c))) return false;
+      }
+    }
+    return true;
+  });
+}
+
+// Whether a "near" flame is neither firing nor resting, so the rocket coming
+// within its reach sets it off.
+const idle = (flame, state, tick) => state.fired < 0 || (tick - state.fired) / TICK_RATE >= flame.warn + flame.on + flame.off;
 
 // Whether a flame, blob, moving block, beam, shot or stalactite could reach the
 // rocket where it is within a second, or rising lava within a few.
@@ -716,7 +790,7 @@ function dangerSoon(world) {
     world.level.flames.some((flame, i) => {
       if (!inFlame(flame, circles, HAZARD_MARGIN)) return false;
       const state = world.flames[i];
-      if (flame.mode === "near" && (state.fired < 0 || (world.tick - state.fired) / TICK_RATE > flame.warn + flame.on + flame.off)) return true;
+      if (flame.mode === "near" && idle(flame, state, world.tick)) return true;
       return soon((t) => burningAt({ flame, state }, t));
     }) ||
     world.level.blobs.some((blob) => inColumn(blob, circles) && soon((t) => blobAt(blob, t).up)) ||
@@ -747,7 +821,11 @@ function incoming(world, seconds) {
 function burningAt({ flame, laser, state, blob, mover, stalactite, crumble, states, points }, tick) {
   if (stalactite) return state.gone < 0; // until it's down
   if (crumble) return crumble.some((i) => states[i].fell < 0); // until it's all gone
-  if (blob) return blobAt(blob, tick).up;
+  if (blob) {
+    // The blob where it'll be then, against the rocket anywhere along the stretch.
+    const { y, up } = blobAt(blob, tick);
+    return up && points.some(([x, py]) => Math.abs(py - y) < ROCKET_REACH + 1 && circlesAt(x, py, 0).some((c) => Math.hypot(c.x - blob.x, c.y - y) < c.r + BLOB_RADIUS + HAZARD_MARGIN));
+  }
   if (laser) return laserPhase(laser, state, tick) === "on";
   if (mover) {
     // The block where it'll be then, against the rocket anywhere along the stretch.
@@ -755,8 +833,10 @@ function burningAt({ flame, laser, state, blob, mover, stalactite, crumble, stat
     return points.some(([x, y]) => inBox(box, circlesAt(x, y, 0)));
   }
   if (flame.mode === "near") {
+    // Burning, or burning again once it's rested, if the rocket's still in reach
+    // then and sets it off.
     const s = (tick - state.fired) / TICK_RATE;
-    return s < flame.warn + flame.on || s > flame.warn + flame.on + flame.off - flame.warn; // near its next firing
+    return s < flame.warn + flame.on || s >= flame.warn + flame.on + flame.off + flame.warn;
   }
   return flamePhase(flame, state, tick) === "on";
 }

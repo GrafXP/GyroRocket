@@ -1,12 +1,14 @@
 // node scripts/levels/check.js 7-1 [ratio]: parses the level, runs Check, flies
 // it with the autopilot and prints its legs, the stretches between pads, the
-// big-level rules, and a suggested tank (`ratio`, 1.3 unless given, times the
-// longest burn from one refill to the next) and par.
+// big-level rules, a suggested tank (`ratio`, 1.3 unless given, times the
+// longest burn from one refill to the next) and par, and how dense and quick it
+// is along the autopilot's route (reaction.js).
 import { levelById } from "../../src/levels/index.js";
 import { parseLevel } from "../../src/sim/level.js";
 import { checkLevel } from "../../src/sim/check.js";
 import { flyLevel } from "../../src/autofly.js";
-import { keepsToBigRules } from "../../test/worlds.js";
+import { keepsToBigRules, keepsToFloors } from "../../test/worlds.js";
+import { watchReaction, summary, describe } from "./reaction.js";
 
 const id = process.argv[2];
 const ratio = Number(process.argv[3] ?? 1.3);
@@ -19,7 +21,8 @@ console.log(
 const problems = checkLevel(def);
 if (problems.length) console.log("Check:", problems.map((p) => `${p.text} (row ${p.at?.r + 1}, column ${p.at?.c + 1})`).join("; "));
 const t0 = performance.now();
-const { legs, failed, seconds, at } = flyLevel(def);
+const watch = watchReaction(level);
+const { legs, failed, seconds, at } = flyLevel(def, { each: watch.tick });
 console.log(`flown in ${seconds.toFixed(1)} s (${((performance.now() - t0) / 1000).toFixed(1)} s to work out)${failed ? `: FAILED ${failed} (row ${at.r + 1}, column ${at.c + 1})` : ""}`);
 let stretch = 0;
 let fuel = 0;
@@ -41,8 +44,10 @@ if (!failed) {
   console.log(`suggested tank ${Math.ceil(worst * ratio)} (longest ${worst.toFixed(1)}), par ${Math.ceil(seconds / 5) * 5}; the level has tank ${def.fuel}, par ${def.par}`);
   try {
     keepsToBigRules(def, legs);
+    keepsToFloors(def);
     console.log("big-level rules: ok");
   } catch (e) {
     console.log("big-level rules:", e.message);
   }
 }
+console.log(describe(summary([watch.report()])));

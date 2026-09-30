@@ -142,25 +142,27 @@ way: things packed closer, shorter gaps in time, and more that goes off because
 of you, so you have to read it and react rather than learn it.
 
 **How it's measured.** Along the autopilot's route (not counting where it waits),
-a hazard is *passed* when the route comes within 6 m of what it covers: a flame's
+a hazard is *passed* when the rocket comes within 6 m of what it covers: a flame's
 or a beam's length, a blob's throw, a block's or crusher's whole travel, the column
 under a stalactite, a patch of crumbling rock, a cycling fan's column, the strong
 part of a magnet's pull (within 60% of its range), or a turret within 24 m. The
 route is *quiet* where nothing is that close. *Triggered* hazards are the ones
 whose timing follows the rocket's: stalactites, crumbling rock, flames that fire
 when you come near, and turrets. A *window* is how long a cycling hazard is clear:
-its off time less its warning.
+its off time less its warning (a crusher's rest, and how long a blob's column is
+clear halfway up its throw).
 
 | World        | Passed per 100 m | Quiet route | Triggered | Shortest window | Shortest warning | Beat  |
 | ------------ | ---------------- | ----------- | --------- | --------------- | ---------------- | ----- |
-| 6 Core       | 2.4 (0–4.3)      | 58%         | 88%       | 1.5 s           | 0.5 s            | —     |
-| 7 Foundry    | 2.5 (1.3–3.7)    | 53%         | none      | 1.9 s           | 0.5 s            | 5 s   |
-| 8 The Vaults | 1.1 (0.8–1.3)    | 74%         | 21%       | 2.7 s           | 0.5 s            | 5 s   |
+| 6 Core       | 2.6 (0–4.7)      | 77%         | 89%       | 1.5 s           | 0.5 s            | —     |
+| 7 Foundry    | 2.6 (1.2–3.7)    | 52%         | none      | 1.9 s           | 0.5 s            | 5 s   |
+| 8 The Vaults | 1.3 (0.8–1.6)    | 74%         | 29%       | 2.7 s           | 0.5 s            | 5 s   |
 | 9 Fault line | 4 or more        | 40% at most | half      | 1.5 s           | 0.5 s            | 3–4 s |
 | 10 The Heart | 6 or more        | 25% at most | half      | 1.2 s           | 0.4 s            | 3 s   |
 
 Worlds 6–8 are measured, over each world's route as a whole (the range is its
-levels). Worlds 9 and 10 are targets for levels 2–8 of each; the first level is a
+levels), by `scripts/levels/reaction.js` since C4; a rougher first count had world
+6's route 58% quiet. Worlds 9 and 10 are targets for levels 2–8 of each; the first level is a
 way back in, at about world 7's density. Like the other tables, they're starting
 points to tune by playing.
 
@@ -513,7 +515,7 @@ shots on its own (19 of 19 in 8-4's hall; one hit each in 8-2 and 8-8). It makes
 
 Levels can be copied into the editor with world 8's look (`LOOKS` is eight).
 
-### Phase C4: World 9, Fault line
+### Phase C4: World 9, Fault line ✅ (done)
 
 The eight levels above, mostly tall. Pressure is the skill: lava from keys and
 switches, floors that go for good, stalactites over the route. Checkpoints must
@@ -538,6 +540,102 @@ each one.
       to a wall you steered into.
 - [ ] Every warning can be reacted to, and nothing you have to react to starts off
       screen.
+
+What was built: first the report. `scripts/levels/reaction.js` measures a level,
+or whole worlds (`node scripts/levels/reaction.js 7 8`), along the autopilot's
+route as *Harder by reaction* says, and with `--quiet` lists where the route is
+quiet, to know where a level needs more. `check.js` prints it for the level it
+flies. It measures from the rocket's shape, which gives worlds 7 and 8 the numbers
+in the table above to within 0.2 hazards per 100 m and a percentage point of quiet
+(8's triggered share comes out 29%, not 21%). Blobs' windows are taken halfway up
+their throw: at the lava they're shorter than anything else in the game, and
+nobody crosses there. Part two's levels keep to the floors on each thing's own
+settings (`keepsToFloors` in the level tests): the big cave, outside the worlds,
+doesn't, with a blob clear for 0.98 s. `flight.js` also tells how far below the
+rocket the rising lava is on each pad, and times gates it passes up or down
+through, not only across.
+
+Then Fault line, world 9, with ash-grey rock and orange cracks, each level with
+its building script:
+
+| Level | Name            | Size      | Autopilot | Par   | Tank | Pads | Sections                                                  |
+| ----- | --------------- | --------- | --------- | ----- | ---- | ---- | --------------------------------------------------------- |
+| 9-1   | Tremor          | 140 × 100 | 108 s     | 110 s | 19 s | 4    | gallery, drop, upper deck, lava hall, updraft, way out    |
+| 9-2   | Vents           | 110 × 140 | 95 s      | 100 s | 16 s | 4    | three vents, with a crossing between each and the next    |
+| 9-3   | Landslide       | 130 × 140 | 121 s     | 125 s | 23 s | 4    | three crumbling floors, each into a chamber, and the bottom |
+| 9-4   | Shifting ground | 120 × 130 | 131 s     | 135 s | 23 s | 4    | lift shaft, slip, upper shaft                             |
+| 9-5   | The rift        | 100 × 140 | 128 s     | 130 s | 24 s | 4    | down one rift, along its floor, up the other              |
+| 9-6   | Aftershock      | 140 × 110 | 137 s     | 140 s | 27 s | 3    | tunnel, lava cave, updraft, top gallery                   |
+| 9-7   | Lava tube       | 160 × 120 | 145 s     | 150 s | 27 s | 4    | climb, tube, climb, upper tube, climb                     |
+| 9-8   | The fault       | 160 × 150 | 248 s     | 250 s | 29 s | 8    | ten, one from each level before it                        |
+
+| Level | Passed per 100 m | Quiet | Triggered | Shortest window | Shortest warning |
+| ----- | ---------------- | ----- | --------- | --------------- | ---------------- |
+| 9-1   | 3.4              | 41%   | 83%       | 2.8 s           | 0.7 s            |
+| 9-2   | 4.3              | 38%   | 67%       | 1.5 s           | 0.5 s            |
+| 9-3   | 6.1              | 31%   | 62%       | 1.5 s           | 0.5 s            |
+| 9-4   | 4.8              | 29%   | 75%       | 1.5 s           | 0.5 s            |
+| 9-5   | 4.5              | 37%   | 57%       | 1.8 s           | 0.5 s            |
+| 9-6   | 6.1              | 29%   | 81%       | 1.5 s           | 0.5 s            |
+| 9-7   | 5.1              | 37%   | 83%       | 1.5 s           | 0.5 s            |
+| 9-8   | 4.8              | 39%   | 67%       | 1.5 s           | 0.5 s            |
+| World | 4.8              | 36%   | 71%       | 1.5 s           | 0.5 s            |
+
+Tanks are 1.25× the longest burn between refills and pars the autopilot's time
+rounded up to 5 s, for C6. The world passes twice as many hazards per 100 m as
+world 7, with a third of its route quiet, which meets its row in *Harder by
+reaction* but for the triggered share: seven in ten of the hazards passed go off
+because of you, not half, as stalactites (quick ones, shaking for 0.5 s once
+you're within 6 m) and flames that fire as you come near are most of it. The
+cycles keep a 4 s beat, 9-1's a 5 s one. 9-1 and 9-2 are shorter than the
+worlds table's 2 minutes, being dense. The lava in 9-7 rises from its key at
+1.2 m/s and in 9-8 from its switch at 2.5 m/s, up to just below the top of the
+vents: the autopilot keeps 23 to 86 m ahead of it at every pad.
+
+The autopilot needed more work, all of it for reactions:
+
+- **Stalactites at speed.** It works out when each stalactite in its way will be
+  set off and fall, as the sim does, and flies through at crossing speed where none
+  would hit it (allowing for going a fifth slower), deciding 11 m out so as not to
+  slow down. Otherwise it edges up to them as before. A row of ten that took 49 s
+  takes 19. World 6 flies much faster for it (6-1 in 28 s instead of 57, 6-4 in 42
+  instead of 72), so its pars, made from the old times, are now roomy.
+- **Flames that fire as you come near** it treats like stalactites: it edges up
+  until one fires, out of its way, then crosses while it rests. Before, it went on
+  while out of reach and flew into the flame it had just set off, unless the reach
+  was wide (8 m in 3-4). It counts the window as the rest and the next warning,
+  since it sets it off again coming through.
+- **Blobs by height.** It crosses a blob's column while the blob is above or below
+  where it crosses, not only while it's down in the lava.
+- **Moving blocks.** Of the shortest paths it takes the one through ground a block
+  covers for the least of its cycle, where that's more than half, so it passes a
+  slab sliding across a shaft at the side it leaves, not in the middle, which a
+  slab covers all the time.
+- **Fixes:** it skips stalactites that have fallen (it waited on one behind a fallen
+  one for ever), and expects rising lava to stop at the top it's given.
+
+Worlds 1–8 fly as before, within a tenth of a second, but for world 6 and 7-2 (4.6
+s quicker) and 8-3 (7.9 s quicker). 3-6 and 7-1 were already a little over their
+pars (by 0.1 and 3.2 s) and stay so.
+
+What the levels taught, for world 10:
+
+- **A pad never under a stalactite**, however far up: it sees the rocket past
+  sliding blocks, and falls on the pad.
+- **Room before what you set off.** A stalactite or a flame that fires as you come
+  near needs clear route before it, about 10 m, to stop in and set it off from;
+  right after a blob or another flame, the autopilot can neither stop between them
+  nor cross both. Likewise crumbling rock across the way needs room to slow down
+  before it.
+- **Flames crossed going up or down rest 2 s**, not 1.5: the rocket is tall, and
+  crossing takes it longer. Their reach is 5 m, so they're set off from out of the
+  way.
+- **A vent stronger than gravity ends well short of the roof**, or it throws you
+  into it.
+- **Slabs across a shaft need a side to pass on**: nothing on the walls that pushes
+  the way into the middle of their travel.
+
+Levels can be copied into the editor with world 9's look (`LOOKS` is nine).
 
 ### Phase C5: World 10, The Heart, and the ending
 

@@ -7,6 +7,7 @@ import { validateLevel, MAX_WIDTH, MAX_HEIGHT } from "../src/sim/validate.js";
 import { copyOfLevel } from "../src/mylevels.js";
 import { levelToJson } from "../src/editor/text.js";
 import { flyLevel } from "../scripts/autopilot.js";
+import { belowFloors } from "../scripts/levels/reaction.js";
 
 // The checks every level of world `number` must pass, a test apiece: it parses,
 // Check finds nothing wrong, and the autopilot flies it within its tank. The big
@@ -23,9 +24,18 @@ export function testWorld(number) {
       assert.deepEqual(checkLevel(def), []);
       const { failed, legs } = flyLevel(def);
       assert.equal(failed, undefined, failed);
-      if (world.part > 1) keepsToBigRules(def, legs);
+      if (world.part > 1) {
+        keepsToBigRules(def, legs);
+        keepsToFloors(def);
+      }
     });
   }
+}
+
+// Part two's floors (PLAN-CONTENT.md, *Harder by reaction*): nothing warns for too
+// short a time to react to, or is clear for too short a time to get past.
+export function keepsToFloors(def) {
+  assert.deepEqual(belowFloors(parseLevel(def)), []);
 }
 
 const MAX_BYTES = 48 * 1024; // a shared level's limit (PLAN-EDITOR.md), as JSON

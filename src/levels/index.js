@@ -62,6 +62,14 @@ import l8_5 from "./8-5.js";
 import l8_6 from "./8-6.js";
 import l8_7 from "./8-7.js";
 import l8_8 from "./8-8.js";
+import l9_1 from "./9-1.js";
+import l9_2 from "./9-2.js";
+import l9_3 from "./9-3.js";
+import l9_4 from "./9-4.js";
+import l9_5 from "./9-5.js";
+import l9_6 from "./9-6.js";
+import l9_7 from "./9-7.js";
+import l9_8 from "./9-8.js";
 import testCave from "./testcave.js";
 import bigCave from "./bigcave.js";
 
@@ -120,6 +128,13 @@ export const WORLDS = [
     part: 2,
     colors: { face: 0x36403d, wall: 0x44504c, rim: 0x5cc4b4, back: 0x0b1110, crumble: 0x84928c, cracks: 0x50e0c8 },
     levels: [l8_1, l8_2, l8_3, l8_4, l8_5, l8_6, l8_7, l8_8],
+  },
+  {
+    name: "Fault line",
+    about: "Where the rock is still moving: it falls, gives way and fills with lava, so watch it and react.",
+    part: 2,
+    colors: { face: 0x77726c, wall: 0x8a847d, rim: 0xe8883a, back: 0x1c1a18, crumble: 0xa89c8e, cracks: 0xff8a30 },
+    levels: [l9_1, l9_2, l9_3, l9_4, l9_5, l9_6, l9_7, l9_8],
   },
 ].map((world, w) => ({
   ...world,

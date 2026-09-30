@@ -7,7 +7,8 @@ import { createPilot } from "./autopilot.js";
 
 // The same bounded flight in the CLI, tests and editor worker. Fuel is measured
 // between refills, including stops at keys and switches that don't refill it.
-export function flyLevel(def, { maxSeconds = 1800, progress = () => {} } = {}) {
+// `each(world)`, if given, sees the world after every tick.
+export function flyLevel(def, { maxSeconds = 1800, progress = () => {}, each = null } = {}) {
   const level = parseLevel(def);
   const world = createWorld(level, buildOutline(level));
   const pilot = createPilot(world, { restart: false });
@@ -21,6 +22,7 @@ export function flyLevel(def, { maxSeconds = 1800, progress = () => {} } = {}) {
     if (world.refuelling) burned = 0;
     const fuel = world.rocket.fuel;
     advance(world, inputCode(input));
+    each?.(world);
     if (world.rocket.burning && fuel > 0) burned += Math.min(1 / TICK_RATE, fuel);
     longest = Math.max(longest, burned);
     if (pilot.legs.length !== legs || world.tick % 600 === 0) {
