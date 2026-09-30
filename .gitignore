@@ -28,3 +28,7 @@ runs
 
 # Pictures of levels from scripts/levels/
 previews
+
+# Hosting secrets and local API configuration
+deploy.json
+server/config.php

@@ -113,6 +113,7 @@ export function play(el, id) {
             <small class="hint" id="tilt-note"></small>
           </label>
           ${THEME_PICKER}
+          <a class="button" href="/profile" data-link>Profile</a>
           <div class="buttons">
             <button id="fs-menu"></button>
             <button id="fps-menu" aria-pressed="false"></button>

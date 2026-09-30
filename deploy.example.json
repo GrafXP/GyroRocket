@@ -1,0 +1,10 @@
+{
+  "protocol": "ftps",
+  "host": "ftp.example.com",
+  "port": 21,
+  "user": "your-login",
+  "password": "your-password",
+  "webRoot": "/public_html",
+  "serverDir": "../gyrorocket-server",
+  "site": "https://game.example.com"
+}

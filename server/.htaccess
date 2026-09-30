@@ -1,0 +1,2 @@
+# This directory is private even on hosts that require it below the web root.
+Require all denied

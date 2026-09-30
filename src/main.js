@@ -6,6 +6,7 @@ import { html, icon, formatTime, starsHtml, bindFullscreenButton, THEME_PICKER, 
 import { play } from "./ui/play.js";
 import { editorList } from "./editor/list.js";
 import { editor } from "./editor/editor.js";
+import { profile } from "./ui/profile.js";
 
 const view = document.getElementById("view");
 let cleanup = null;
@@ -18,6 +19,7 @@ const routes = {
   "/": home,
   "/levels": levels,
   "/editor": editorList,
+  "/profile": profile,
   "/help": help,
 };
 
@@ -78,6 +80,7 @@ function home(el) {
         <span>${progress.levels[next.id] ? "Play it again" : "Tilt to steer, hold the screen to burn"}</span>
       </a>
       <a class="card" href="/levels" data-link><b>Levels</b><span>${stars} of ${LEVELS.length * 3} stars</span></a>
+      <a class="card" href="/profile" data-link><b>Profile</b><span>Your name and code to use on another phone</span></a>
       <a class="card" href="/help" data-link><b>Help</b><span>Controls, fuel and stars</span></a>
     </div>
     <h2>Theme</h2>
@@ -166,6 +169,11 @@ function help(el) {
     <p>Build your own caves under Editor, from a plain cave or a copy of one you've played. Paint rock, air, pads, keys, doors and hazards with one finger. With Move (the arrows), drag a placed thing to reposition it or drag the background to pan; use two fingers to move and zoom. If something's wrong with the level, it says what at the top, and Show finds it. Fly tries it straight away. The palette also adds switches, gates, fans, magnets and other things. Inspect (O), or hold a thing, to change its settings; moving blocks have a path you can drag. The menu has level settings, a reach overlay, Check for unreachable places, and Autopilot for a test flight with tank and par suggestions. Fly your level from the start to the exit yourself to mark it finished; changing it (but for its name) takes the finish away until you fly it again.</p>
     <h2>Tilt not working?</h2>
     <p class="hint">Browsers only share the motion sensors over HTTPS (or on localhost). On iPhone, allow motion access when asked.</p>
+    <h2 id="privacy">Privacy and storage</h2>
+    <p>Your levels, progress, settings and best replays are kept in this browser on this phone. The game and editor do not need a profile or a connection.</p>
+    <p>Using Profile talks to this site's community server. It keeps a player ID, your name, when the profile was created and last used, and a hash of your secret player code. Names are public when used to share levels or times. The code stays on your phone; the server never stores the code itself.</p>
+    <p>When sharing opens, the server will also keep the levels, runs, ratings, plays, reports and run checks you submit, to show levels and scores and check that runs finish. <a href="/profile" data-link>Profile</a> lets you save your online data as JSON or use Forget me to delete your profile and its online content. Clearing this phone's browser storage loses its copy of the code; keep the code elsewhere if you want to return.</p>
+    <p>For rate limits, the server keeps a keyed hash of the connecting IP address, changed every UTC day. These expire within a day and are pruned during ordinary requests. They are kept apart from player data. This version sends no anonymous play statistics. The host may keep its own access logs under its hosting policy.</p>
     <button id="fs" class="wide"></button>`,
   );
   const unbindFs = bindFullscreenButton($("#fs"));

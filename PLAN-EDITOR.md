@@ -502,7 +502,7 @@ same tick, *Restart from pad* is in the recording, the autopilot's runs aren't
 kept, and my level shows as finished in the editor's list. The checklist above is
 for the phone.
 
-### Phase E4: The server, and names
+### Phase E4: The server, and names ✅ (built locally; hosting checks pending)
 
 `server/`: PHP with PDO and MariaDB. One entry point, `api/index.php`, sends JSON in
 and out, with errors as `{ error }` and the right status, and has everything in
@@ -548,6 +548,52 @@ phpMyAdmin.
 - [ ] An online header check gives the site's headers full marks.
 - [ ] A name is picked in seconds, can't be taken twice, and moves to another phone with the code.
 - [ ] With the server down, nothing in the game waits or breaks.
+
+What was built: `server/` has the PHP entry point, PDO connection with real
+prepared statements and utf8mb4, the initial MariaDB/MySQL schema, config example,
+and saved moderation queries. All health and player endpoints above are implemented.
+Tokens are random 256-bit hex codes, stored only as SHA-256 hashes; names are
+validated and unique ignoring case. Requests have strict fields, a 128 KiB cap,
+a JSON depth limit, proper JSON errors/statuses, no cookies or CORS, and limits
+per IP and player. IP buckets use an HMAC that changes each UTC day; expired rows
+are pruned during requests. A schema version mismatch returns 503, including on
+health. Foreign keys remove owned content and references when a player is deleted.
+Even a banned player can export or delete their own data.
+
+`/profile`, linked from Home and the pause menu, picks a name, copies the private
+transfer code, restores a profile after checking its code, downloads the player's
+data, and deletes the online profile. Visiting the page does not create a player;
+saving a name does. Failed transfers and outages keep the current code. A code
+deleted on another phone is cleared after an explicit 401, without clearing local
+levels, progress or replays. The API client has a timeout, cancellation on leaving
+the page, and API/sim version checks. Only Profile uses the network in E4, so
+ordinary play and editing do not wait for it. Help explains storage and privacy;
+anonymous statistics are not sent yet.
+
+`npm run api` starts the local PHP server and Vite proxies `/api` to it. Builds
+seed the built-in IDs/hashes and sim version, and generate Apache headers with
+the exact hash of the built inline theme script. SPA paths load directly, and
+private files are denied. `npm run deploy` supports SSH, FTP and explicit FTPS;
+`--dry-run` lists the files without uploading. Each upload is renamed into place,
+private guards go first and HTML last, and the real `config.php` is never uploaded
+or replaced. Private server files can live beside the document root, or in its
+protected `server/` directory. Setup, testing and deployment are in
+`server/README.md`; real config and deployment credentials are ignored by git.
+
+Validation: all 267 Node tests passed with the PHP/MariaDB integration suite
+enabled, and the production build passed. The API tests cover malformed/deep and
+oversized JSON, unknown fields, markup/SQL/control characters, bad tokens,
+case-insensitive name conflicts, export isolation, token hashing, deletion
+cascades, bans, schema mismatch, all IP/player limits, expiry and forwarded-header
+spoofing. A local DOM smoke test exercised Profile creation, copying the code,
+transfer, deletion and offline handling. Actual FTP uploads tested renaming and
+preserving config; Apache checked both private-directory layouts, deep links,
+asset loading, API JSON errors and private-file denial. Local HTTPS checks verified
+HSTS, CSP (including the theme hash) and the other headers without duplicate PHP
+headers. The host still needs `deploy.json`, its own config and database import;
+the live subdomain/header check and physical-phone checklist above remain open.
+On the phone, pick a name, restore its code in another browser, try a conflicting
+name, save the data, and delete the profile; then try play/editor with the API down.
 
 ### Phase E5: Sharing levels, checked by players
 

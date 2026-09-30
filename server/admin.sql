@@ -1,0 +1,12 @@
+-- Saved queries for phpMyAdmin. Replace the example IDs before running.
+-- No moderation API: trusted status is assigned here, never by a request.
+
+-- SELECT id, name, role, banned, strikes, created_at FROM players ORDER BY id DESC;
+-- UPDATE players SET role = 'trusted' WHERE id = 123;
+-- UPDATE players SET banned = TRUE WHERE id = 123;
+-- UPDATE levels SET hidden = TRUE WHERE code = 'K7Q2XW';
+-- DELETE FROM scores WHERE id = 123;
+-- SELECT * FROM scores WHERE state = 'disputed';
+-- SELECT * FROM checks WHERE score_id = 123;
+-- UPDATE scores SET state = 'passed' WHERE id = 123;
+-- UPDATE levels SET state = 'passed' WHERE id = 123;

@@ -36,4 +36,9 @@ function saveRuns() {
   };
 }
 
-export default defineConfig({ plugins: [saveRuns()] });
+export default defineConfig({
+  plugins: [saveRuns()],
+  server: {
+    proxy: { "/api": { target: process.env.GYRO_API || "http://127.0.0.1:8081" } },
+  },
+});
