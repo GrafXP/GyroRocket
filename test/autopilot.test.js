@@ -152,6 +152,38 @@ test("it sets off a flame that fires as it comes near, from out of its way, and 
   assert.equal(w.rocket.hull, 100, "burned");
 });
 
+test("crossing flames under a turret, it dodges the shots without stopping in a flame or backing into one", () => {
+  // Getting out of the way of a shot from overhead that passes in front of it
+  // used to mean stopping dead, in the flame it was crossing.
+  const { w, pilot } = flyMap(
+    "turret",
+    `
+    ############################################
+    ############################################
+    #####################2######################
+    ####################...#####################
+    ####################...#####################
+    ####################...#####################
+    ############1#####1#...#1#####1#############
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##........................................##
+    ##.SSS..............................EEE...##
+    ############################################`,
+    {
+      1: { kind: "flame", mode: "near", facing: "down", length: 10, on: 1, off: 1.5, warn: 0.4, reach: 5 },
+      2: { kind: "turret", range: 36, speed: 9, windup: 0.5, reload: 1 },
+    },
+  );
+  assert.equal(w.done, true, pilot.failed);
+});
+
 test("it goes under a blob thrown high while the blob's up out of its way", () => {
   // Low over the lava, it's only in the blob's way at the start and end of each
   // throw: waiting for the blob to be down for long enough, it would never go.

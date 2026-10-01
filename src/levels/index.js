@@ -70,6 +70,14 @@ import l9_5 from "./9-5.js";
 import l9_6 from "./9-6.js";
 import l9_7 from "./9-7.js";
 import l9_8 from "./9-8.js";
+import l10_1 from "./10-1.js";
+import l10_2 from "./10-2.js";
+import l10_3 from "./10-3.js";
+import l10_4 from "./10-4.js";
+import l10_5 from "./10-5.js";
+import l10_6 from "./10-6.js";
+import l10_7 from "./10-7.js";
+import l10_8 from "./10-8.js";
 import testCave from "./testcave.js";
 import bigCave from "./bigcave.js";
 
@@ -135,6 +143,14 @@ export const WORLDS = [
     part: 2,
     colors: { face: 0x77726c, wall: 0x8a847d, rim: 0xe8883a, back: 0x1c1a18, crumble: 0xa89c8e, cracks: 0xff8a30 },
     levels: [l9_1, l9_2, l9_3, l9_4, l9_5, l9_6, l9_7, l9_8],
+  },
+  {
+    name: "The Heart",
+    about: "The bottom of everything, where all the caves meet: all of it at once, and fast.",
+    part: 2,
+    colors: { face: 0x3a2c4a, wall: 0x4a3860, rim: 0xb8d4ff, back: 0x100a18, crumble: 0x7e6c96, cracks: 0x9ad0ff },
+    ending: { title: "Heart of the world!", text: "Down to where all the caves meet, and all the way back up through them to the sky." },
+    levels: [l10_1, l10_2, l10_3, l10_4, l10_5, l10_6, l10_7, l10_8],
   },
 ].map((world, w) => ({
   ...world,

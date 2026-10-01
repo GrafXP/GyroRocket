@@ -39,7 +39,8 @@ or in between them.
   world 6 levels, but no leg between pads is longer than 45 s of the autopilot's
   flying (a player does it faster). A four-minute level has six to ten pads.
   Length makes a level harder by asking you to stay good for longer, not by making
-  you repeat more.
+  you repeat more. World 10, the hardest, spaces its pads further apart: up to
+  60 s of the autopilot's flying, about 40 s on average where world 9's are 29.
 - **Big, but within the editor's limits.** At most 200×150 tiles and 48 KB, like
   a shared level (`PLAN-EDITOR.md`, *The level file*). Every new level then opens
   in the editor as "Copy of a built-in level", passes `validate.js`, and can be
@@ -66,7 +67,7 @@ or in between them.
 | 7     | Foundry    | timing          | 140–200 × 60–100 | 4–8      | 1½–4 min | 1.3×          | 8 m           |
 | 8     | The Vaults | finding the way | 160–200 × 80–120 | 5–9      | 2–4½ min | 1.3×          | 8 m           |
 | 9     | Fault line | reactions       | 100–160 × 100–150 | 5–9     | 2½–6½ min | 1.25×        | 7 m           |
-| 10    | The Heart  | everything, fast | up to 200 × 150 | 6–10     | 2½–5 min | 1.2×          | 7 m           |
+| 10    | The Heart  | everything, fast | up to 200 × 150 | 5–9      | 4–7½ min | 1.2×          | 7 m           |
 
 As in `PLAN.md`, these are starting points to tune by playing. "Tank vs route" is
 the tank against the fuel the autopilot burns on the longest leg between pads, and
@@ -166,7 +167,8 @@ levels), by `scripts/levels/reaction.js` since C4; a rougher first count had wor
 way back in, lighter than the rest. Like the other tables, they're starting
 points to tune by playing, and world 9's already has been: built first to 4 or
 more and 40% quiet, it played well on the phone but was too sparse, and was
-rebuilt at twice the density (C4). World 10 has to be denser still.
+rebuilt at twice the density (C4). World 10 has to be denser still, and is:
+11.2 per 100 m and 14% quiet as built, though 43% triggered (C5).
 
 Density is easiest to reach across a room and hardest up a shaft. What you set
 off needs room before it to stop in, so flames across a shaft come 12 m apart at
@@ -301,7 +303,7 @@ hardest world, testing all of it at speed. 10-3 and 10-6 are dark.
 | 10-3  | Undertow           | Dark: fans and magnets pushing different ways at once, crushers where they meet, and stalactites you only see in your headlight. |
 | 10-4  | Keyring            | All four keys, each behind a set piece from a different world, in any order.      |
 | 10-5  | Pressure           | One switch starts a timed gate and the rising lava together, and a long climb follows through crumbling rock and flames that fire as you come near. |
-| 10-6  | Deep night         | Dark, and the longest yet: every hazard in the game, with pads glowing close together. |
+| 10-6  | Deep night         | Dark, and the longest yet: every hazard in the game, and pads you find by their glow. |
 | 10-7  | The long hall      | One 200-column hall with every kind of hazard in a row, most of them set off by you, and pads between: a race for par. |
 | 10-8  | Heart of the world | The finale: down into the heart, where a key wakes the lava, then all the way up through every world's caves to the sky. |
 
@@ -687,7 +689,7 @@ And the rebuild, packing them closer:
 
 Levels can be copied into the editor with world 9's look (`LOOKS` is nine).
 
-### Phase C5: World 10, The Heart, and the ending
+### Phase C5: World 10, The Heart, and the ending ✅ (done)
 
 The eight levels above, and the ending. The tightest tanks and the longest levels:
 each level is a test of the whole game, and 10-8 the biggest. Its results say
@@ -705,6 +707,106 @@ to keep a rhythm and react at the same time. Likely autopilot work: windows of
       it, not from narrow gaps or unfair surprises.
 - [ ] 10-8 is long and hard but fair, and feels like the end of the game.
 - [ ] Every pad-to-pad stretch in world 10 can be flown in a few tries.
+
+What was built: The Heart, world 10, with deep violet rock and bright, icy
+edges, each level with its building script. 10-8's results give the game's
+ending, "Heart of the world!", and the levels page marks a part "✓ done" once
+every level in it is finished.
+
+| Level | Name               | Size      | Autopilot | Par   | Tank | Pads | Sections                                                        |
+| ----- | ------------------ | --------- | --------- | ----- | ---- | ---- | --------------------------------------------------------------- |
+| 10-1  | Threshold          | 180 × 90  | 245 s     | 245 s | 32 s | 5    | mine, furnace, works, deep dark, core: one from each world      |
+| 10-2  | Firing line        | 164 × 76  | 297 s     | 300 s | 30 s | 7    | first line, under cover, crossfire, gallery and battery, last line |
+| 10-3  | Undertow           | 180 × 124 | 260 s     | 265 s | 29 s | 6    | crosswinds, the pull, the undertow, headwind, the last drop     |
+| 10-4  | Keyring            | 162 × 112 | 408 s     | 410 s | 38 s | 5    | a hub, and a loop out and back for each of the four keys        |
+| 10-5  | Pressure           | 124 × 128 | 324 s     | 325 s | 34 s | 7    | three galleries and drops down, the switch, and the climb       |
+| 10-6  | Deep night         | 170 × 130 | 394 s     | 395 s | 35 s | 8    | four galleries joined by shafts, ten sections, and a last chase |
+| 10-7  | The long hall      | 200 × 46  | 250 s     | 250 s | 30 s | 5    | mine, works, furnace, the turn, the pull, slabs, the last run   |
+| 10-8  | Heart of the world | 200 × 150 | 436 s     | 440 s | 34 s | 9    | fourteen: down the west side, the heart, up the east to the sky |
+
+| Level | Hazards | Passed per 100 m | Quiet | Triggered | Shortest window | Shortest warning | Stretches (average / longest) |
+| ----- | ------- | ---------------- | ----- | --------- | --------------- | ---------------- | ----------------------------- |
+| 10-1  | 83      | 8.0              | 24%   | 54%       | 1.4 s           | 0.4 s            | 40 / 51 s                     |
+| 10-2  | 121     | 11.4             | 11%   | 44%       | 1.2 s           | 0.4 s            | 36 / 49 s                     |
+| 10-3  | 128     | 12.4             | 8%    | 44%       | 1.2 s           | 0.4 s            | 36 / 46 s                     |
+| 10-4  | 164     | 10.4             | 18%   | 32%       | 1.2 s           | 0.4 s            | 44 / 53 s                     |
+| 10-5  | 126     | 11.1             | 15%   | 42%       | 1.2 s           | 0.4 s            | 40 / 51 s                     |
+| 10-6  | 157     | 11.4             | 15%   | 50%       | 1.2 s           | 0.4 s            | 43 / 53 s                     |
+| 10-7  | 119     | 14.0             | 12%   | 51%       | 1.2 s           | 0.4 s            | 41 / 48 s                     |
+| 10-8  | 169     | 11.5             | 12%   | 41%       | 1.2 s           | 0.4 s            | 43 / 51 s                     |
+| World | 1,067   | 11.2             | 14%   | 43%       | 1.2 s           | 0.4 s            | 41 / 53 s                     |
+
+Against world 9 it's denser (11.2 passed per 100 m for 9.4, 14% of the route
+quiet for 18%), faster (a 3 s beat for 4 s, warnings of 0.4 s for 0.5 s,
+crumbling rock that falls after 0.6 s for 1 s, turret shots at 9 m/s), and its
+pads are further apart, as asked for after world 9 was played: 52 pads for 54
+in a world half as long again, 41 s of the autopilot's flying between them on
+average for 29, and none over 60 s (world 10's own limit, `maxStretch` in
+`test/worlds.js`; the others keep 45 s). Tanks are 1.2× the longest burn
+between refills. The autopilot takes 2,612 s for the world, 44 minutes.
+
+Two things fall short of the world's row in *Harder by reaction*. Less of it is
+set off by you than in world 9, 43% for 77%: that's the mix with every cycle in
+the game, and the free things (gusts and magnets) that fill what would be quiet
+route. And 10-4 Keyring is under the mark, at 10.4 per 100 m and 18% quiet: its
+hub and the chambers at the ends of its loops are breathers by design. 10-1 is
+lighter on purpose, as the way back in.
+
+Three levels were reworked after they first flew:
+
+- **10-4** was first built with 73-column tunnels in pairs, out along one and
+  back along the other. The autopilot flew out and back along the same one,
+  past stalactites already fallen: 5.1 per 100 m, half the route quiet, a
+  stretch of 64 s. Now the red and green doors shut the lower tunnels off from
+  the hub and the keys are at the foot of the far chambers, so each loop is one
+  way round; the tunnels are 50 columns, and the hub has magnets and gusts.
+- **10-6** and **10-8** flew at 8 to 9.5 per 100 m; they got another pad each
+  where a stretch ran over 60 s, pads on ledges, more of everything in the
+  galleries, and magnets in the shafts.
+
+The autopilot needed one change, for turrets with fast shots over cycles: a
+shot coming while it was crossing a flame used to stop it dead in the flame, or
+push it back into the one behind. Now it tries the ways it could dodge
+(away, the other way, on as it was, straight away or back), takes the one that
+clears the shot without flying into rock, a flame, a beam or a blob, and
+decides again whether to cross what's ahead. Worlds 5 and 8 and the big cave
+fly in the same times as before, and 8-8 without the hit it used to take.
+
+What the levels taught:
+
+- **The autopilot flies low over flames from the floor and high under flames
+  from the roof.** Of the shortest paths it takes the one least in reach of
+  hazards, and a flame is narrowest at its nozzle; one step less is enough to
+  pull the whole way down a hall to the floor, into the blobs. So blobs go with
+  flames from the roof, not the floor, or a sill of rock before the pool
+  lifts the way over it; and pads stand on ledges, so the way between them is
+  over the throws. The rocket is 5.2 m tall and its path is where its feet are.
+- **It won't break through crumbling rock it can fly round**, however far
+  round is. A crumbling wall goes where it's the only way.
+- **A loop needs a door.** With two ways there and back it takes the one with
+  less left in it. A key's door across the way back's near end, and the key by
+  its far end, make a loop one way round.
+- **Turrets go beside what it waits for, not over it.** It dodges shots while
+  crossing cycles, but one from straight overhead, where it hovers waiting for
+  a flame or edges up to a stalactite, knocks it into what it was waiting for.
+  A turret in a shallow pocket 6 tiles or more along from the nearest such spot
+  is fine; a deep pocket that narrows its view to straight down is the worst.
+- **Cycles 5 tiles apart, not 4**: at 4 a hammer and a beam are too close to
+  stop between, it needs both clear at once, and with a row of them it waits
+  for ever. A stalactite or a flame that fires as you come near needs 5 tiles
+  after a cycle too, as world 9 found, and so does a cycle after such a flame.
+- **No gusts beside beams.** It allows for a gust's push, but a beam kills
+  outright, and held in a gust it started across late. Nor right before a
+  stalactite it edges up to: the gust carries it under.
+- **A slab that slides across a shaft wants nothing above it to one side** (a
+  key in a nook, say) that draws the way across its travel.
+- **Blobs count only within 6 m.** A way pulled up to the roof by flames there
+  passes too far over blobs 3 tiles high for the report to count them; gusts
+  between the flames count, and push.
+- **A map names 50 things**, and 10-4 uses 49: settings shared between copies
+  (offsets in thirds of the beat, two gusts for the whole level) keep it under.
+
+Levels can be copied into the editor with world 10's look (`LOOKS` is ten).
 
 ### Phase C6: Tuning on the phone
 

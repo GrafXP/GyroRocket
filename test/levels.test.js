@@ -29,10 +29,12 @@ test("every world has a test file of its own", () => {
   }
 });
 
-test("worlds come in parts, in order, and the core ends part one", () => {
+test("worlds come in parts, in order, the core ends part one and the heart part two", () => {
   WORLDS.forEach((w, i) => assert.ok(w.part >= (WORLDS[i - 1]?.part ?? 1) && w.part <= (WORLDS[i - 1]?.part ?? 1) + 1, `world ${w.number}`));
   assert.equal(endingOf("6-8").title, "Out of the core!");
   assert.equal(endingOf("6-7"), null);
+  assert.equal(endingOf("10-8").title, "Heart of the world!");
+  assert.equal(LEVELS.at(-1).id, "10-8");
   assert.equal(endingOf("big"), null);
   assert.deepEqual(
     LEVELS.filter((l) => endingOf(l.id)).map((l) => l.id),

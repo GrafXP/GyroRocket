@@ -4,11 +4,12 @@ import { buildOutline, setTile, solidAt } from "./sim/outline.js";
 import { circlesAt, CENTRE_Y, GRAVITY, THRUST, DRAG, MAX_LEAN, TICK_RATE } from "./sim/rocket.js";
 import { padUnder, switched, RETRY_AFTER } from "./sim/world.js";
 import { flamePhase, inFlame } from "./sim/hazards/flame.js";
-import { blobAt, BLOB_RADIUS } from "./sim/hazards/blob.js";
+import { blobAt, inBlob, BLOB_RADIUS } from "./sim/hazards/blob.js";
 import { fieldAt, moverBox } from "./sim/machines.js";
 import { laserPhase, inLaser } from "./sim/hazards/laser.js";
 import { hangingShapes, below, stalactiteShape } from "./sim/hazards/stalactite.js";
 import { lavaHeight } from "./sim/hazards/rise.js";
+import { SHOT_RADIUS } from "./sim/hazards/turret.js";
 
 // A cautious autopilot: given a level in play (sim/world.js), it gives the input
 // for each tick to fly the level's route. The game can hand it the controls, and
@@ -24,7 +25,8 @@ import { lavaHeight } from "./sim/hazards/rise.js";
 //
 // It steers round flames and laser beams that are always on and hanging
 // stalactites, allows for the push of fans and magnets, sidesteps turrets' shots
-// coming its way, and keeps above rising lava. Where its path crosses any other
+// coming its way (not into a flame or rock, and deciding again whether to cross
+// what's ahead), and keeps above rising lava. Where its path crosses any other
 // flame or beam, a lava blob's column, or the ground a crusher or moving block
 // covers, it slows as it comes up to it and waits, hovering, until the hazard's
 // schedule shows a gap long enough to get across; then it goes, and doesn't change
@@ -226,8 +228,13 @@ function steer(world, leg) {
     [vx, vy] = [((tx - r.x) / d) * speed, ((ty - r.y) / d) * speed];
   }
   // Out of the way of any shot coming at it.
-  const dodge = incoming(world, 1.5);
-  if (dodge) [vx, vy] = [vx + dodge[0] * 6, vy + dodge[1] * 6];
+  const shot = incoming(world, 1.5);
+  if (shot) {
+    const [dx, dy] = dodge(world, shot, vx, vy);
+    // That throws its timing out: what it hasn't started across yet, it decides again.
+    if ((dx !== vx || dy !== vy) && zone?.go && ahead > 0) for (const z of run) z.go = false;
+    [vx, vy] = [dx, dy];
+  }
 
   // The push it needs: towards that velocity, plus holding up against gravity,
   // drag, fans and magnets; the engine's on/off, so it burns for that share of the
@@ -800,8 +807,9 @@ function dangerSoon(world) {
   );
 }
 
-// Which way to move to get out of the way of a turret's shot that'll pass within
-// 3 m of the rocket in the next `seconds`, as a unit [x, y], or null if none will.
+// A turret's shot that'll pass within 3 m of the rocket in the next `seconds`,
+// as { shot, away }, with `away` the way to move to get out of its way (a unit
+// [x, y]), or null if none will.
 function incoming(world, seconds) {
   const r = world.rocket;
   for (const s of world.shots) {
@@ -812,9 +820,73 @@ function incoming(world, seconds) {
     const d = Math.hypot(cx, cy);
     if (d > 3) continue;
     // Away from where it passes; straight across its path if it's coming dead on.
-    return d > 0.3 ? [-cx / d, -cy / d] : [-vy / Math.hypot(vx, vy), vx / Math.hypot(vx, vy)];
+    return { shot: s, away: d > 0.3 ? [-cx / d, -cy / d] : [-vy / Math.hypot(vx, vy), vx / Math.hypot(vx, vy)] };
   }
   return null;
+}
+
+const DODGE = 6; // m/s it adds to get out of a shot's way
+const DODGE_ROOM = 0.5; // m it wants between the shot and its shape
+
+// The velocity to fly at instead of (vx, vy) with `shot` (from incoming) coming:
+// away from where it'll pass, if that clears it; if not (going away would only
+// stop it, say, when it's crossing a flame and the shot passes in front), of
+// that, the other way, (vx, vy) as it was, and straight away or the other way,
+// the one that keeps furthest from it.
+function dodge(world, { shot, away: [ux, uy] }, vx, vy) {
+  const options = [
+    [vx + ux * DODGE, vy + uy * DODGE],
+    [vx - ux * DODGE, vy - uy * DODGE],
+    [vx, vy],
+    [ux * DODGE, uy * DODGE],
+    [-ux * DODGE, -uy * DODGE],
+  ];
+  const room = options.map(([tx, ty]) => clearance(world, shot, tx, ty));
+  if (room[0] >= DODGE_ROOM) return options[0];
+  return options[room.indexOf(Math.max(...room))];
+}
+
+// How close `shot` comes to the rocket's shape in the next 1.5 s, in metres, if
+// the rocket heads for velocity (tx, ty) as steer() drives it, until the shot hits
+// rock or has gone by; or -HARMED if that takes it into rock, a flame, a beam or
+// a blob instead, before it has had time to turn back once the shot's by.
+const HARMED = 10;
+const TURN_BACK = 0.8; // s after a shot's gone by
+function clearance(world, shot, tx, ty) {
+  const r = world.rocket;
+  let least = Infinity;
+  let gone = Infinity; // when the shot hit rock or went by
+  for (let t = 1 / 30; t <= Math.min(1.5, gone + TURN_BACK); t += 1 / 30) {
+    const [sx, sy] = [shot.x + shot.vx * t, shot.y + shot.vy * t];
+    // Towards (tx, ty) at 2.5 /s, as steer() asks for.
+    const k = (1 - Math.exp(-2.5 * t)) / 2.5;
+    const [x, y] = [r.x + tx * t + (r.vx - tx) * k, r.y + ty * t + (r.vy - ty) * k];
+    const circles = circlesAt(x, y, 0);
+    if (harms(world, circles, world.tick + Math.round(t * TICK_RATE))) return -HARMED;
+    if (gone < Infinity) continue;
+    for (const c of circles) least = Math.min(least, Math.hypot(c.x - sx, c.y - sy) - c.r - SHOT_RADIUS);
+    const by = (sx - x) * shot.vx + (sy - y) * shot.vy > 0 && Math.hypot(sx - x, sy - y) > 3;
+    if (by || solidAt(world.outline, sx, sy)) gone = t;
+  }
+  return least;
+}
+
+// Whether the rocket's `circles` would be in rock, or in a flame, beam or blob
+// that could be burning at `tick` (a "near" flame unless it's resting: it would
+// fire).
+function harms(world, circles, tick) {
+  const { level } = world;
+  return (
+    circles.some((c) => solidAt(world.outline, c.x, c.y)) ||
+    level.flames.some((f, i) => {
+      if (!inFlame(f, circles, 0.3)) return false;
+      if (f.mode !== "near") return flamePhase(f, world.flames[i], tick) !== "off";
+      const s = (tick - world.flames[i].fired) / TICK_RATE;
+      return world.flames[i].fired < 0 || s < f.warn + f.on || s >= f.warn + f.on + f.off;
+    }) ||
+    level.lasers.some((l, i) => inLaser(l, circles, 0.3) && laserPhase(l, world.lasers[i], tick) !== "off") ||
+    level.blobs.some((b) => inBlob(b, circles, tick, 0.3))
+  );
 }
 
 // Whether a zone's hazard could hurt at `tick`, as far as can be told now.

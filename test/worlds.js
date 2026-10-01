@@ -39,11 +39,15 @@ export function keepsToFloors(def) {
 }
 
 const MAX_BYTES = 48 * 1024; // a shared level's limit (PLAN-EDITOR.md), as JSON
-const MAX_STRETCH = 45; // s of the autopilot's flying between pads, at most
+// s of the autopilot's flying between pads, at most: world 10's pads are further
+// apart.
+const MAX_STRETCH = 45;
+const STRETCHES = { 10: 60 };
+export const maxStretch = (def) => STRETCHES[def.world] ?? MAX_STRETCH;
 
 // A big level's rules: it opens in the editor as a copy (so it's within the map's
 // limits, and valid), it's small enough to share, it has three crystals, and the
-// autopilot never flies more than MAX_STRETCH seconds from one pad to the next.
+// autopilot never flies more than maxStretch seconds from one pad to the next.
 export function keepsToBigRules(def, legs) {
   const copy = copyOfLevel(def);
   validateLevel(copy);
@@ -56,7 +60,7 @@ export function keepsToBigRules(def, legs) {
   for (const leg of legs) {
     stretch += leg.seconds;
     if (!/→ (fuel pad|exit)$/.test(leg.name)) continue;
-    assert.ok(stretch <= MAX_STRETCH, `${leg.name} after ${stretch.toFixed(1)} s since the last pad`);
+    assert.ok(stretch <= maxStretch(def), `${leg.name} after ${stretch.toFixed(1)} s since the last pad`);
     stretch = 0;
   }
 }
