@@ -1,0 +1,508 @@
+/* ---- The level editor ---- */
+
+.editor {
+  position: fixed;
+  inset: 0;
+  background: #0b0c10;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ed-view {
+  position: absolute;
+  inset: 0;
+}
+
+.ed-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.editor[data-mode="pan"] .ed-canvas {
+  cursor: grab;
+}
+
+/* The bars float over the level; the level shows between their buttons. */
+.ed-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.ed-bar > * {
+  pointer-events: auto;
+}
+
+.ed-top {
+  top: 0;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 0
+    calc(12px + env(safe-area-inset-left, 0px));
+}
+
+.ed-tools {
+  bottom: 0;
+  justify-content: center;
+  padding: 0 calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px))
+    calc(12px + env(safe-area-inset-left, 0px));
+}
+
+.editor .icon-btn:disabled {
+  opacity: 0.4;
+}
+
+input.ed-name {
+  flex: 1;
+  height: 44px;
+  padding: 0 12px;
+  font: 600 1rem/1 var(--display);
+  background: color-mix(in srgb, var(--field) 88%, transparent);
+}
+
+a.button.ed-fly {
+  --fill: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, #fff), var(--accent) 60%);
+  --edge: linear-gradient(135deg, var(--accent-rim), var(--accent-deep) 70%);
+  height: 44px;
+  padding: 0 20px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--on-accent);
+}
+
+a.button.ed-fly[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+/* The tile being painted with: tap it for the palette. */
+.ed-swatch {
+  --bw: 2px;
+  --fill: var(--panel);
+  --edge: var(--accent);
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+}
+
+.ed-swatch canvas {
+  width: 28px;
+  height: 28px;
+}
+
+.ed-size {
+  font-weight: 700;
+}
+
+/* Eight buttons across a narrow phone held upright. */
+@media (max-width: 400px) {
+  .ed-tools {
+    gap: 4px;
+    padding-left: calc(8px + env(safe-area-inset-left, 0px));
+    padding-right: calc(8px + env(safe-area-inset-right, 0px));
+  }
+
+  .ed-tools .icon-btn {
+    width: 38px;
+  }
+
+  .ed-swatch {
+    width: 46px;
+  }
+}
+
+/* The level's first problem, under the top bar. */
+.ed-problem {
+  --cut: 9px;
+  --fill: rgb(190 40 45 / 0.92);
+  --edge: rgb(255 140 140 / 0.7);
+  position: absolute;
+  top: calc(62px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 6px 6px 6px 14px;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.ed-problem button {
+  --cut: 5px;
+  --fill: rgb(255 255 255 / 0.2);
+  --edge: transparent;
+  flex: none;
+  min-height: 0;
+  padding: 6px 12px;
+  color: #fff;
+}
+
+.ed-problem.shake {
+  animation: shake 0.4s;
+}
+
+@keyframes shake {
+  25% {
+    transform: translateX(calc(-50% - 8px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 8px));
+  }
+}
+
+/* The tile under the finger, and short notes. */
+.ed-note {
+  position: absolute;
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  font-size: 0.8rem;
+  color: #d8dbe3;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
+.ed-toast {
+  --cut: 9px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 16px;
+  pointer-events: none;
+}
+
+/* The palette: a sheet of tiles to pick from. */
+.overlay.ed-palette {
+  justify-content: flex-end;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(12px, calc(50% - 300px)) calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.ed-sheet {
+  --cut: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 14px 14px;
+  text-align: left;
+  background: var(--panel-solid);
+}
+
+.ed-sheet h3 {
+  margin: 14px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--head);
+}
+
+.ed-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.ed-tile {
+  --fill: var(--field);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+}
+
+.ed-tile canvas {
+  width: 36px;
+  height: 36px;
+}
+
+.ed-tile small {
+  font: 0.72rem/1.15 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.ed-tile[aria-pressed="true"] {
+  --bw: 2px;
+  --edge: var(--accent);
+}
+
+/* Resizing: a panel at the bottom, with the level still in view above it. */
+.ed-panel {
+  --cut: 12px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, calc(100% - 24px));
+  padding: 12px;
+  text-align: center;
+}
+
+.ed-panel > b {
+  font-family: var(--display);
+}
+
+.ed-resize {
+  display: grid;
+  grid-template-columns: auto repeat(4, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-resize span {
+  padding-right: 6px;
+  text-align: left;
+  font: 600 1rem/1.2 var(--display);
+}
+
+.ed-resize button {
+  --fill: var(--field);
+  min-height: 0;
+  padding: 8px 0;
+}
+
+.ed-resize button:disabled {
+  opacity: 0.35;
+}
+
+.ed-panel button.big {
+  padding: 12px;
+}
+
+textarea.ed-text {
+  width: 100%;
+  padding: 10px;
+  font: 12px/1.4 ui-monospace, monospace;
+  resize: vertical;
+}
+
+.menu .ed-text {
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* The editor's front page. */
+.ed-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ed-item {
+  --cut: 10px;
+  --fill: var(--panel);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 10px 14px;
+}
+
+.ed-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ed-item-main b {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 600 1.05rem/1.3 var(--display);
+}
+
+.ed-item-main small {
+  color: var(--muted);
+}
+
+.ed-item .button,
+.ed-item button {
+  --fill: var(--field);
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.ed-copy {
+  display: flex;
+  gap: 10px;
+}
+
+.ed-copy select {
+  flex: 1;
+}
+
+.ed-error {
+  color: var(--bad);
+}
+
+main > .ed-text {
+  margin-bottom: 10px;
+}
+
+/* Things, settings and checks share a sheet that scrolls on a small phone. */
+.ed-form,
+.ed-report {
+  width: 100%;
+  padding: 16px;
+}
+
+.ed-form h2,
+.ed-report h2 {
+  margin: 0 0 12px;
+}
+
+.ed-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.ed-field > label,
+.ed-toggle {
+  font: 600 0.95rem/1.25 var(--display);
+}
+
+.ed-field input:not([type="range"]):not([type="checkbox"]),
+.ed-field select {
+  width: 100%;
+  padding: 10px;
+  background: var(--field);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ed-number,
+.ed-vector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 12px;
+  align-items: center;
+}
+
+.ed-vector {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ed-vector label {
+  font-size: 0.8rem;
+}
+
+.ed-form fieldset {
+  border: 0;
+  padding: 0 0 0 12px;
+  margin: 0;
+}
+
+.ed-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0;
+}
+
+.ed-form details {
+  margin: 18px 0;
+}
+
+.ed-form summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+
+.ed-actions {
+  position: sticky;
+  bottom: -16px;
+  padding: 12px 0;
+  background: var(--panel-solid);
+}
+
+.ed-form .hint,
+.ed-report .hint {
+  font-size: 0.85rem;
+}
+
+.ed-table-scroll {
+  overflow-x: auto;
+}
+
+.ed-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ed-report th,
+.ed-report td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ed-report th:first-child,
+.ed-report td:first-child {
+  text-align: left;
+  white-space: normal;
+}
+
+.ed-path-active .ed-bar {
+  visibility: hidden;
+}
+
+.ed-path {
+  bottom: auto;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  font-size: 0.85rem;
+}
+
+/* Nine controls fit at 360 px; at smaller widths the tools can scroll. */
+@media (max-width: 440px) {
+  .ed-tools {
+    gap: 3px;
+    padding-left: 4px;
+    padding-right: 4px;
+    overflow-x: auto;
+    justify-content: safe center;
+  }
+
+  .ed-tools .icon-btn {
+    width: 34px;
+    min-width: 34px;
+  }
+
+  .ed-tools .ed-swatch {
+    width: 42px;
+    min-width: 42px;
+  }
+}
+
+.editor .overlay.menu {
+  justify-content: flex-start;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .editor .overlay.menu {
+    align-items: flex-start;
+  }
+}

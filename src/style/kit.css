@@ -1,0 +1,502 @@
+/* The kit: what every screen is made of (ui/kit.js has the markup). */
+
+/* ---- Cut corners ----
+   The cave's rock is cut at 45° at every corner, with a lighter rim along its
+   edge, and so is everything here: a fill (::before) and an edge one pixel wide
+   (::after), each a polygon, behind what's in it. A border wouldn't survive the
+   clipping. --cut is the size of the cut, --fill and --edge what they're painted
+   with, --bw the edge's width. Whatever's listed here must not scroll (its fill
+   would scroll away): what scrolls, and what can't have ::before, is cut whole,
+   below. */
+:where(
+    button,
+    a.button,
+    label.button,
+    .panel,
+    .card,
+    .segmented,
+    .icon-btn,
+    .level,
+    .score,
+    .message,
+    .menu section,
+    .ed-item,
+    .ed-panel,
+    .ed-toast,
+    .ed-problem,
+    .ed-tile
+  ) {
+  --cut: 7px;
+  --bw: 1px;
+  --fill: var(--panel-solid);
+  --edge: linear-gradient(135deg, var(--rim), var(--line) 55%);
+  --ci: calc(var(--cut) + 0.414 * var(--bw));
+  position: relative;
+  isolation: isolate;
+  background: none;
+  border: none;
+  border-radius: 0;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  &::before {
+    background: var(--fill);
+    clip-path: polygon(
+      var(--cut) 0,
+      calc(100% - var(--cut)) 0,
+      100% var(--cut),
+      100% calc(100% - var(--cut)),
+      calc(100% - var(--cut)) 100%,
+      var(--cut) 100%,
+      0 calc(100% - var(--cut)),
+      0 var(--cut)
+    );
+  }
+
+  /* The edge: the outline, then the same one a line's width in, as a hole. */
+  &::after {
+    background: var(--edge);
+    clip-path: polygon(
+      evenodd,
+      var(--cut) 0,
+      calc(100% - var(--cut)) 0,
+      100% var(--cut),
+      100% calc(100% - var(--cut)),
+      calc(100% - var(--cut)) 100%,
+      var(--cut) 100%,
+      0 calc(100% - var(--cut)),
+      0 var(--cut),
+      var(--cut) 0,
+      var(--ci) var(--bw),
+      var(--bw) var(--ci),
+      var(--bw) calc(100% - var(--ci)),
+      var(--ci) calc(100% - var(--bw)),
+      calc(100% - var(--ci)) calc(100% - var(--bw)),
+      calc(100% - var(--bw)) calc(100% - var(--ci)),
+      calc(100% - var(--bw)) var(--ci),
+      calc(100% - var(--ci)) var(--bw),
+      var(--ci) var(--bw)
+    );
+  }
+}
+
+/* Cut whole, with a line inside the straight edges: what you type in, and
+   sheets that scroll. */
+input:not([type="range"]):not([type="checkbox"]):not([type="hidden"]):not([type="file"]),
+textarea,
+select,
+.ed-sheet {
+  --cut: 6px;
+  border: none;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% calc(100% - var(--cut)),
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut)),
+    0 var(--cut)
+  );
+}
+
+/* ---- Buttons ---- */
+
+button,
+a.button,
+label.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font: 600 1rem/1.25 var(--display);
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform 0.08s,
+    filter 0.08s;
+}
+
+/* Links (and file pickers) that act like buttons look like them. */
+a.button,
+label.button {
+  display: flex;
+}
+
+button:active,
+a.button:active,
+label.button:active,
+.card:active,
+.level:active {
+  transform: scale(0.97);
+  filter: brightness(1.2);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Where the keyboard is: a glow that follows the cut corners, as an outline can't. */
+:is(button, a.button, label.button, .card, .level):focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 1px var(--focus)) drop-shadow(0 0 5px var(--focus));
+}
+
+/* A button that's on. */
+button[aria-pressed="true"] {
+  --edge: var(--accent);
+  color: var(--accent);
+}
+
+/* The one to press. */
+a.button.big,
+button.big {
+  --cut: 11px;
+  --fill: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, #fff), var(--accent) 60%);
+  --edge: linear-gradient(135deg, var(--accent-rim), var(--accent-deep) 70%);
+  width: 100%;
+  padding: 20px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--on-accent);
+}
+
+button.wide {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.buttons > * {
+  flex: 1;
+  padding-inline: 8px;
+}
+
+/* Square, with an icon. */
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  color: var(--text);
+  --fill: var(--panel);
+}
+
+.icon-btn[aria-pressed="true"] {
+  --fill: var(--accent);
+  --edge: var(--accent-rim);
+  color: var(--on-accent);
+}
+
+/* ---- Icons: lines in the text's colour, or filled ---- */
+
+.icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon.solid {
+  fill: currentColor;
+  stroke-width: 1;
+}
+
+/* In a line of text. */
+p .icon,
+small .icon,
+dd .icon,
+.segmented .icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+}
+
+/* ---- Panels and cards ---- */
+
+.panel {
+  --cut: 12px;
+  --fill: var(--panel);
+  padding: 16px;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.card {
+  --cut: 12px;
+  --fill: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  font: inherit;
+  letter-spacing: 0;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform 0.08s,
+    filter 0.08s;
+}
+
+.card b {
+  font: 600 1.1rem/1.3 var(--display);
+  letter-spacing: 0.02em;
+}
+
+.card span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+button.card {
+  width: 100%;
+  text-align: left;
+}
+
+/* The one to press, as a card: an amber edge, and a bar of it down the left. */
+.card.primary {
+  --bw: 2px;
+  --edge: linear-gradient(135deg, var(--accent-rim), var(--accent) 40%, var(--accent-deep));
+  --fill: linear-gradient(90deg, color-mix(in srgb, var(--accent) 26%, var(--panel-solid)), var(--panel-solid) 70%);
+}
+
+.card.primary b {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ---- One of a few: buttons side by side, the chosen one filled ---- */
+
+.segmented {
+  --cut: 9px;
+  --fill: var(--panel);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.segmented button {
+  --cut: 6px;
+  --fill: transparent;
+  --edge: transparent;
+  flex: 1;
+  min-height: 40px;
+  padding: 8px;
+  color: var(--muted);
+}
+
+.segmented button[aria-pressed="true"] {
+  --fill: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---- On or off ---- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font: 600 1rem/1.25 var(--display);
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The slot, and the block that slides along it. */
+.switch i {
+  --cut: 5px;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 28px;
+  background: var(--line);
+  clip-path: polygon(
+    var(--cut) 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% calc(100% - var(--cut)),
+    calc(100% - var(--cut)) 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut)),
+    0 var(--cut)
+  );
+  transition: background 0.15s;
+}
+
+.switch i::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  background: var(--text);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  transition: transform 0.15s;
+}
+
+.switch input:checked + i {
+  background: var(--accent);
+}
+
+.switch input:checked + i::after {
+  transform: translateX(24px);
+  background: var(--on-accent);
+}
+
+.switch input:focus-visible + i {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.switch span {
+  margin-right: auto;
+}
+
+/* ---- What you type in, and choose from ---- */
+
+input:not([type="range"]):not([type="checkbox"]):not([type="hidden"]):not([type="file"]),
+textarea,
+select {
+  min-width: 0;
+  padding: 11px 12px;
+  font: inherit;
+  color: var(--text);
+  background: var(--field);
+}
+
+input:not([type="range"]):not([type="checkbox"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+/* A slider: a slot, and a block to drag along it. */
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--line);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--line);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 26px;
+  margin-top: -10px;
+  background: var(--accent);
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 26px;
+  border: none;
+  border-radius: 0;
+  background: var(--accent);
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 600 1rem/1.25 var(--display);
+}
+
+.setting small {
+  font: 0.85rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---- Stars: gold when earned ---- */
+
+.stars {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.stars .icon {
+  width: 1em;
+  height: 1em;
+  stroke: none;
+  color: var(--line);
+}
+
+.stars .icon.on {
+  color: var(--gold);
+}
+
+/* ---- Numbers that change (setDigits in ui/kit.js): every digit in a box of
+   one width, as wide as the font's widest ---- */
+
+.digits i {
+  font-style: normal;
+  white-space: pre;
+}
+
+.digits i.d {
+  display: inline-block;
+  width: 0.66em;
+  text-align: center;
+}

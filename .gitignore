@@ -32,3 +32,6 @@ previews
 # Hosting secrets and local API configuration
 deploy.json
 server/config.php
+
+# Pictures of every screen, from npm run shots
+shots

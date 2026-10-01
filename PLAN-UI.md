@@ -201,9 +201,9 @@ now.
 - **Type.** The display font at three sizes (title, heading, button) and for
   numbers; the system font for anything longer than a line. The clock needs
   digits of one width: use the font's tabular figures if it has them, and set
-  each digit in its own box if not. The font is **Chakra Petch** (its letters
-  have the same cut corners; SIL Open Font Licence, to be checked when the file
-  is added). Latin subset, `woff2`, two weights at most.
+  each digit in its own box if not (it hasn't, so they're in boxes). The font
+  is **Chakra Petch** (its letters have the same cut corners; SIL Open Font
+  Licence 1.1). Latin subset, `woff2`, two weights.
 - **Buttons.** One primary per screen (amber, large), secondary ones in panel
   colour with the rim, icon buttons at 44 px as now, and switches for on/off
   (never a label that reads "…: off"). A press scales to 97% and brightens.
@@ -228,9 +228,11 @@ src/
                      (components), and a file per screen
   levels/title.js    the title screen's small cave
   render/backdrop.js the title's scene: createView on title.js, a drifting camera
+  render/rock.js     the rock's texture, for the cave and behind the menus
   ui/
-    kit.js           button, panel, switch, slider, stars, icon: markup helpers,
-                     and `onPress` for a button's feedback
+    kit.js           button, switch, slider, stars, icon: markup helpers;
+                     `setDigits` for numbers that change, and `onPress` for a
+                     button's feedback
     frame.js         a page's back button, heading and background
     sheet.js         sheets and dialogs: opening adds a history entry, so Back
                      closes them; Esc too; focus is kept inside and put back
@@ -266,12 +268,43 @@ test/summary.test.js
 
 ## Phases
 
-### Phase U1: The look
+### Phase U1: The look ✅ (built; to check on the phones)
 `scripts/shots.js` first, and a set of pictures of the game as it is, to compare
 against. Then the tokens (dark and light), the font, the cut-corner mixin, the
 kit (`ui/kit.js`, `kit.css`) and its page at `/ui`. `style.css` is split, and
 every screen is moved onto the kit as it stands: same structure, new look. The
 glyphs become icons. No screen changes what it does in this phase.
+
+What was built: `npm run shots [-- label] [--theme=both] [--only=pause,kit]
+[--scale=1]` pictures 16 screens sideways and upright into `shots/<label>/` (not
+in git), in about a minute and a half a theme; `shots/before/` has the game as
+it was. `style.css` became `style/base.css`, `kit.css`, `pages.css`,
+`levels.css`, `play.css` and `editor.css`.
+
+The cut corners are one rule in `kit.css` over a list of what gets them
+(buttons, cards, panels, level tiles, the HUD's pill, the message, the menus'
+sections, the editor's tiles and bars): a fill and an edge as two polygons
+behind the content, the edge running from the rim's colour at the top left to
+the line's. It's in `:where()`, so anything can override it. What can't have
+`::before` (inputs) or scrolls (the editor's sheets) is clipped whole, with a
+line inside its straight edges only. The pause menu's and the results' two
+sections became panels with this, the one change to how a screen is laid out.
+Keyboard focus is a glow that follows the cut, since an outline can't.
+
+Chakra Petch 600 and 700 are in `public/fonts/` with its licence, 10 KB each,
+preloaded. It has no tabular figures, so `setDigits` (in `ui/kit.js`) puts each
+character of the clock and the speed in its own box, the digits' 0.66 em wide,
+and touches only the ones that changed; the kit page measures four times and
+says they're one width. `ui/kit.js` also has the icons (36, with star, crystal
+and play filled), `stars`, `button`, `toggle`, `slider` and `onPress`, with
+`test/kit.test.js`, which also checks that every icon asked for by name exists.
+
+`--world` is the rim colour of the world of the next level to do, set on every
+page change, and headings take it. Behind the pages is a glow of it from the
+top, and rock: `render/rock.js` (the cave's texture, moved out of `cave.js`)
+makes a see-through copy once, which masks a layer of the world's colour at 8%.
+`/ui?dev` is the kit's page, in its own chunk: tap a world's number to see its
+tint. The tab bar is still there, restyled, until U2.
 - [ ] Every screen is in the new look, in both themes, and none still shows a rounded grey card.
 - [ ] The font loads with no request to another site, and the clock's digits don't jiggle.
 - [ ] Buttons answer a press at once, and the one to press on each screen is obvious.

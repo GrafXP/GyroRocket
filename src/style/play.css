@@ -1,0 +1,390 @@
+/* ---- The play page: the whole screen, with no tab bar ---- */
+
+body.playing {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.playing nav {
+  display: none;
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+  background: #08090d;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.game canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* Pause, the pill with the clock, fuel, hull, crystals and speed, and fullscreen along the top. */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 0
+    calc(12px + env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.score {
+  --cut: 10px;
+  --fill: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+  padding: 3px 16px 5px;
+  line-height: 1.1;
+  pointer-events: none;
+}
+
+.score > b {
+  font: 700 1.55rem/1.1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.readout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 0.85rem/1.2 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.crystals {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--crystal);
+}
+
+.crystals .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.keys {
+  display: flex;
+  gap: 2px;
+}
+
+.keys svg {
+  width: 16px;
+  height: 16px;
+}
+
+.speed {
+  color: var(--muted);
+}
+
+.speed[data-safe="true"] {
+  color: var(--good);
+}
+
+/* How far below the rising lava is: amber, and red when it's close. */
+.lava {
+  color: #c2410c;
+}
+
+:root:not([data-theme="light"]) .lava {
+  color: #ff8a3a;
+}
+
+.lava[data-near="true"] {
+  color: var(--bad);
+}
+
+/* A labelled bar: fuel or hull. */
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.gauge small {
+  width: 2.6em;
+  color: var(--muted);
+  font: 600 0.65rem/1 var(--display);
+  letter-spacing: 0.06em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.bar {
+  display: block;
+  width: 96px;
+  height: 8px;
+  overflow: hidden;
+  background: var(--line);
+  clip-path: polygon(3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px), 0 3px);
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  transition: width 0.15s;
+}
+
+.bar i.fuel {
+  background: #3fa9f5;
+}
+
+.bar i.hull {
+  background: #3fbf6a;
+}
+
+.bar i[data-level="low"] {
+  background: #e0a000;
+}
+
+.bar i[data-level="bad"] {
+  background: var(--bad);
+}
+
+.bar i.fuel[data-level="bad"] {
+  animation: flash 0.5s steps(1) infinite;
+}
+
+@keyframes flash {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* A red flash round the edges when the rocket hits rock. */
+.game::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 60px 10px rgb(214 58 63 / 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game.hit::after {
+  animation: hit 0.4s ease-out;
+}
+
+@keyframes hit {
+  from {
+    opacity: 1;
+  }
+}
+
+/* What to do next, near the bottom; presses go through it to the canvas. */
+.message {
+  --cut: 10px;
+  --fill: var(--panel);
+  position: absolute;
+  left: 50%;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 9px 18px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px max(16px, calc(50% - 240px));
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+}
+
+/* The pause menu and the level complete sheet: one column of panels, or two
+   side by side on a phone held sideways. */
+.overlay.menu {
+  overflow-y: auto;
+  gap: 12px;
+}
+
+.menu section {
+  --cut: 14px;
+  --fill: var(--panel);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.menu h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.menu .hint {
+  margin: -6px 0 4px;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .overlay.menu {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 12px max(16px, calc(50% - 370px));
+  }
+
+  .menu section {
+    flex: 1;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .menu button.big,
+  .menu a.button.big {
+    padding: 14px;
+  }
+}
+
+/* The stars a finish earns, each over what it's for. */
+.awards {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.award {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 84px;
+  color: var(--line);
+}
+
+.award .icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  stroke: none;
+}
+
+.award.on .icon {
+  color: var(--gold);
+}
+
+.award small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.award.new .icon {
+  animation: pop 0.5s ease-out both;
+  animation-delay: calc(0.25s + var(--i) * 0.25s);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.2) rotate(-40deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.35);
+  }
+}
+
+.results {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: center;
+  gap: 4px 16px;
+  margin: 0;
+  text-align: left;
+}
+
+.results dd {
+  font-family: var(--display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.results b {
+  color: var(--accent);
+}
+
+.results small {
+  color: var(--muted);
+}
+
+/* The frame rate display, and the ?dev overlay under it, below the buttons at the
+   top left: most levels start at the bottom left, where they'd hide the rocket. */
+.debug {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left, 0px));
+  top: calc(62px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.fps,
+.dev {
+  margin: 0;
+  padding: 6px 8px;
+  font: 11px/1.4 ui-monospace, monospace;
+  color: #e6e8ee;
+  background: rgb(0 0 0 / 0.55);
+  pointer-events: none;
+}
+
+.fps b {
+  font-size: 14px;
+}
+
+.fps[data-level="ok"] b {
+  color: #5fd38a;
+}
+
+.fps[data-level="low"] b {
+  color: #f0b429;
+}
+
+.fps[data-level="bad"] b {
+  color: #ff6b6b;
+}
+
+/* The map: the level scaled to fit, on its own dark panel. */
+.overlay.map {
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 8px;
+  background: rgb(8 9 13 / 0.94);
+}
+
+.overlay.map canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.overlay.map .hint {
+  margin: 0;
+  color: #8b90a0;
+}

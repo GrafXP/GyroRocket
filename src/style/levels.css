@@ -1,0 +1,84 @@
+/* The levels page. A part's heading stands over its worlds' headings. */
+
+h2.part {
+  margin: 32px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+/* Every level in the part finished. */
+h2.part small {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.world h2 small {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.world h2 small .icon {
+  color: var(--gold);
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.level {
+  --cut: 9px;
+  --fill: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  color: var(--text);
+  text-decoration: none;
+  text-align: center;
+  transition:
+    transform 0.08s,
+    filter 0.08s;
+}
+
+/* Finished: its edge in the world's colour. */
+.level.done {
+  --edge: linear-gradient(135deg, var(--head), color-mix(in srgb, var(--world) 45%, var(--line)) 60%);
+}
+
+.level b {
+  font: 700 1.3rem/1.2 var(--display);
+}
+
+.level small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.level .best {
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.level.locked {
+  opacity: 0.45;
+}
+
+.level.locked .icon {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0;
+}

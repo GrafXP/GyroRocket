@@ -1,0 +1,97 @@
+/* The pages that are mostly words: home, help and the profile. */
+
+.profile-form {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.profile-form label,
+label[for="player-code"] {
+  font: 600 1rem/1.25 var(--display);
+}
+
+.profile-form input,
+.profile-form textarea,
+.player-code {
+  width: 100%;
+}
+
+.player-code {
+  display: block;
+  margin: 8px 0;
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+
+.profile-delete {
+  margin-top: 20px;
+}
+
+.profile-delete summary {
+  cursor: pointer;
+  color: var(--bad);
+}
+
+/* ---- The kit's page, /ui?dev ---- */
+
+.kit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.kit-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.kit-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 64px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.kit-swatch i {
+  width: 40px;
+  height: 40px;
+  background: var(--c);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.kit-clock b {
+  font-family: var(--display);
+  font-size: 2.5rem;
+}
+
+.kit-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 60px;
+  padding: 12px;
+  background: linear-gradient(135deg, #5b3327, #1a1210);
+}
+
+.kit-game .message {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+}
+
+.kit-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 52px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}

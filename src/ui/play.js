@@ -11,7 +11,8 @@ import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSet
 import { playableLevel } from "../mylevels.js";
 import { makeReplay, unpackInput, unplayable, counts } from "../replay.js";
 import { loadRun, keepRun, finishOf } from "../runs.js";
-import { html, icon, esc, formatTime, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { html, esc, formatTime, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { icon, setDigits } from "./kit.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
 const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
@@ -79,10 +80,10 @@ export function play(el, id) {
         <button class="icon-btn" id="map-btn" aria-label="Map">${icon("map")}</button>
         <button class="icon-btn" id="auto-btn" aria-label="Autopilot" aria-pressed="false">${icon("auto")}</button>
         <div class="score">
-          <b id="time">0:00.0</b>
+          <b class="digits" id="time"></b>
           <span class="gauge"><small>Fuel</small><span class="bar" role="meter" aria-label="Fuel" aria-valuemin="0" aria-valuemax="100"><i class="fuel" id="fuel"></i></span></span>
           <span class="gauge"><small>Hull</small><span class="bar" role="meter" aria-label="Hull" aria-valuemin="0" aria-valuemax="100"><i class="hull" id="hull"></i></span></span>
-          <span class="readout"><span class="crystals" id="crystals"></span><span class="keys" id="keys"></span><span class="lava" id="lava"></span><span class="speed" id="speed">0.0 m/s</span></span>
+          <span class="readout"><span class="crystals" id="crystals"></span><span class="keys" id="keys"></span><span class="lava" id="lava"></span><span class="speed digits" id="speed"></span></span>
         </div>
         <button class="icon-btn" id="fs"></button>
       </div>
@@ -181,6 +182,7 @@ export function play(el, id) {
     message: $("#message"),
   };
   let keysShown = "";
+  let crystalsShown = "";
   let autoShown = null;
   let lostUntil = 0; // when to stop saying the autopilot gave up
   const show = (el, text) => el.textContent !== text && (el.textContent = text);
@@ -210,7 +212,7 @@ export function play(el, id) {
     fullTilt: settings.fullTilt,
     onFrame(w, controls) {
       const r = w.rocket;
-      show(hud.time, formatTime(clock(w)));
+      setDigits(hud.time, formatTime(clock(w)));
       // Fuel goes amber below 30% and flashes red below 15%; the hull at 60% and 30%.
       const f = r.fuel / r.tank;
       setBar(hud.fuel, f, f > 0.3 ? "ok" : f > 0.15 ? "low" : "bad");
@@ -218,9 +220,13 @@ export function play(el, id) {
       setBar(hud.hull, h, h > 0.6 ? "ok" : h > 0.3 ? "low" : "bad");
       // Speed, green while slow enough to land.
       const v = Math.hypot(r.vx, r.vy);
-      show(hud.speed, `${v.toFixed(1)} m/s`);
+      setDigits(hud.speed, `${v.toFixed(1)} m/s`);
       hud.speed.dataset.safe = r.state === "flying" && v <= SAFE_SPEED;
-      show(hud.crystals, level.crystals.length ? `◆ ${crystalCount(w)}/${level.crystals.length}` : "");
+      const crystals = level.crystals.length ? `${crystalCount(w)}/${level.crystals.length}` : "";
+      if (crystals !== crystalsShown) {
+        crystalsShown = crystals;
+        hud.crystals.innerHTML = crystals && icon("crystal") + crystals;
+      }
       // Rising lava: how far below the rocket's feet it is.
       const below = w.rise && w.rise.from >= 0 ? Math.max(0, r.y - CENTRE_Y - w.rise.y) : null;
       show(hud.lava, below === null ? "" : `Lava ${below.toFixed(0)} m ↓`);
@@ -327,7 +333,7 @@ export function play(el, id) {
         ]
           .map(
             (label, i) =>
-              `<div class="award${result.after[i] ? " on" : ""}${result.after[i] && !result.before[i] ? " new" : ""}" style="--i: ${i}"><span>★</span><small>${label}</small></div>`,
+              `<div class="award${result.after[i] ? " on" : ""}${result.after[i] && !result.before[i] ? " new" : ""}" style="--i: ${i}">${icon("star")}<small>${label}</small></div>`,
           )
           .join("")
       : "";

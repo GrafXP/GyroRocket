@@ -1,8 +1,17 @@
-import "./style.css";
+import "./style/base.css";
+import "./style/kit.css";
+import "./style/pages.css";
+import "./style/levels.css";
+import "./style/play.css";
+import "./style/editor.css";
 import { SAFE_SPEED } from "./sim/rocket.js";
 import { WORLDS, LEVELS } from "./levels/index.js";
 import { loadProgress, nextToPlay, isUnlocked, allUnlocked, setAllUnlocked, starsOf, starCount } from "./progress.js";
-import { html, icon, formatTime, starsHtml, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./ui/dom.js";
+import { html, formatTime, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./ui/dom.js";
+import { icon, stars as starsHtml } from "./ui/kit.js";
+import { css } from "./looks.js";
+import { rockCanvas } from "./render/rock.js";
+import { CAVE_COLORS } from "./render/cave.js";
 import { play } from "./ui/play.js";
 import { editorList } from "./editor/list.js";
 import { editor } from "./editor/editor.js";
@@ -41,14 +50,44 @@ function pageFor(path) {
   if (mine) return (el) => play(el, `my:${mine}`);
   const editing = path.match(/^\/editor\/(\w+)$/)?.[1];
   if (editing) return (el) => editor(el, editing);
+  if (path === "/ui" && new URLSearchParams(location.search).has("dev")) return kit;
   return routes[path] || notFound;
 }
+
+// The kit's page, /ui?dev: every component in every state. It's only fetched here.
+function kit(el) {
+  let gone = false;
+  let stop = null;
+  import("./ui/kitpage.js").then((m) => {
+    if (!gone) stop = m.kitPage(el);
+  });
+  return () => {
+    gone = true;
+    stop?.();
+  };
+}
+
+// The menus take the colour of the world the player has reached: its rock's rim.
+function tint() {
+  const rim = WORLDS[nextToPlay(loadProgress()).world - 1].colors?.rim ?? CAVE_COLORS.rim;
+  document.documentElement.style.setProperty("--world", css(rim));
+}
+
+// The rock behind the menus (style/base.css): its texture, see-through where the
+// cave's is dark, made once.
+function rock() {
+  const canvas = rockCanvas(256, (v) => [255, 255, 255, Math.max(0, Math.min(255, (v - 0.35) * 600))]);
+  document.documentElement.style.setProperty("--rock", `url(${canvas.toDataURL()})`);
+  document.documentElement.classList.add("rocky");
+}
+(window.requestIdleCallback ?? setTimeout)(rock);
 
 function render() {
   cleanup?.();
   cleanup = null;
   document.body.classList.remove("playing"); // the play page puts it back
   view.innerHTML = "";
+  tint();
   cleanup = pageFor(location.pathname)(view) || null;
   const path = location.pathname;
   const section = path.startsWith("/play/my/") || path.startsWith("/editor") ? "/editor" : path.startsWith("/play") ? "/levels" : path;
@@ -114,7 +153,7 @@ function levels(el) {
       const done = finished(world.part) ? ` <small>${icon("check")} done</small>` : "";
       const part = parts && world.part !== WORLDS[w - 1]?.part ? `<h2 class="part">${PART_NAMES[world.part - 1]}${done}</h2>` : "";
       return `${part}<section class="world">
-        <h2>${world.number} · ${world.name} <small>★ ${stars}/${world.levels.length * 3}</small></h2>
+        <h2>${world.number} · ${world.name} <small>${icon("star")} ${stars}/${world.levels.length * 3}</small></h2>
         <p class="hint">${world.about}</p>
         <div class="level-grid">
           ${world.levels
@@ -145,7 +184,7 @@ function help(el) {
     <dl>
       <dt>Steer</dt><dd>Tilt the phone left or right, held flat or upright. Or ← → / A D.</dd>
       <dt>Burn</dt><dd>Hold a finger anywhere on the screen. Or ↑ / W / Space, or hold the mouse.</dd>
-      <dt>Pause</dt><dd>The ❚❚ button, or P / Esc. The pause menu has restarts, tilt sensitivity, and a frame rate display to check how smoothly the game runs.</dd>
+      <dt>Pause</dt><dd>The ${icon("pause")} button, or P / Esc. The pause menu has restarts, tilt sensitivity, and a frame rate display to check how smoothly the game runs.</dd>
       <dt>Autopilot</dt><dd>The arrow button, or O: sit back and watch it fly the level, from wherever you are. It's careful rather than quick, and a run it flies any of doesn't earn stars.</dd>
     </dl>
     <h2>Landing</h2>
@@ -155,7 +194,7 @@ function help(el) {
     <h2>Hitting rock</h2>
     <p>The rocket bounces off rock and loses hull, more the harder it hits. A slam, or losing all its hull, breaks it up. Tap to try again.</p>
     <h2>Keys, doors and switches</h2>
-    <p>Fly through a key to pick it up; the doors of its colour and shape open as you come near. Land on an orange switch to open the gate with its number. Some gates shut again: the countdown starts as you lift off. The map (▦ or M) shows where you've been.</p>
+    <p>Fly through a key to pick it up; the doors of its colour and shape open as you come near. Land on an orange switch to open the gate with its number. Some gates shut again: the countdown starts as you lift off. The map (${icon("map")} or M) shows where you've been.</p>
     <h2>Flames and lava</h2>
     <p>Flamethrowers flicker before they fire, and burn the hull fast: a quick pass hurts, lingering kills. Some fire on a beat, some when you come near, and some never stop. Lava, and the blobs it throws up, destroy the rocket at a touch.</p>
     <h2>Machinery and magnets</h2>
@@ -165,7 +204,7 @@ function help(el) {
     <h2>Falling rock, crumbling rock and rising lava</h2>
     <p>Stalactites shake and shed dust when you pass beneath them, then drop: hang back until they've fallen, or be quick. A hit costs hull. Crumbling rock is paler, with glowing cracks: touch it or land on it and it gives way a moment later, with all the crumbling rock joined to it, so take off fast. In some caves the lava rises, from the start or once you've taken something: the HUD shows how far below you it is. Climb!</p>
     <h2>Stars</h2>
-    <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ◆ in one run. Finishing a level opens the next.</p>
+    <p>Each level has three: one for finishing, one for beating its par time, and one for collecting all its crystals ${icon("crystal")} in one run. Finishing a level opens the next.</p>
     <h2>Replays</h2>
     <p>Every run is recorded, and your fastest finish on each level is kept on this phone: watch it from the pause menu. After a finish, Watch plays back the run you've just flown. Runs the autopilot flew any of aren't kept.</p>
     <h2>Level editor</h2>

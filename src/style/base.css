@@ -1,0 +1,193 @@
+/* The look's tokens, the type, and the page. The dark values are the game's;
+   the light theme has its own of each. */
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/chakra-petch-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/chakra-petch-700.woff2") format("woff2");
+}
+
+:root {
+  --bg: #0d1020; /* the night blue */
+  --panel: rgb(29 35 62 / 0.88); /* over whatever's behind */
+  --panel-solid: #1b2039;
+  --field: #11152a; /* what you type in */
+  --line: #333b66;
+  --rim: #6a75a8; /* the lighter edge, top and left, like the rock's rim */
+  --text: #e9ecf5;
+  --muted: #949bb5;
+  --accent: #ffb347; /* the flame: what to press */
+  --accent-rim: #ffe0ad;
+  --accent-deep: #e08a1a;
+  --on-accent: #1a1005;
+  --world: #cdb698; /* the rim of the rock in the world you've reached (main.js) */
+  --head: color-mix(in srgb, var(--world) 62%, #fff); /* headings, in the world's colour */
+  --gold: #f2b90c;
+  --crystal: #d86bff;
+  --focus: #ffffff;
+  --bad: #e0464b;
+  --good: #3fbf6a;
+  --nav-h: 60px;
+  --display: "Chakra Petch", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+/* Bright and high in contrast, for sunlight. */
+:root[data-theme="light"] {
+  --bg: #f3efe6;
+  --panel: rgb(255 255 255 / 0.92);
+  --panel-solid: #ffffff;
+  --field: #ffffff;
+  --line: #c4bba6;
+  --rim: #8f866f;
+  --text: #111318;
+  --muted: #4a4f5c;
+  --accent: #c25a0c;
+  --accent-rim: #e58a3c;
+  --accent-deep: #8f3f04;
+  --on-accent: #ffffff;
+  --head: color-mix(in srgb, var(--world) 40%, #1a1408);
+  --gold: #d99a00;
+  --crystal: #a43fd0;
+  --focus: #7a3200;
+  --bad: #c62f34;
+  --good: #1d7a3c;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The hidden attribute always wins over a display set below. */
+[hidden] {
+  display: none !important;
+}
+
+/* Behind the pages: the night, with a glow of the world's colour from above. */
+body {
+  margin: 0;
+  background:
+    radial-gradient(120% 420px at 50% -80px, color-mix(in srgb, var(--world) 26%, transparent), transparent) no-repeat,
+    var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* And rock, faintly: --rock is its texture, see-through, made once (main.js),
+   and it shapes a layer of the world's colour. */
+:root.rocky body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--world);
+  -webkit-mask: var(--rock) 0 0 / 256px;
+  mask: var(--rock) 0 0 / 256px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+:root[data-theme="light"].rocky body::before {
+  background: color-mix(in srgb, var(--world) 50%, #5a4a30);
+  opacity: 0.1;
+}
+
+main {
+  padding: calc(20px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  line-height: 1.2;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+h2 {
+  margin: 28px 0 8px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--head);
+}
+
+a {
+  color: var(--accent);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+}
+
+dt {
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--head);
+}
+
+dd {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The tab bar. */
+nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: var(--panel-solid);
+  border-top: 1px solid var(--line);
+}
+
+nav a {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--muted);
+}
+
+nav a.active {
+  color: var(--accent);
+  box-shadow: inset 0 3px 0 var(--accent);
+}

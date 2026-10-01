@@ -1,4 +1,5 @@
-import { html, icon, esc, go, saveFile, formatTime } from "../ui/dom.js";
+import { html, esc, go, saveFile, formatTime } from "../ui/dom.js";
+import { icon } from "../ui/kit.js";
 import { loadLevel, saveLevel, deleteLevel } from "../mylevels.js";
 import { finishOf } from "../runs.js";
 import { buildOutline, setTile as setOutlineTile } from "../sim/outline.js";
