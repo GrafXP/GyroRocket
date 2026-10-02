@@ -1,0 +1,126 @@
+/* ---- The settings sheet (ui/settings.js) ---- */
+
+.settings section + section {
+  margin-top: 16px;
+}
+
+.settings section > * + * {
+  margin-top: 8px;
+}
+
+.settings h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--head);
+}
+
+.settings .hint {
+  margin-bottom: 0;
+}
+
+.settings a.button {
+  --fill: var(--field);
+}
+
+/* The steering's picture: the phone, the arc of tilt that steers, and the rocket. */
+.steer-pic {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin-inline: auto;
+}
+
+.steer-pic .track,
+.steer-pic .range,
+.steer-pic path.needle {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.steer-pic .track {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.steer-pic .range {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.steer-pic .phone {
+  fill: var(--field);
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.steer-pic path.needle {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.steer-pic circle.needle {
+  fill: var(--text);
+}
+
+/* The rocket's own colours, with a line round them for the light theme's white. */
+#steer-rocket > * {
+  stroke: var(--muted);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+}
+
+/* With nothing to tilt, the keys instead. */
+.steer[data-with="keys"] :is(.steer-pic, .setting),
+.steer[data-with="tilt"] .steer-keys {
+  display: none;
+}
+
+.steer-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-bottom: 0;
+}
+
+.steer-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  font: 600 0.9rem/1 var(--display);
+  color: var(--text);
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--rim);
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+}
+
+/* On a phone held sideways: steering on the left, the rest beside it. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .sheet.settings {
+    width: min(720px, calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+
+  .settings .sheet-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 0 24px;
+  }
+
+  .settings .steer {
+    grid-row: span 3;
+  }
+
+  .settings section:nth-child(2) {
+    margin-top: 0;
+  }
+}

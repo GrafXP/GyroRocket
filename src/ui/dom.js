@@ -12,10 +12,10 @@ export function html(el, markup) {
 export const esc = (text) =>
   String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 
-// Goes to another page, as a link with data-link does (main.js listens).
-export function go(path) {
-  history.pushState(null, "", path);
-  window.dispatchEvent(new PopStateEvent("popstate"));
+// Goes to another page, as a link does whose data-link is `how` (main.js listens,
+// and says what each means).
+export function go(path, how = "") {
+  window.dispatchEvent(new CustomEvent("go", { detail: { path, how } }));
 }
 
 // Hands the viewer `text` as a file called `name`, to save.

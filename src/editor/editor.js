@@ -1,5 +1,6 @@
 import { html, esc, go, saveFile, formatTime } from "../ui/dom.js";
 import { icon } from "../ui/kit.js";
+import { frame } from "../ui/frame.js";
 import { loadLevel, saveLevel, deleteLevel } from "../mylevels.js";
 import { finishOf } from "../runs.js";
 import { buildOutline, setTile as setOutlineTile } from "../sim/outline.js";
@@ -50,7 +51,7 @@ function sessionFor(id, record) {
 export function editor(el, id) {
   const record = loadLevel(id);
   if (!record) {
-    html(el, `<h1>No such level</h1><p>It may have been deleted.</p><p><a href="/editor" data-link>My levels</a></p>`);
+    frame(el, "No such level", `<p>It may have been deleted.</p>`, "/editor");
     return null;
   }
   document.body.classList.add("playing");
@@ -60,7 +61,7 @@ export function editor(el, id) {
     `<div class="editor" id="editor">
       <div class="ed-view" id="view"></div>
       <div class="ed-bar ed-top">
-        <a class="icon-btn" href="/editor" data-link aria-label="My levels">${icon("back")}</a>
+        <a class="icon-btn" href="/editor" data-link="up" aria-label="My levels">${icon("back")}</a>
         <input class="ed-name" id="name" maxlength="40" aria-label="Level name" spellcheck="false" autocomplete="off">
         <button class="icon-btn" id="undo" aria-label="Undo">${icon("undo")}</button>
         <button class="icon-btn" id="redo" aria-label="Redo">${icon("redo")}</button>
@@ -578,7 +579,7 @@ export function editor(el, id) {
     deleted = true;
     deleteLevel(id);
     sessions.delete(id);
-    go("/editor");
+    go("/editor", "up");
   });
 
   // Resizing: each press adds or takes away rows or columns, as a step to undo.

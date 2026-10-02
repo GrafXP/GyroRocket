@@ -311,7 +311,7 @@ tint. The tab bar is still there, restyled, until U2.
 - [ ] Stars, crystals and the pause icon look the same on an iPhone, an Android phone and a desktop.
 - [ ] Nothing is harder to read than before, outdoors included.
 
-### Phase U2: Title, menu and settings
+### Phase U2: Title, menu and settings ✅ (built; to check on the phones)
 `levels/title.js` and `render/backdrop.js`: the title's cave, coloured by the
 world you're in, drawn at 30 frames a second and not at all while the page is
 hidden. `ui/title.js`: *Tap to start* (asking for the motion sensors on an
@@ -320,6 +320,53 @@ page its back button. `ui/sheet.js` and `ui/settings.js`: the settings sheet,
 from the menu's gear and from pause, with the steering slider's leaning rocket.
 The tilt prompt on the play page only comes up on a phone, and only if the
 title's tap didn't settle it.
+
+What was built: the title's cave is a level like any other, 36 × 22, never
+flown: a chamber with the rocket on its pad and two crystals by it, a chimney
+over it for a phone held upright, a tunnel to the right for one held sideways.
+`createView` takes a *shot*, a camera of the caller's own (a point, where on
+the screen to put it, how close, and how far to the side to look from), and the
+backdrop gives it one that wanders a metre and leans up to three with the
+phone's tilt. The rocket stands left of the menu sideways and between the name
+and the menu upright. If the phone can't make a WebGL context, the menu is
+there without the cave.
+
+*Tap to start* shows the first time in a session, and again whenever an iPhone
+still has to be asked for its sensors (it forgets when the page is loaded
+again), so the play page's own prompt is only for a game opened at a level. The
+menu is *Play* or *Continue* with the level under it, Levels with the stars,
+Workshop, How to play, and the gear.
+
+The settings sheet has Steering, Screen, Pilot and More. Steering's picture is
+a phone that tilts as yours does inside the arc of tilt that steers, and the
+rocket leaning as far as that makes it: the slider moves the arc's ends. Until
+the phone's been heard from the picture rocks by itself; with nothing to tilt,
+it's the keys. The frame rate display and fullscreen are switches. Opened from
+pause, the sheet leaves out what leads to another page (the pilot, privacy), and
+the level takes up a change as it's made. The version is the day of the build
+and its commit. Pause keeps Autopilot and a Settings button in its second
+panel until U4.
+
+A sheet is a modal `<dialog>`, so the browser keeps the focus in it and puts it
+back. Opening one adds an entry to the history, and Back, Esc, the cross and a
+tap outside all close it; keys pressed in it don't reach the level under it.
+
+So that Back leads out the way you came in, a link says what it does to the
+history (`main.js`): nothing more than `data-link` adds the page; `"replace"`
+puts it in this one's place (the next level); `"up"`, for the way out of a page
+(a frame's back button, *Levels* in pause and the results, the editor's arrow),
+steps back if that's where the page was come to from, and takes this page's
+place if not. A page gone to from a sheet takes the sheet's entry. So from the
+title, however many levels were played, Back at the levels is the title, and
+Back at the title leaves the game.
+
+`main.js` is the routes and that; Levels and How to play moved to `ui/levels.js`
+and `ui/help.js` as they stood, in the frame, and the pages are headed
+*Workshop*, *Pilot* and *How to play*. `test/title.test.js`, and the asking in
+`test/controls.test.js`. `npm run shots` has the title, the menu and the
+settings from both places, but hasn't been run: this phase was built on the
+phone, which has no Chrome, and checked there with the pages run in node on a
+stand-in DOM. The pictures, and the look of all of it, are still to do.
 - [ ] Opening the game looks like a game before anything is tapped.
 - [ ] A new player gets from the title into 1-1 in two taps, and is asked for the sensors once.
 - [ ] Back, on the phone and in the browser, always goes where you'd expect, and closes a sheet first.

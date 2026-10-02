@@ -1,5 +1,5 @@
 import { createGame } from "../game.js";
-import { requestTiltPermission } from "../controls.js";
+import { requestTiltPermission, tiltNeedsAsking } from "../controls.js";
 import { SAFE_SPEED, HULL, TICK_RATE, CENTRE_Y } from "../sim/rocket.js";
 import { parseLevel, TILE } from "../sim/level.js";
 import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
@@ -7,24 +7,25 @@ import { rising } from "../sim/hazards/rise.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
 import { levelById, nextLevel, endingOf, EXTRAS } from "../levels/index.js";
-import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
+import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings } from "../progress.js";
 import { playableLevel } from "../mylevels.js";
 import { makeReplay, unpackInput, unplayable, counts } from "../replay.js";
 import { loadRun, keepRun, finishOf } from "../runs.js";
-import { html, esc, formatTime, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { html, esc, formatTime, saveFile, bindFullscreenButton } from "./dom.js";
 import { icon, setDigits } from "./kit.js";
+import { frame } from "./frame.js";
+import { openSettings } from "./settings.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
 const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
 const LAVA_NEAR = 10; // m below the rocket that rising lava shows red
-const TILT_MIN = 15; // degrees for full steer, at the sensitivity slider's ends
-const TILT_MAX = 60;
 
 // The play page for level `id`: the game with its HUD, the pause menu (button, P
 // or Esc, and whenever the app is hidden), the level complete sheet, and with ?dev
-// in the URL, a developer overlay (and every level open). The frame rate display
-// is a debug option in the pause menu, and ?dev shows it too. My levels, from the
-// editor, have ids "my:<id>", and lead back to the editor.
+// in the URL, a developer overlay (and every level open). The pause menu leads to
+// the settings (ui/settings.js), which the level takes up as they change; the
+// frame rate display is one, and ?dev shows it too. My levels, from the editor,
+// have ids "my:<id>", and lead back to the editor.
 //
 // Every run is recorded (game.js), and the best one that counts is kept (runs.js):
 // the pause menu can watch it, and the results can watch the run just flown. For
@@ -45,22 +46,17 @@ export function play(el, id) {
     problem = e.message;
   }
   if (mine && !level) {
-    html(
+    frame(
       el,
-      `<h1>${problem ? "This level can't be flown yet" : "No such level"}</h1>
-      <p>${problem ? esc(problem) : "It may have been deleted."}</p>
-      <p><a href="${problem ? `/editor/${mine}` : "/editor"}" data-link>Back to the editor</a></p>`,
+      problem ? "This level can't be flown yet" : "No such level",
+      `<p>${problem ? esc(problem) : "It may have been deleted."}</p>`,
+      problem ? `/editor/${mine}` : "/editor",
     );
     return null;
   }
   const extra = EXTRAS.includes(def); // the test cave and the big cave: always open, never recorded
   if (!def || (!extra && !mine && !dev && !allUnlocked() && !isUnlocked(progress, id))) {
-    html(
-      el,
-      `<h1>${def ? `${id} is locked` : "No such level"}</h1>
-      <p>${def ? "Finish the level before it to open it." : ""}</p>
-      <p><a href="/levels" data-link>Pick a level</a></p>`,
-    );
+    frame(el, def ? `${id} is locked` : "No such level", def ? `<p>Finish the level before it to open it.</p>` : "", "/levels");
     return null;
   }
   document.body.classList.add("playing");
@@ -104,21 +100,11 @@ export function play(el, id) {
           </div>
           <button id="watch-best" hidden></button>
           <button id="stop-watch" hidden>Stop watching</button>
-          <a class="button" href="${back.href}" data-link>${back.label}</a>
+          <a class="button" href="${back.href}" data-link="up">${back.label}</a>
         </section>
         <section>
           <button id="auto-menu" aria-pressed="false">Autopilot: off</button>
-          <label class="setting">
-            <span>Tilt sensitivity</span>
-            <input type="range" id="tilt" min="${TILT_MIN}" max="${TILT_MAX}" step="5">
-            <small class="hint" id="tilt-note"></small>
-          </label>
-          ${THEME_PICKER}
-          <a class="button" href="/profile" data-link>Profile</a>
-          <div class="buttons">
-            <button id="fs-menu"></button>
-            <button id="fps-menu" aria-pressed="false"></button>
-          </div>
+          <button id="settings">${icon("gear")}Settings</button>
         </section>
       </div>
 
@@ -138,15 +124,15 @@ export function play(el, id) {
         <section>
           ${
             next
-              ? `<a class="button big" href="/play/${next.id}${dev ? "?dev" : ""}" data-link id="next">Next: ${next.id} ${next.name}</a>`
+              ? `<a class="button big" href="/play/${next.id}${dev ? "?dev" : ""}" data-link="replace" id="next">Next: ${next.id} ${next.name}</a>`
               : mine
-                ? `<a class="button big" href="${back.href}" data-link id="next">Back to editor</a>`
-                : `<a class="button big" href="/levels" data-link id="next">Back to the levels</a>`
+                ? `<a class="button big" href="${back.href}" data-link="up" id="next">Back to editor</a>`
+                : `<a class="button big" href="/levels" data-link="up" id="next">Back to the levels</a>`
           }
           <div class="buttons">
             <button id="retry">Retry</button>
             <button id="watch">Watch</button>
-            <a class="button" href="${mine ? "/editor" : "/levels"}" data-link>${mine ? "My levels" : "Levels"}</a>
+            <a class="button" href="${mine ? "/editor" : "/levels"}" data-link="up">${mine ? "My levels" : "Levels"}</a>
           </div>
           ${dev ? `<button id="save-run">Save this run</button>` : ""}
         </section>
@@ -159,10 +145,11 @@ export function play(el, id) {
     </div>`,
   );
   const gameEl = $("#game");
-  const unbind = [bindFullscreenButton($("#fs")), bindFullscreenButton($("#fs-menu")), bindThemePicker($(".theme"))];
+  const unbindFs = bindFullscreenButton($("#fs"));
 
-  // iOS asks before it sends orientation events, and only from a tap.
-  if (typeof globalThis.DeviceOrientationEvent?.requestPermission === "function") {
+  // iOS asks before it sends orientation events, and only from a tap: the title's,
+  // unless the game was opened at a level.
+  if (tiltNeedsAsking()) {
     const ask = $("#tilt-ask");
     ask.hidden = false;
     $("#tilt-ok").addEventListener("click", async () => {
@@ -507,33 +494,13 @@ export function play(el, id) {
   const onHidden = () => document.hidden && openPause();
   document.addEventListener("visibilitychange", onHidden);
 
-  // Tilt sensitivity: the slider runs from gentle (full steer at TILT_MAX°) to sharp.
-  const tilt = $("#tilt");
-  const syncTilt = () => {
-    tilt.value = TILT_MIN + TILT_MAX - settings.fullTilt;
-    show($("#tilt-note"), `Full steer at ${settings.fullTilt}° of tilt`);
+  // The settings, over the pause menu: the level takes them up as they change.
+  const applySettings = ({ fullTilt, fps }) => {
+    game.setFullTilt(fullTilt);
+    fpsEl.hidden = !fps && !dev;
   };
-  tilt.addEventListener("input", () => {
-    settings.fullTilt = TILT_MIN + TILT_MAX - Number(tilt.value);
-    saveSettings(settings);
-    game.setFullTilt(settings.fullTilt);
-    syncTilt();
-  });
-  syncTilt();
-
-  // The frame rate display, a debug option.
-  const fpsBtn = $("#fps-menu");
-  const syncFps = () => {
-    fpsBtn.setAttribute("aria-pressed", settings.fps);
-    show(fpsBtn, `Frame rate: ${settings.fps ? "on" : "off"}`);
-    fpsEl.hidden = !settings.fps && !dev;
-  };
-  fpsBtn.addEventListener("click", () => {
-    settings.fps = !settings.fps;
-    saveSettings(settings);
-    syncFps();
-  });
-  syncFps();
+  $("#settings").addEventListener("click", () => openSettings({ inGame: true, onChange: applySettings }));
+  applySettings(settings);
 
   if (devHud) {
     gameEl.querySelector(":scope > canvas").addEventListener("pointermove", devHud.onPointer(game)); // the game's, not the map's
@@ -544,7 +511,7 @@ export function play(el, id) {
     if (window.game === game) delete window.game;
     window.removeEventListener("keydown", onKey);
     document.removeEventListener("visibilitychange", onHidden);
-    for (const u of unbind) u();
+    unbindFs();
     game.dispose();
   };
 }

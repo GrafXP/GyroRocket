@@ -20,6 +20,7 @@
     .score,
     .message,
     .menu section,
+    .sheet,
     .ed-item,
     .ed-panel,
     .ed-toast,
@@ -139,6 +140,7 @@ label.button {
 
 button:active,
 a.button:active,
+a.icon-btn:active,
 label.button:active,
 .card:active,
 .level:active {
@@ -152,7 +154,7 @@ button:disabled {
 }
 
 /* Where the keyboard is: a glow that follows the cut corners, as an outline can't. */
-:is(button, a.button, label.button, .card, .level):focus-visible {
+:is(button, a.button, a.icon-btn, label.button, .card, .level):focus-visible {
   outline: none;
   filter: drop-shadow(0 0 1px var(--focus)) drop-shadow(0 0 5px var(--focus));
 }
@@ -467,6 +469,82 @@ input[type="range"]::-moz-range-thumb {
 
 .setting small {
   font: 0.85rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* A word for each end of a slider. */
+.ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+
+/* ---- Sheets (ui/sheet.js): a panel over the page, which waits behind it. The
+   panel doesn't scroll, so that its fill stays put: what's in it does. ---- */
+
+.sheet {
+  --cut: 14px;
+  position: fixed;
+  inset: 0;
+  width: min(520px, calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  max-width: none;
+  height: fit-content;
+  max-height: calc(100% - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  margin: auto;
+  padding: 0;
+  overflow: visible;
+  color: var(--text);
+}
+
+.sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet::backdrop {
+  background: rgb(6 8 16 / 0.62);
+}
+
+.sheet > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 10px 6px 18px;
+}
+
+.sheet > header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.sheet > header .icon-btn {
+  --fill: transparent;
+  --edge: transparent;
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 18px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet[open] {
+    animation: sheet-in 0.18s ease-out;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 /* ---- Stars: gold when earned ---- */

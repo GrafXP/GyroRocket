@@ -1,0 +1,192 @@
+/* ---- The title and the menu (ui/title.js): the whole screen, over the cave ---- */
+
+.title {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 320px);
+  align-items: center;
+  gap: 16px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-right, 0px))
+    calc(20px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-left, 0px));
+  /* What shows if the cave can't be drawn. */
+  background: radial-gradient(120% 90% at 30% 15%, color-mix(in srgb, var(--world) 32%, #08090d), #08090d);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.title-cave {
+  position: absolute;
+  inset: 0;
+}
+
+.title-cave canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A shadow over the cave where the name is, for it to stand out of. */
+.title-cave::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, rgb(4 5 10 / 0.6), transparent 48%);
+  pointer-events: none;
+}
+
+/* The name, over the cave whatever the theme: light, with the world's colour. */
+.title h1 {
+  position: relative;
+  align-self: start;
+  margin: 0;
+  font-size: clamp(2.6rem, 15vh, 5rem);
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow:
+    0 3px 0 rgb(0 0 0 / 0.45),
+    0 0 28px rgb(0 0 0 / 0.7);
+  pointer-events: none;
+}
+
+.title h1 span {
+  color: color-mix(in srgb, var(--world) 72%, #fff);
+}
+
+/* Tap to start: words, where the menu will be, and the whole screen takes the tap. */
+.title-start {
+  --fill: transparent;
+  --edge: transparent;
+  position: relative;
+  grid-column: 2;
+  padding: 20px 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 16px rgb(0 0 0 / 0.9);
+}
+
+.title-menu {
+  position: relative;
+  grid-column: 2;
+  display: grid;
+  gap: 10px;
+}
+
+.title-menu a.button {
+  --fill: var(--panel);
+  justify-content: space-between;
+  padding-inline: 16px;
+}
+
+/* Play: the word, and under it the level it plays. */
+.title-menu a.button.big {
+  --fill: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, #fff), var(--accent) 60%);
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 13px 16px;
+}
+
+.title-menu .big b {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.45rem;
+}
+
+.title-menu .big .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.title-menu small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.title-menu .big small {
+  letter-spacing: 0.04em;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.title-menu small .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--gold);
+}
+
+.title-menu .icon-btn {
+  flex: none;
+}
+
+@media (orientation: portrait) {
+  .title {
+    grid-template-columns: minmax(0, 360px);
+    grid-template-rows: 1fr auto;
+    justify-content: center;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .title-cave::after {
+    background: linear-gradient(180deg, rgb(4 5 10 / 0.6), transparent 36%);
+  }
+
+  .title h1 {
+    margin-top: 5vh;
+    font-size: clamp(2.8rem, 17vw, 5rem);
+    text-align: center;
+  }
+
+  .title-start,
+  .title-menu {
+    grid-column: 1;
+  }
+
+  /* As tall as the menu that takes its place, so nothing else moves. */
+  .title-start {
+    margin-bottom: 15vh;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .title-start {
+    animation: beckon 1.4s ease-in-out infinite alternate;
+  }
+
+  .title-menu > * {
+    animation: rise 0.25s ease-out both;
+  }
+
+  .title-menu > :nth-child(2) {
+    animation-delay: 0.04s;
+  }
+
+  .title-menu > :nth-child(3) {
+    animation-delay: 0.08s;
+  }
+
+  .title-menu > :nth-child(4) {
+    animation-delay: 0.12s;
+  }
+}
+
+@keyframes beckon {
+  from {
+    opacity: 0.4;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}

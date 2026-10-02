@@ -35,7 +35,6 @@
   --focus: #ffffff;
   --bad: #e0464b;
   --good: #3fbf6a;
-  --nav-h: 60px;
   --display: "Chakra Petch", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
 }
@@ -103,10 +102,28 @@ body {
 }
 
 main {
-  padding: calc(20px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
-    calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  padding: calc(10px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   max-width: 640px;
   margin: 0 auto;
+}
+
+/* A page's back button and heading (ui/frame.js). The button is top left, where
+   pause is in play, and stays there as the page scrolls under it. */
+a.page-back {
+  --fill: var(--panel-solid);
+  position: sticky;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  z-index: 5;
+  margin-bottom: -44px;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 0 16px;
+  padding-left: 56px;
 }
 
 h1,
@@ -160,34 +177,4 @@ dd {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-/* The tab bar. */
-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  background: var(--panel-solid);
-  border-top: 1px solid var(--line);
-}
-
-nav a {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  font-family: var(--display);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: var(--muted);
-}
-
-nav a.active {
-  color: var(--accent);
-  box-shadow: inset 0 3px 0 var(--accent);
 }

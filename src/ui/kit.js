@@ -67,9 +67,12 @@ export function button({ label = "", icon: name, id, big = false, href, pressed,
 export const toggle = ({ label, id, on = false }) =>
   `<label class="switch"><span>${label}</span><input type="checkbox" role="switch"${id ? ` id="${id}"` : ""}${on ? " checked" : ""}><i></i></label>`;
 
-// A slider under its `label`, with a line of `note` below it.
-export const slider = ({ label, id, min, max, step = 1, value, note = "" }) =>
-  `<label class="setting"><span>${label}</span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}"${value === undefined ? "" : ` value="${value}"`}><small class="hint" id="${id}-note">${note}</small></label>`;
+// A slider under its `label`, with a line of `note` below it, or with `ends`, a
+// word for each end of it.
+export const slider = ({ label, id, min, max, step = 1, value, note = "", ends }) =>
+  `<label class="setting"><span>${label}</span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}"${value === undefined ? "" : ` value="${value}"`}>${
+    ends ? `<span class="ends"><small>${ends[0]}</small><small>${ends[1]}</small></span>` : `<small class="hint" id="${id}-note">${note}</small>`
+  }</label>`;
 
 // Shows `text` in `el` with each digit in a box of one width, for numbers that
 // change as you watch: the display font's digits differ (its 1 is narrow), and a
@@ -90,7 +93,7 @@ export function setDigits(el, text) {
 // Every press of a button, or of a link that looks like one, comes through here,
 // so that a click's sound and buzz have one place to hang on (PLAN.md's phase 9).
 // onPress(fn) has fn(element) called for each; it returns a function that stops it.
-const PRESSED = "button, a.button, label.button, a.card, a.level, nav a";
+const PRESSED = "button, a.button, label.button, a.card, a.level, a.icon-btn";
 const listeners = new Set();
 export function onPress(fn) {
   listeners.add(fn);

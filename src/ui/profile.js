@@ -1,14 +1,14 @@
 import { player } from "../net/player.js";
 import { transferCode } from "../net/player.js";
-import { html, saveFile } from "./dom.js";
+import { saveFile } from "./dom.js";
+import { frame } from "./frame.js";
 
 export function profile(el) {
   const controller = new AbortController();
   let current = null;
   let alive = true;
   let busy = false;
-  const $ = html(el, `<h1>Profile</h1>
-    <p>Pick a name for sharing levels and times when the community opens. Your game and editor work without a profile.</p>
+  const $ = frame(el, "Pilot", `<p>Pick a name for sharing levels and times when the community opens. Your game and editor work without a profile.</p>
     <p id="profile-status" class="hint" role="status" aria-live="polite">Checking the community server…</p>
     <form id="profile-name" class="profile-form">
       <label for="player-name">Your name</label>

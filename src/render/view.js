@@ -23,6 +23,10 @@ const TAN = Math.tan(((FOV / 2) * Math.PI) / 180);
 
 // Draws a level in play (sim/world.js) from the side, the camera following the
 // rocket and staying inside the level. Reads the world each frame, never writes it.
+// A `shot` puts the camera where the caller says instead, for the title's
+// backdrop (render/backdrop.js): { at: [x, y], on: [u, v], zoom, lean } shows the
+// point `at` at `on` (fractions of the way across and down the screen), with
+// `zoom` times as much of the cave across as in play, from `lean` metres to the side.
 export function createView(container, level, outline) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -88,7 +92,7 @@ export function createView(container, level, outline) {
     // The last frame's draw calls and triangles.
     info: renderer.info.render,
     // Draws `world`; `dt` is the seconds since the last frame, for smoothing.
-    render(world, dt = 1 / 60) {
+    render(world, dt = 1 / 60, shot = null) {
       const r = world.rocket;
       rocket.update(r);
       things.update(world);
@@ -105,6 +109,16 @@ export function createView(container, level, outline) {
         boom.position.set(r.x, r.y, 0);
         boom.scale.setScalar(1 + since * 8);
         boom.material.opacity = 1 - since;
+      }
+
+      if (shot) {
+        const halfH = ((VIEW / 2) * shot.zoom) / Math.min(1, camera.aspect);
+        const x = shot.at[0] + (0.5 - shot.on[0]) * 2 * halfH * camera.aspect;
+        const y = shot.at[1] + (shot.on[1] - 0.5) * 2 * halfH;
+        camera.position.set(x + (shot.lean ?? 0), y, halfH / TAN);
+        camera.lookAt(x, y, 0);
+        renderer.render(scene, camera);
+        return;
       }
 
       // Back off a little at speed, look ahead to where the rocket's going, and

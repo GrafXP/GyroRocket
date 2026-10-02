@@ -25,10 +25,13 @@ export function tiltAngle(beta, gamma, screenAngle = 0) {
 export const steerOf = (tilt, full = FULL_TILT) => Math.max(-1, Math.min(1, tilt / full));
 
 // iOS only sends orientation events after asking, from a tap. Elsewhere this is a
-// no-op. Resolves to whether we may listen.
+// no-op. Resolves to whether we may listen. Once asked, the answer stands until
+// the page is loaded again.
+let asked = false;
 export async function requestTiltPermission() {
   const ask = globalThis.DeviceOrientationEvent?.requestPermission;
   if (typeof ask !== "function") return true;
+  asked = true;
   try {
     return (await ask.call(DeviceOrientationEvent)) === "granted";
   } catch {
@@ -36,7 +39,15 @@ export async function requestTiltPermission() {
   }
 }
 
-const screenAngle = () => screen.orientation?.angle ?? window.orientation ?? 0;
+// Whether this is a phone or a tablet: something to tilt, with a screen to touch.
+export const onPhone = () => !!globalThis.matchMedia?.("(pointer: coarse)").matches;
+
+// Whether the motion sensors are still to be asked for: on a phone that asks
+// (a desktop browser may have the question too, and nothing to tilt), and not
+// since the page was loaded.
+export const tiltNeedsAsking = () => !asked && onPhone() && typeof globalThis.DeviceOrientationEvent?.requestPermission === "function";
+
+export const screenAngle = () => screen.orientation?.angle ?? window.orientation ?? 0;
 
 // Listens on `canvas` for presses and on the window for keys and tilt. `input()`
 // gives { steer, slow, thrust } for the sim (the keys turn it slowly); `hasTilt` turns true once the phone has

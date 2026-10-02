@@ -3,6 +3,8 @@ import { ICONS, icon, stars, button, toggle, slider, setDigits } from "./kit.js"
 import { WORLDS } from "../levels/index.js";
 import { CAVE_COLORS } from "../render/cave.js";
 import { css } from "../looks.js";
+import { openSheet } from "./sheet.js";
+import { openSettings } from "./settings.js";
 
 const TOKENS = ["bg", "panel-solid", "field", "line", "rim", "text", "muted", "accent", "world", "head", "gold", "crystal", "good", "bad"];
 
@@ -54,12 +56,16 @@ export function kitPage(el) {
       </div>
       ${toggle({ label: "Frame rate display", on: false })}
       ${toggle({ label: "Autopilot", on: true })}
-      ${slider({ label: "Tilt sensitivity", id: "kit-tilt", min: 15, max: 60, step: 5, value: 40, note: "Gentle to sharp" })}
+      ${slider({ label: "Tilt sensitivity", id: "kit-tilt", min: 15, max: 60, step: 5, value: 40, ends: ["Gentle", "Sharp"] })}
+      ${slider({ label: "Volume", id: "kit-volume", min: 0, max: 10, value: 7, note: "With a line of note under it" })}
       <input placeholder="Your name" aria-label="A line to type in">
       <textarea rows="2" aria-label="More to type in">A box to type more in</textarea>
       <select aria-label="A list to choose from"><option>1-1 Lift-off</option><option>1-2 The gap</option></select>
       <label class="ed-toggle"><input type="checkbox" checked> Open to the sky</label>
     </div>
+
+    <h2>Sheets</h2>
+    <div class="buttons">${button({ label: "A sheet", id: "kit-sheet" })}${button({ label: "Settings", icon: "gear", id: "kit-settings" })}${button({ label: "Mid-level", icon: "gear", id: "kit-settings-game" })}</div>
 
     <h2>Stars and levels</h2>
     <p>${[0, 1, 2, 3].map((n) => stars([n > 0, n > 1, n > 2])).join(" &nbsp; ")}</p>
@@ -107,6 +113,11 @@ export function kitPage(el) {
     const rim = e.target.closest("[data-rim]")?.dataset.rim;
     if (rim) document.documentElement.style.setProperty("--world", rim);
   });
+  $("#kit-sheet").addEventListener("click", () =>
+    openSheet({ title: "A sheet", body: `<p>Back closes it, and so do Esc, the cross and a tap outside it.</p><p class="hint">What's under it waits.</p>` }),
+  );
+  $("#kit-settings").addEventListener("click", () => openSettings());
+  $("#kit-settings-game").addEventListener("click", () => openSettings({ inGame: true }));
   const unbind = bindThemePicker($(".theme"));
   return () => {
     clearInterval(tick);

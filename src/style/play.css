@@ -1,12 +1,8 @@
-/* ---- The play page: the whole screen, with no tab bar ---- */
+/* ---- The play page: the whole screen ---- */
 
 body.playing {
   overflow: hidden;
   overscroll-behavior: none;
-}
-
-body.playing nav {
-  display: none;
 }
 
 .game {

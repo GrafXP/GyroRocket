@@ -1,4 +1,4 @@
-// npm run shots [-- <label>] [--only=home,pause] [--theme=dark|light|both] [--scale=2]
+// npm run shots [-- <label>] [--only=menu,pause] [--theme=dark|light|both] [--scale=2]
 //
 // Pictures of every screen, at a phone's size held sideways (wide) and upright
 // (tall), into shots/<label>/, to compare before and after a change to the UI.
@@ -36,8 +36,11 @@ const flying = async (p) => {
   await p.key("ArrowRight", "down");
   await p.wait(500);
 };
+const start = (p) => p.click("#start");
 const SCREENS = [
-  { name: "home", path: "/" },
+  { name: "title", path: "/", wait: 1200 },
+  { name: "menu", path: "/", wait: 1200, steps: start },
+  { name: "settings", path: "/", steps: (p) => start(p).then(() => p.click("#settings")) },
   { name: "levels", path: "/levels" },
   { name: "help", path: "/help" },
   { name: "profile", path: "/profile", wait: 1500 },
@@ -48,6 +51,7 @@ const SCREENS = [
   { name: "play-start", path: "/play/1-1?dev", play: true },
   { name: "play-flying", path: "/play/3-2?dev", play: true, steps: flying },
   { name: "pause", path: "/play/3-2?dev", play: true, steps: (p) => p.key("KeyP") },
+  { name: "pause-settings", path: "/play/3-2?dev", play: true, steps: (p) => p.key("KeyP").then(() => p.click("#settings")) },
   { name: "map", path: "/play/2-3?dev", play: true, steps: (p) => p.key("KeyM") },
   { name: "crash", path: "/play/1-2?dev", play: true, steps: (p) => p.run(CRASH).then(() => p.wait(1600)) },
   { name: "results", path: "/play/3-3?dev", play: true, steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
@@ -185,7 +189,7 @@ try {
         if (only && !only.includes(screen.name)) continue;
         // Storage first, from a page of the game's own.
         await go("/help");
-        await run(`localStorage.setItem("gyrorocket:theme", "${theme}"); localStorage.setItem("gyrorocket:progress", ${JSON.stringify(JSON.stringify(PROGRESS))})`);
+        await run(`sessionStorage.clear(); localStorage.setItem("gyrorocket:theme", "${theme}"); localStorage.setItem("gyrorocket:progress", ${JSON.stringify(JSON.stringify(PROGRESS))})`);
         const made = screen.before ? await run(screen.before) : null;
         await go(typeof screen.path === "function" ? screen.path(made) : screen.path);
         await run("document.fonts.ready.then(() => true)");

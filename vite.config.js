@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 // On the dev server, the play page's *Save this run* (with ?dev) posts the run to
 // /__runs, which writes it to runs/ in the project, for `npm run verify` to play
@@ -36,8 +37,20 @@ function saveRuns() {
   };
 }
 
+// Which build this is, for the settings to say (ui/settings.js): the day, and the
+// commit it was built from.
+function build() {
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    return `${day} · ${execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()}`;
+  } catch {
+    return day;
+  }
+}
+
 export default defineConfig({
   plugins: [saveRuns()],
+  define: { __BUILD__: JSON.stringify(build()) },
   server: {
     proxy: { "/api": { target: process.env.GYRO_API || "http://127.0.0.1:8081" } },
   },

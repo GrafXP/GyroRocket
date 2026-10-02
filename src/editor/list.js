@@ -1,4 +1,5 @@
-import { html, esc, go } from "../ui/dom.js";
+import { esc, go } from "../ui/dom.js";
+import { frame } from "../ui/frame.js";
 import { WORLDS, TEST_CAVE, BIG_CAVE, levelById } from "../levels/index.js";
 import { loadProgress, isUnlocked, allUnlocked } from "../progress.js";
 import { listLevels, loadLevel, createLevel, duplicateLevel, deleteLevel, newLevel, copyOfLevel } from "../mylevels.js";
@@ -9,15 +10,15 @@ import { levelFromText } from "./text.js";
 
 const FULL = "Couldn't save: the phone's storage for the game is full.";
 
-// The editor's front page, /editor: my levels (and which are finished), a new one,
-// a copy of a built-in level (one that's open), or one pasted in.
+// The workshop, /editor: my levels (and which are finished), a new one, a copy of
+// a built-in level (one that's open), or one pasted in.
 export function editorList(el) {
   const progress = loadProgress();
   const open = WORLDS.map((w) => ({ ...w, levels: w.levels.filter((l) => allUnlocked() || isUnlocked(progress, l.id)) })).filter((w) => w.levels.length);
-  const $ = html(
+  const $ = frame(
     el,
-    `<h1>Level editor</h1>
-    <p>Build your own caves: paint the rock, place pads, keys and hazards, and fly them straight away.</p>
+    "Workshop",
+    `<p>Build your own caves: paint the rock, place pads, keys and hazards, and fly them straight away.</p>
     <div class="cards">
       <button class="card primary" id="new"><b>New level</b><span>A plain cave with a start and an exit, to build on</span></button>
     </div>

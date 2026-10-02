@@ -43,4 +43,8 @@ test("a switch and a slider carry their labels and values", () => {
   const html = slider({ label: "Tilt", id: "tilt", min: 15, max: 60, step: 5, value: 35, note: "Gentle" });
   assert.match(html, /<input type="range" id="tilt" min="15" max="60" step="5" value="35">/);
   assert.match(html, /id="tilt-note">Gentle</);
+  // Or a word at each end, in the note's place.
+  const ends = slider({ label: "Tilt", id: "tilt", min: 15, max: 60, ends: ["Gentle", "Sharp"] });
+  assert.match(ends, /<span class="ends"><small>Gentle<\/small><small>Sharp<\/small><\/span>/);
+  assert.doesNotMatch(ends, /tilt-note/);
 });
