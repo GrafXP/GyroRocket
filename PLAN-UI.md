@@ -374,12 +374,51 @@ stand-in DOM. The pictures, and the look of all of it, are still to do.
 - [ ] The title holds 60 fps on the phone, and stops drawing when you switch away.
 - [ ] Sideways and upright both look laid out, not stretched.
 
-### Phase U3: The way down
+### Phase U3: The way down ✅ (built; to check on the phones)
 `ui/summary.js` with its test, then `ui/levels.js`: the bands, the tunnels and
 stops, the rule at part two, opening at your world, and the level card on a
 sheet. The world's description is its intro, on its band (this is the "intro on
 the levels page" from `PLAN.md`'s phase 9, done here). The test caves and the
 unlock note show only with `?dev`.
+
+What was built: `summarize(progress)` (`ui/summary.js`) gives where you are, the
+stars in all, and each world and level with its state, its stars, and for a
+locked one the level that opens it. `ui/way.js` is the geometry, with a test
+too: the stops stand a column apart, alternately high and low, so the tunnel
+between two has a level stretch, a 45° slope and a level stretch; rows snake,
+with a straight drop from one to the next; the tunnel comes in at the top over
+the first stop and goes out at the bottom under the last.
+
+The page is as wide as the screen. Under the night sky, with the heading and
+the stars in all, each world is a band of its own rock (its `colors.face`,
+darkened for the words; paled in the light theme), lit along the top with its
+rim's colour, with the rock's texture over it. A band has the world's number
+and name, its stars and its description, then the tunnel, a line drawn in SVG
+in the cave's dark with the rim's colour along it, whose width stays the same
+while the picture scales. The stops are buttons over it, placed by percentages,
+so there's nothing to measure and nothing to do when the phone is turned:
+sideways (600 px and wider) it's one row of eight and upright two rows of four,
+both drawn, and the stylesheet shows one. Sideways, the worlds run left to
+right and right to left by turns, so each one's way out is over the next one's
+way in; upright, every world starts and ends on the left. The tunnel only runs
+on into a world that's open, down through its heading (and the rule at part
+two), so finishing a world's last level opens the way.
+
+A stop has the level's number and three star pips, or a lock. The one to do
+next has the flame's colour round it, a glow that pulses behind it, and the
+rocket standing on it. A locked world is a thin, darker band: its name, and
+*Finish 3-8 … to open it*. The page scrolls to the world you're in as it opens.
+
+The level card is a sheet: the world, your best time (or *Not flown yet*) and
+par, the three stars with what each is for and which are done, *Watch best
+run* with its time if one's kept, and *Play*. A locked level's card says which
+level opens it, in place of the buttons. `/play/3-2?watch` opens a level
+watching its kept run, which is what *Watch best run* links to. The old tiles,
+and the part headings, are gone; the kit's page shows a band.
+
+Checked as U2 was, in node on a stand-in DOM (the page from a new player's and
+from two worlds down, the card, playing and watching from it, `?dev`, and all
+eighty open). `npm run shots` has the card as well, and still hasn't been run.
 - [ ] You can see where you are and what's next without scrolling.
 - [ ] Each world looks like its caves, and going down the list feels like going deeper.
 - [ ] A locked level and a locked world say what opens them.

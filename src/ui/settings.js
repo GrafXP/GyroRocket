@@ -3,7 +3,7 @@ import { tiltAngle, steerOf, screenAngle, onPhone } from "../controls.js";
 import { MAX_LEAN } from "../sim/rocket.js";
 import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from "../fullscreen.js";
 import { THEME_PICKER, bindThemePicker } from "./dom.js";
-import { icon, toggle, slider } from "./kit.js";
+import { icon, toggle, slider, ROCKET } from "./kit.js";
 import { openSheet } from "./sheet.js";
 
 const TILT_MIN = 15; // degrees of tilt for full steer, at the sensitivity slider's ends
@@ -23,13 +23,7 @@ const PICTURE = `<svg class="steer-pic" viewBox="0 0 200 100" aria-hidden="true"
     <rect class="phone" x="${PX - 26}" y="${PY - 14}" width="52" height="28" rx="4"/>
     <circle class="needle" cx="${PX}" cy="${PY - PR}" r="3"/>
   </g>
-  <g id="steer-rocket">
-    <path fill="#d63a3f" d="M5 -3V12L14 19h2v-2.5zM-5 -3V12L-14 19h-2v-2.5z"/>
-    <path fill="#6b7280" d="M12 19h6v3h-6zM-18 19h6v3h-6zM-4 11h8l1.2 6.5h-10.4z"/>
-    <rect fill="#e9ecf2" x="-6" y="-20" width="12" height="31"/>
-    <path fill="#d63a3f" d="M-6 -20L0 -30.5 6 -20zM-6.2 -18h12.4v2h-12.4z"/>
-    <circle fill="#6cd4ff" cy="-9" r="2.3"/>
-  </g>
+  <g id="steer-rocket">${ROCKET}</g>
 </svg>`;
 
 // The arc from `degrees` left of straight up to as far right, with a tick at each

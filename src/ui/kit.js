@@ -47,6 +47,15 @@ export const ICONS = Object.keys(PATHS);
 export const icon = (name, cls = "") =>
   `<svg class="icon${SOLID.has(name) ? " solid" : ""}${cls && ` ${cls}`}" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`;
 
+// The rocket, for a picture: its shapes in its own colours, about its centre of
+// mass at (0, 0), ten to the metre. It fits a viewBox of ROCKET_BOX.
+export const ROCKET = `<path fill="#d63a3f" d="M5 -3V12L14 19h2v-2.5zM-5 -3V12L-14 19h-2v-2.5z"/>
+  <path fill="#6b7280" d="M12 19h6v3h-6zM-18 19h6v3h-6zM-4 11h8l1.2 6.5h-10.4z"/>
+  <rect fill="#e9ecf2" x="-6" y="-20" width="12" height="31"/>
+  <path fill="#d63a3f" d="M-6 -20L0 -30.5 6 -20zM-6.2 -18h12.4v2h-12.4z"/>
+  <circle fill="#6cd4ff" cy="-9" r="2.3"/>`;
+export const ROCKET_BOX = "-19 -31.5 38 54.5";
+
 // Three stars, lit for each true in `earned`.
 export const stars = (earned) =>
   `<span class="stars" role="img" aria-label="${earned.filter(Boolean).length} of 3 stars">${earned.map((on) => icon("star", on ? "on" : "")).join("")}</span>`;
@@ -93,7 +102,7 @@ export function setDigits(el, text) {
 // Every press of a button, or of a link that looks like one, comes through here,
 // so that a click's sound and buzz have one place to hang on (PLAN.md's phase 9).
 // onPress(fn) has fn(element) called for each; it returns a function that stops it.
-const PRESSED = "button, a.button, label.button, a.card, a.level, a.icon-btn";
+const PRESSED = "button, a.button, label.button, a.card, a.icon-btn";
 const listeners = new Set();
 export function onPress(fn) {
   listeners.add(fn);

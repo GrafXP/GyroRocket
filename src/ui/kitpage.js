@@ -4,7 +4,13 @@ import { WORLDS } from "../levels/index.js";
 import { CAVE_COLORS } from "../render/cave.js";
 import { css } from "../looks.js";
 import { openSheet } from "./sheet.js";
+import { summarize } from "./summary.js";
+import { band } from "./levels.js";
 import { openSettings } from "./settings.js";
+
+// Some progress to show: two worlds done, and three levels into the third.
+const SAMPLE = { levels: { "3-1": { best: 5, crystals: true }, "3-2": { best: 500, crystals: false }, "3-3": { best: 500, crystals: true } } };
+for (const world of WORLDS.slice(0, 2)) for (const l of world.levels) SAMPLE.levels[l.id] = { best: 5, crystals: true };
 
 const TOKENS = ["bg", "panel-solid", "field", "line", "rim", "text", "muted", "accent", "world", "head", "gold", "crystal", "good", "bad"];
 
@@ -69,12 +75,10 @@ export function kitPage(el) {
 
     <h2>Stars and levels</h2>
     <p>${[0, 1, 2, 3].map((n) => stars([n > 0, n > 1, n > 2])).join(" &nbsp; ")}</p>
-    <div class="level-grid">
-      <a class="level done" href="/ui?dev" data-link><b>1-1</b>${stars([true, true, true])}<small>Lift-off</small><small class="best">${formatTime(8.4)}</small></a>
-      <a class="level done" href="/ui?dev" data-link><b>1-2</b>${stars([true, false, true])}<small>The gap</small><small class="best">${formatTime(21.7)}</small></a>
-      <a class="level" href="/ui?dev" data-link><b>1-3</b>${stars([false, false, false])}<small>Chimney</small><small class="best">&nbsp;</small></a>
-      <div class="level locked"><b>1-4</b>${icon("lock")}<small>The well</small></div>
-    </div>
+    <div><div class="way">${summarize(SAMPLE)
+      .worlds.slice(2, 4)
+      .map((world) => band(world))
+      .join("")}</div></div>
     <div class="awards">
       ${["Finished", "Par 0:35.0", "The crystal"].map((label, i) => `<div class="award${i < 2 ? " on new" : ""}" style="--i: ${i}">${icon("star")}<small>${label}</small></div>`).join("")}
     </div>

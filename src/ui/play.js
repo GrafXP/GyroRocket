@@ -29,11 +29,14 @@ const LAVA_NEAR = 10; // m below the rocket that rising lava shows red
 //
 // Every run is recorded (game.js), and the best one that counts is kept (runs.js):
 // the pause menu can watch it, and the results can watch the run just flown. For
-// my level, the kept run is its finish, which the editor shows. With ?dev, the
-// results can save the run as a file, for scripts/verify.js.
+// my level, the kept run is its finish, which the editor shows. With ?watch in
+// the URL, as the level card's Watch best run has, the page opens watching the
+// kept run. With ?dev, the results can save the run as a file, for
+// scripts/verify.js.
 export function play(el, id) {
   const mine = id.startsWith("my:") ? id.slice(3) : null;
-  const dev = new URLSearchParams(location.search).has("dev");
+  const params = new URLSearchParams(location.search);
+  const dev = params.has("dev");
   const progress = loadProgress();
   let def = null;
   let level = null;
@@ -190,6 +193,7 @@ export function play(el, id) {
       .then((codes) => {
         bestRun ??= { codes, replay: kept };
         syncPauseMenu();
+        if (params.has("watch") && !finished && !watched && game.world.startTick < 0) startWatching({ ...bestRun, label: "your best run" });
       })
       .catch(() => {});
   }

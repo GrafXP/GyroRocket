@@ -555,8 +555,9 @@ burn, scrapes, bumps, crash, key, crystal, door, fuel pump, flame hiss, a low-fu
 beep and a level complete jingle. Volume and mute go in the pause menu. Particles:
 exhaust smoke, sparks on scrapes, debris and smoke on a crash, embers near fire. A
 small camera shake on hits, and a buzz on hits and landings where the phone can
-vibrate. Each world gets its palette, lighting and background, and an intro on the
-levels page. (This was phase 6; it moved to the end, so the game's all there first.)
+vibrate. Each world gets its palette, lighting and background. (Its intro on the
+levels page is there: `PLAN-UI.md`'s phase U3.) (This was phase 6; it moved to the
+end, so the game's all there first.)
 - [ ] You can tell you're burning from the sound alone.
 - [ ] Hits feel like hits (sound, shake, sparks, buzz) and landings feel solid.
 - [ ] Mute is remembered.

@@ -1,84 +1,500 @@
-/* The levels page. A part's heading stands over its worlds' headings. */
+/* ---- The levels (ui/levels.js): the way down. The page is as wide as the
+   screen, and its rock goes from edge to edge. ---- */
 
-h2.part {
-  margin: 32px 0 0;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--accent);
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text);
+main:has(> .way) {
+  max-width: none;
+  padding: 0;
 }
 
-/* Every level in the part finished. */
-h2.part small {
-  color: var(--accent);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: none;
+/* The rock's colours are each world's (--face, --rim, --back, set on its band),
+   darkened for the words on it to stand out; in the light theme, paled. The
+   tunnel and the stops are the cave's dark in either. */
+.way {
+  --shade: #06070d;
+  --share: 56%; /* how much of the rock's own colour is left, */
+  --share-locked: 27%; /* and in a locked world's band */
+  --ink: #f2f4f9;
+  --ink-muted: #c9cedb;
+  --left: calc(16px + env(safe-area-inset-left, 0px));
+  --right: calc(16px + env(safe-area-inset-right, 0px));
+  --indent: 12.5%; /* the words on a band start past the tunnel on its way in */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bg);
 }
 
-.world h2 small {
-  margin-left: 6px;
-  color: var(--muted);
-  font-size: 0.9rem;
-  white-space: nowrap;
+:root[data-theme="light"] .way {
+  --shade: #ffffff;
+  --share: 42%;
+  --share-locked: 20%;
+  --ink: #15171d;
+  --ink-muted: #3c424e;
 }
 
-.world h2 small .icon {
+:root[data-theme="light"] .band {
+  --name: color-mix(in srgb, var(--face) 45%, #000);
+}
+
+.way > .page-back {
+  margin-left: var(--left);
+}
+
+/* The night sky over the surface, whatever the theme, with the page's heading. */
+.sky {
+  position: relative;
+  min-height: 116px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) var(--right) 26px calc(var(--left) + 56px);
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(1.5px 1.5px at 9% 62%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 21% 24%, #fff 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 34% 48%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 47% 18%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 58% 66%, #fff 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 66% 30%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 91% 54%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 97% 16%, #fff 50%, transparent 52%),
+    linear-gradient(180deg, #04050b, #1a2650 72%, #2d3f78);
+}
+
+.sky .page-title {
+  margin: 0;
+  padding: 0;
+}
+
+.sky p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font: 600 1rem/1.2 var(--display);
+  color: #dfe4f5;
+}
+
+.sky p .icon {
+  width: 16px;
+  height: 16px;
   color: var(--gold);
 }
 
-.level-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
-  margin: 12px 0 8px;
+.moon {
+  position: absolute;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  right: max(15%, calc(var(--right) + 20px));
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff4d6;
+  box-shadow: 0 0 34px 14px rgb(255 244 214 / 0.16);
 }
 
-.level {
-  --cut: 9px;
-  --fill: var(--panel);
+/* A world: a band of its rock, lit along the top as the cave's rim is. --in is
+   where the tunnel comes into it, across it: --in-w sideways, --in-t upright. */
+.band,
+.part-rule {
+  --in: var(--in-w);
+}
+
+.band {
+  --name: color-mix(in srgb, var(--rim) 68%, #fff);
+  position: relative;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--face) var(--share), var(--shade));
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--rim) 70%, transparent);
+}
+
+/* The rock's texture over it, faintly (--rock is made once, in main.js). */
+:root.rocky .band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  -webkit-mask: var(--rock) 0 0 / 256px;
+  mask: var(--rock) 0 0 / 256px;
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+.band-in {
+  position: relative;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 var(--right) 0 var(--left);
+}
+
+/* Room under the words for the rocket, standing on a stop just below. */
+.band-head {
+  position: relative;
+  padding: 12px 0 14px;
+}
+
+.band-head > :not(.shaft) {
+  margin-inline: var(--indent);
+}
+
+.band-head > div {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 6px;
-  color: var(--text);
-  text-decoration: none;
+  gap: 12px;
+}
+
+.band h2 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--name);
+}
+
+/* The world's number, in a chip of the tunnel's dark. */
+.band h2 b {
+  flex: none;
+  min-width: 30px;
+  padding: 4px 6px;
   text-align: center;
-  transition:
-    transform 0.08s,
-    filter 0.08s;
+  color: #f2f4f9;
+  background: var(--back);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
 }
 
-/* Finished: its edge in the world's colour. */
-.level.done {
-  --edge: linear-gradient(135deg, var(--head), color-mix(in srgb, var(--world) 45%, var(--line)) 60%);
+.band-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 600 0.95rem/1 var(--display);
+  white-space: nowrap;
 }
 
-.level b {
-  font: 700 1.3rem/1.2 var(--display);
+.band-stars .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--gold);
 }
 
-.level small {
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.2;
+.band-head p {
+  margin-block: 4px 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: var(--ink-muted);
 }
 
-.level .best {
+/* The tunnel on its way in, down through the heading: as wide as the tunnel
+   drawn below it, with the same rim. */
+.shaft {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--in);
+  width: 22px;
+  margin-left: -11px;
+  background: var(--back);
+  box-shadow:
+    -2px 0 0 var(--rim),
+    2px 0 0 var(--rim);
+}
+
+/* The stops along the tunnel. The picture keeps its shape as it's scaled, so
+   45° stays 45°; the stops are placed over it by where it has them. */
+.tunnel {
+  position: relative;
+  aspect-ratio: var(--wide);
+}
+
+.tunnel svg:not(.marker) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.tunnel .tall {
+  display: none;
+}
+
+.tunnel path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.tunnel .rim {
+  stroke: var(--rim);
+  stroke-width: 26px;
+}
+
+.tunnel .air {
+  stroke: var(--back);
+  stroke-width: 22px;
+}
+
+.stop,
+.glow,
+.marker {
+  --x: var(--xw);
+  --y: var(--yw);
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+}
+
+/* A stop: a chamber in the tunnel, with the level's number and its stars. */
+.stop {
+  --cut: 13px;
+  --bw: 2px;
+  --fill: var(--back);
+  --edge: var(--rim);
+  flex-direction: column;
+  gap: 4px;
+  width: 60px;
+  height: 60px;
+  min-height: 0;
+  margin: -30px 0 0 -30px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #f2f4f9;
+}
+
+.stop .stars .icon {
+  width: 11px;
+  height: 11px;
+  color: rgb(255 255 255 / 0.24);
+}
+
+.stop .stars .icon.on {
+  color: #f2b90c;
+}
+
+.stop.locked {
+  --edge: color-mix(in srgb, var(--rim) 45%, var(--back));
+  color: rgb(242 244 249 / 0.5);
+}
+
+.stop.locked .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* The one to do next: the flame's colour round it, a glow behind, and the
+   rocket standing on it. */
+.stop.here {
+  --edge: #ffb347;
+}
+
+.glow {
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  background: radial-gradient(closest-side, rgb(255 179 71 / 0.6), transparent);
+  pointer-events: none;
+}
+
+.marker {
+  width: 22px;
+  height: 31.5px;
+  margin: -59px 0 0 -11px;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .glow {
+    animation: glow 1.4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+/* A locked world: its name, and what opens it. */
+.band.locked {
+  background: color-mix(in srgb, var(--face) var(--share-locked), var(--shade));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--rim) 30%, transparent);
+}
+
+.band.locked h2 {
+  font-size: 1.05rem;
+  opacity: 0.75;
+}
+
+.band.locked p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.band.locked p .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* Where a part of the game starts. */
+.part-rule {
+  position: relative;
+  font: 700 1rem/1 var(--display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg);
+}
+
+.rule {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 38px;
+}
+
+.rule::before,
+.rule::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: var(--accent);
+}
+
+.part-rule span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.part-rule .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.way-dev {
+  margin: 0;
+  padding: 14px var(--right) 14px var(--left);
+}
+
+/* Narrow, as a phone held upright is: two rows of four, the way in on the left. */
+@media (max-width: 599px) {
+  .band,
+  .part-rule {
+    --in: var(--in-t);
+  }
+
+  .band-head > :not(.shaft) {
+    margin-inline: 25% 0;
+  }
+
+  .band h2 {
+    font-size: 1.15rem;
+  }
+
+  .tunnel {
+    aspect-ratio: var(--tall);
+  }
+
+  .tunnel .wide {
+    display: none;
+  }
+
+  .tunnel .tall {
+    display: block;
+  }
+
+  .stop,
+  .glow,
+  .marker {
+    --x: var(--xt);
+    --y: var(--yt);
+  }
+}
+
+/* ---- The level's card, on a sheet ---- */
+
+.level-card .sheet-body > * + * {
+  margin-top: 12px;
+}
+
+.level-card .hint {
+  margin: 0;
+}
+
+.card-time {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 0;
   font-family: var(--display);
-  font-variant-numeric: tabular-nums;
 }
 
-.level.locked {
-  opacity: 0.45;
+.card-time b {
+  margin-right: 10px;
+  font-size: 1.7rem;
+  line-height: 1;
 }
 
-.level.locked .icon {
-  width: 18px;
-  height: 18px;
-  margin: 1px 0;
+.card-time small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.card-time span {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.goals {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goals li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.goals .icon {
+  width: 22px;
+  height: 22px;
+  stroke: none;
+  color: var(--line);
+}
+
+.goals .on .icon {
+  color: var(--gold);
+}
+
+.goals .hint {
+  margin-left: auto;
+}
+
+.card-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.card-locked .icon {
+  flex: none;
+}
+
+.level-card a.button:not(.big) {
+  --fill: var(--field);
 }

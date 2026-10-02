@@ -42,6 +42,7 @@ const SCREENS = [
   { name: "menu", path: "/", wait: 1200, steps: start },
   { name: "settings", path: "/", steps: (p) => start(p).then(() => p.click("#settings")) },
   { name: "levels", path: "/levels" },
+  { name: "level-card", path: "/levels", steps: (p) => p.click(".stop.here") },
   { name: "help", path: "/help" },
   { name: "profile", path: "/profile", wait: 1500 },
   { name: "workshop", path: "/editor", before: MY_LEVEL },

@@ -16,7 +16,6 @@
     .card,
     .segmented,
     .icon-btn,
-    .level,
     .score,
     .message,
     .menu section,
@@ -142,8 +141,7 @@ button:active,
 a.button:active,
 a.icon-btn:active,
 label.button:active,
-.card:active,
-.level:active {
+.card:active {
   transform: scale(0.97);
   filter: brightness(1.2);
 }
@@ -154,7 +152,7 @@ button:disabled {
 }
 
 /* Where the keyboard is: a glow that follows the cut corners, as an outline can't. */
-:is(button, a.button, a.icon-btn, label.button, .card, .level):focus-visible {
+:is(button, a.button, a.icon-btn, label.button, .card):focus-visible {
   outline: none;
   filter: drop-shadow(0 0 1px var(--focus)) drop-shadow(0 0 5px var(--focus));
 }
