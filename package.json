@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/seed.js && vite build && node scripts/headers.js",
-    "api": "php -S 127.0.0.1:8081 -t server/public server/router.php",
+    "api": "node scripts/api.js",
     "deploy": "node scripts/deploy.js",
     "preview": "vite preview",
     "test": "node --test",

@@ -11,8 +11,30 @@ is needed on the host. The game is at the HTTPS root of its own subdomain.
    credentials and a random 64-character hex `ip_secret`. Never commit it.
 3. `npm run api` serves the API at `127.0.0.1:8081`; `npm run dev -- --host`
    serves the game and proxies `/api`. `GYRO_API` changes Vite's proxy target.
+   Without a config or a database, every request is answered with HTTP 503 and
+   the game says the community server isn't set up.
 4. Open `/profile`. Pick a name, copy its code, restore it on another browser,
    save the data, and delete the online profile.
+
+`npm run api` can run the database too, if it's a MariaDB of your own with its
+settings in `~/.local/share/gyrorocket/my.cnf` (or the file `GYRO_DB` names):
+
+```ini
+[mariadbd]
+datadir=/home/you/.local/share/gyrorocket/db
+socket=/home/you/.local/share/gyrorocket/db.sock
+pid-file=/home/you/.local/share/gyrorocket/db.pid
+log-error=/home/you/.local/share/gyrorocket/db.log
+port=13306
+bind-address=127.0.0.1
+```
+
+Make the data directory once with `mariadb-install-db --no-defaults
+--datadir=…`, start it, and create the database, its user and the schema as in
+steps 1 and 2. From then on, if nothing answers on that port, `npm run api`
+starts `mariadbd` with that file before PHP, and stops it again when the API
+stops; one that's already running is left alone. Keep the data directory out of
+the project: deploying uploads everything under `server/` but `config.php`.
 
 The PHP development router exposes only API responses. It never serves the
 private directory. `GYRO_CONFIG=/absolute/path/config.php` selects an alternative
