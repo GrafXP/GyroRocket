@@ -39,6 +39,10 @@ const PATHS = {
   inspect: "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM15 15l6 6M10 7v6M7 10h6",
   pick: "M14 4l6 6-2.5 2.5-6-6zM12.5 7.5L5 15v4h4l7.5-7.5",
   check: "M5 12l5 5 9-10",
+  fuel: "M5 21V5h9v16M5 10h9M3 21h13M14 11h3v6a2 2 0 0 0 4 0V9l-3-3M18 6v4h3",
+  warning: "M12 3L2 21h20zM12 9v5M12 17v.5",
+  gate: "M5 21V3h14v18M9 7v14M15 7v14M5 7h14",
+  laser: "M3 9v6M21 9v6M3 12h18M8 6l2 2M14 16l2 2",
 };
 const SOLID = new Set(["play", "star", "crystal"]);
 export const ICONS = Object.keys(PATHS);

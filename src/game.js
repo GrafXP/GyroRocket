@@ -130,6 +130,7 @@ export function createGame(container, { level, onFrame, fullTilt } = {}) {
     },
     setFullTilt: controls.setFullTilt,
     screenToWorld: view.screenToWorld,
+    worldToScreen: view.worldToScreen,
     dispose() {
       cancelAnimationFrame(raf);
       controls.dispose();

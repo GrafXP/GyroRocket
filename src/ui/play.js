@@ -1,24 +1,28 @@
 import { createGame } from "../game.js";
-import { requestTiltPermission, tiltNeedsAsking } from "../controls.js";
+import { requestTiltPermission, tiltNeedsAsking, onPhone } from "../controls.js";
 import { SAFE_SPEED, HULL, TICK_RATE, CENTRE_Y } from "../sim/rocket.js";
 import { parseLevel, TILE } from "../sim/level.js";
-import { clock, padUnder, crystalCount, gateTimers } from "../sim/world.js";
-import { rising } from "../sim/hazards/rise.js";
+import { clock, padUnder, crystalCount } from "../sim/world.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
+import { CAVE_COLORS } from "../render/cave.js";
 import { drawMap } from "./map.js";
-import { levelById, nextLevel, endingOf, EXTRAS } from "../levels/index.js";
-import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings } from "../progress.js";
+import { levelById, nextLevel, endingOf, WORLDS, EXTRAS } from "../levels/index.js";
+import { loadProgress, saveProgress, recordRun, starsOf, isUnlocked, allUnlocked, loadSettings } from "../progress.js";
 import { playableLevel } from "../mylevels.js";
 import { makeReplay, unpackInput, unplayable, counts } from "../replay.js";
 import { loadRun, keepRun, finishOf } from "../runs.js";
 import { html, esc, formatTime, saveFile, bindFullscreenButton } from "./dom.js";
-import { icon, setDigits } from "./kit.js";
+import { icon, stars, setDigits } from "./kit.js";
+import { introduceWorld, completionTitle, guidePosition, flightPrompt } from "./flight.js";
+import { controlPictures } from "./flight-pictures.js";
 import { frame } from "./frame.js";
 import { openSettings } from "./settings.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
-const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
+const COUNT_AFTER = 1100; // ms for the three stars to arrive before the clock counts up
+const COUNT_MS = 850;
 const LAVA_NEAR = 10; // m below the rocket that rising lava shows red
+const introducedWorlds = new Set();
 
 // The play page for level `id`: the game with its HUD, the pause menu (button, P
 // or Esc, and whenever the app is hidden), the level complete sheet, and with ?dev
@@ -65,6 +69,9 @@ export function play(el, id) {
   document.body.classList.add("playing");
 
   const title = extra || mine ? def.name || "My level" : `${def.id} ${def.name}`;
+  const world = WORLDS.find((w) => w.number === def.world);
+  const intro = introduceWorld(def, progress, introducedWorlds);
+  const doneTitle = completionTitle(def);
   const settings = loadSettings();
   const next = extra || mine ? null : nextLevel(id);
   const ending = extra || mine ? null : endingOf(id); // the way out of the core, the end of part one
@@ -73,7 +80,14 @@ export function play(el, id) {
   const runId = mine ? `my:${mine}` : def.id; // where its best run is kept
   const $ = html(
     el,
-    `<div class="game" id="game">
+    `<div class="game is-loading" id="game">
+      <div class="level-loading" id="loading" role="status">
+        <p class="level-number">${mine ? "Workshop" : extra ? "Test cave" : `Level ${def.id}`}</p>
+        <h1>${esc(def.name || "My level")}</h1>
+        ${intro ? `<p class="world-intro">World ${intro.number} · ${esc(intro.name)}</p>` : ""}
+        <span class="loading-line" aria-hidden="true"></span>
+        <small>Entering the cave</small>
+      </div>
       <div class="hud">
         <button class="icon-btn" id="pause-btn" aria-label="Pause">${icon("pause")}</button>
         <button class="icon-btn" id="map-btn" aria-label="Map">${icon("map")}</button>
@@ -86,69 +100,98 @@ export function play(el, id) {
         </div>
         <button class="icon-btn" id="fs"></button>
       </div>
-      <div class="message" id="message"></div>
+      <div class="flight-guide panel" id="flight-guide" hidden>
+        <div class="level-intro" id="level-intro">
+          <small>${mine ? "Workshop" : extra ? "Test cave" : `Level ${def.id}`}</small>
+          <h2>${esc(def.name || "My level")}</h2>
+          ${intro ? `<p>World ${intro.number} · ${esc(intro.name)}</p>` : ""}
+        </div>
+        <div class="control-cues" id="control-cues"></div>
+      </div>
+      <div class="message" id="message" role="status" hidden><span id="prompt-icon"></span><span><b id="prompt-title"></b><small id="prompt-detail"></small></span></div>
       <div class="debug">
         <pre class="fps" id="fps" hidden><b>… fps</b></pre>
         <pre class="dev" id="dev" hidden></pre>
       </div>
 
-      <div class="overlay menu" id="pause" hidden>
-        <section>
-          <h2>Paused</h2>
-          <p class="hint">${esc(title)}</p>
-          <button class="big" id="resume">Resume</button>
-          <div class="buttons" id="restarts">
-            <button id="restart-pad">Restart from pad</button>
-            <button id="restart-level">Restart level</button>
+      <div class="overlay menu pause-screen" id="pause" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+        <section class="pause-panel">
+          <header><small>${world ? `World ${world.number} · ${esc(world.name)}` : mine ? "Workshop" : "Test cave"}</small><h2 id="pause-title">Paused</h2><p>${esc(title)}</p></header>
+          <div class="pause-actions">
+            <div class="buttons" id="restarts">
+              <button id="restart-pad">${icon("retry")}Restart from pad</button>
+              <button id="restart-level">${icon("retry")}Restart level</button>
+            </div>
+            <button id="watch-best" hidden></button>
+            <button id="stop-watch" hidden>${icon("close")}Stop watching</button>
+            <a class="button" href="${back.href}" data-link="up">${icon(mine ? "brush" : "map")}${back.label}</a>
+            <button class="big" id="resume">${icon("play")}Resume</button>
           </div>
-          <button id="watch-best" hidden></button>
-          <button id="stop-watch" hidden>Stop watching</button>
-          <a class="button" href="${back.href}" data-link="up">${back.label}</a>
-        </section>
-        <section>
-          <button id="auto-menu" aria-pressed="false">Autopilot: off</button>
-          <button id="settings">${icon("gear")}Settings</button>
+          <div class="pause-tools">
+            <button class="icon-btn" id="settings" aria-label="Settings" title="Settings">${icon("gear")}</button>
+            <button class="icon-btn" id="auto-menu" aria-label="Autopilot" title="Autopilot" aria-pressed="false">${icon("auto")}</button>
+            <button class="icon-btn" id="fs-pause"></button>
+          </div>
         </section>
       </div>
 
-      <div class="overlay map" id="map" hidden>
-        <canvas id="map-canvas"></canvas>
-        <p class="hint">Tap to close</p>
+      <div class="overlay map" id="map" role="dialog" aria-modal="true" aria-labelledby="map-title" hidden>
+        <section class="map-frame panel">
+          <header><div>${icon("map")}<h2 id="map-title">${esc(title)}</h2></div><button class="icon-btn" id="map-close" aria-label="Close map">${icon("close")}</button></header>
+          <canvas id="map-canvas" aria-label="Explored cave map"></canvas>
+          <p class="hint">${onPhone() ? "Tap the map" : "M / Esc"} to close</p>
+        </section>
       </div>
 
-      <div class="overlay menu" id="done" hidden>
-        <section>
-          <h2 id="done-title">${ending ? ending.title : "Level complete"}</h2>
+      <div class="overlay menu done-screen" id="done" role="dialog" aria-modal="true" aria-labelledby="done-title" hidden>
+        <section class="done-summary">
+          <h2 id="done-title">${esc(doneTitle)}</h2>
           <p class="hint">${esc(title)}</p>
           ${ending ? `<p id="ending">${ending.text}${next ? "" : " That's every level, for now: go back for the stars you missed."}</p>` : ""}
           <div class="awards" id="awards"></div>
+          <p class="best-run" id="best-stars" hidden></p>
           <dl class="results" id="results"></dl>
         </section>
-        <section>
+        <section class="done-actions">
           ${
             next
-              ? `<a class="button big" href="/play/${next.id}${dev ? "?dev" : ""}" data-link="replace" id="next">Next: ${next.id} ${next.name}</a>`
+              ? `<a class="button big" href="/play/${next.id}${dev ? "?dev" : ""}" data-link="replace" id="next">${icon("play")}<span>Next · ${next.id}<small>${esc(next.name)}</small></span></a>`
               : mine
-                ? `<a class="button big" href="${back.href}" data-link="up" id="next">Back to editor</a>`
-                : `<a class="button big" href="/levels" data-link="up" id="next">Back to the levels</a>`
+                ? `<a class="button big" href="${back.href}" data-link="up" id="next">${icon("brush")}Back to editor</a>`
+                : `<a class="button big" href="/levels" data-link="up" id="next">${icon("map")}Back to the levels</a>`
           }
           <div class="buttons">
-            <button id="retry">Retry</button>
-            <button id="watch">Watch</button>
-            <a class="button" href="${mine ? "/editor" : "/levels"}" data-link="up">${mine ? "My levels" : "Levels"}</a>
+            <button id="retry">${icon("retry")}<span>Retry</span></button>
+            <button id="watch">${icon("play")}<span>Watch</span></button>
+            <a class="button" href="${mine ? "/editor" : "/levels"}" data-link="up">${icon(mine ? "brush" : "map")}${mine ? "My levels" : "Levels"}</a>
           </div>
           ${dev ? `<button id="save-run">Save this run</button>` : ""}
         </section>
       </div>
 
       <div class="overlay" id="tilt-ask" hidden>
-        <p>Gyro Rocket steers by tilting your phone, and needs your OK to read its motion sensors.</p>
-        <button class="big" id="tilt-ok">Enable tilt steering</button>
+        <section class="panel tilt-panel">${icon("tilt")}<h2>Tilt to steer</h2><p>Allow motion sensors to steer with your phone.</p><button class="big" id="tilt-ok">Enable steering</button></section>
       </div>
     </div>`,
   );
   const gameEl = $("#game");
-  const unbindFs = bindFullscreenButton($("#fs"));
+  if (world) document.documentElement.style.setProperty("--world", css(world.colors?.rim ?? CAVE_COLORS.rim));
+  const unbindFs = [bindFullscreenButton($("#fs")), bindFullscreenButton($("#fs-pause"))];
+  let game = null;
+  let disposed = false;
+  let loadFrame = 0;
+  let countFrame = 0;
+  let ready = false;
+  let introUntil = 0;
+  let guidePlaced = false;
+  let guideMode = null;
+  let promptShown = "";
+  const guide = $("#flight-guide");
+  const cues = $("#control-cues");
+  const introEl = $("#level-intro");
+  const onResize = () => { guidePlaced = false; if (game && !$("#map").hidden) drawMap($("#map-canvas"), game.world); };
+  window.addEventListener("resize", onResize);
+  document.fonts.ready.then(() => { if (!disposed) guidePlaced = false; });
 
   // iOS asks before it sends orientation events, and only from a tap: the title's,
   // unless the game was opened at a level.
@@ -176,8 +219,6 @@ export function play(el, id) {
   let autoShown = null;
   let lostUntil = 0; // when to stop saying the autopilot gave up
   const show = (el, text) => el.textContent !== text && (el.textContent = text);
-  const started = performance.now();
-  const hasFuelPads = level.pads.some((p) => p.kind === "fuel");
   let lastHit = -1;
   let finished = false;
   const devHud = dev ? createDevHud($("#dev")) : null;
@@ -191,17 +232,24 @@ export function play(el, id) {
   if (counts(kept) && !unplayable(def, kept)) {
     unpackInput(kept.input)
       .then((codes) => {
+        if (disposed) return;
         bestRun ??= { codes, replay: kept };
         syncPauseMenu();
-        if (params.has("watch") && !finished && !watched && game.world.startTick < 0) startWatching({ ...bestRun, label: "your best run" });
+        if (params.has("watch") && game && !finished && !watched && game.world.startTick < 0) startWatching({ ...bestRun, label: "your best run" });
       })
       .catch(() => {});
   }
 
-  const game = createGame(gameEl, {
+  const gameOptions = {
     level,
     fullTilt: settings.fullTilt,
     onFrame(w, controls) {
+      if (!ready) {
+        ready = true;
+        introUntil = performance.now() + 2000;
+        $("#loading").hidden = true;
+        gameEl.classList.remove("is-loading");
+      }
       const r = w.rocket;
       setDigits(hud.time, formatTime(clock(w)));
       // Fuel goes amber below 30% and flashes red below 15%; the hull at 60% and 30%.
@@ -244,36 +292,22 @@ export function play(el, id) {
       if (auto !== autoShown) {
         autoShown = auto;
         for (const b of [$("#auto-btn"), $("#auto-menu")]) b.setAttribute("aria-pressed", auto);
-        show($("#auto-menu"), `Autopilot: ${auto ? "on" : "off"}`);
         if (!auto && game?.lastPilot?.failed) lostUntil = performance.now() + 3000;
       }
 
-      const back = w.checkpoint.pad === level.start ? "the start" : "the last fuel pad";
-      const on = padUnder(level, r);
-      const timer = gateTimers(w)[0];
-      let text = "";
-      const how =
-        { flame: "Burned up!", lava: "Into the lava!", crush: "Crushed!", laser: "Zapped!", shot: "Shot down!", stalactite: "Hit by falling rock!" }[r.cause] ??
-        "Crashed!";
-      if (w.done) text = "";
-      else if (watched) text = `Watching ${watched.label}`;
-      else if (game?.pilot) text = game.pilot.status;
-      else if (performance.now() < lostUntil) text = game.lastPilot.status;
-      else if (r.state === "crashed") text = `${how} Tap to go back to ${back}`;
-      else if (w.stranded) text = `Out of fuel! Tap to go back to ${back}`;
-      else if (rising(w) && w.tick - w.rise.from < LAVA_NEWS) text = "The lava's rising!";
-      else if (on?.kind === "switch") {
-        const laser = level.lasers.some((l) => l.label === on.opens);
-        text = `${laser ? `Laser ${on.label} is off` : `Gate ${on.label} is open`}${on.time ? `. You have ${on.time} s from lift-off` : ""}`;
+      const prompt = flightPrompt(w, { phone: onPhone(), watching: watched?.label, pilot: game?.pilot, failure: performance.now() < lostUntil ? game.lastPilot : null });
+      const shown = JSON.stringify(prompt);
+      if (shown !== promptShown) {
+        promptShown = shown;
+        hud.message.hidden = !prompt;
+        if (prompt) {
+          $("#prompt-icon").innerHTML = icon(prompt.icon);
+          show($("#prompt-title"), prompt.title);
+          show($("#prompt-detail"), prompt.detail);
+          $("#prompt-detail").hidden = !prompt.detail;
+        }
       }
-      else if (timer) text = `${timer.laser ? "Laser" : "Gate"} ${timer.gate.switch} ${timer.laser ? "comes back on" : "shuts"} in ${Math.ceil(timer.seconds)}`;
-      else if (on?.kind === "fuel") text = w.refuelling ? "Refuelling…" : "Full up. After a crash, you'll start again here";
-      else if (w.startTick < 0) {
-        const steer = controls.hasTilt || performance.now() - started < 1500 ? "tilt to steer" : "← → to steer (no tilt sensor found)";
-        text = `${title}. Hold the screen (or ↑) to burn, ${steer}. ${hasFuelPads ? "Refuel on blue pads, finish" : "Finish"} on the green one.`;
-      }
-      show(hud.message, text);
-      hud.message.hidden = !text;
+      updateGuide(w, controls);
 
       if (w.done && !finished && w.tick - w.endTick >= RESULTS_AFTER) finish(w);
       else if (watched && !finished && w.tick >= watched.codes.length + RESULTS_AFTER) finish(w); // it should have landed by now
@@ -283,12 +317,60 @@ export function play(el, id) {
         showFps(fpsEl, game.stats);
       }
     },
+  };
+
+  // Two frames let the browser paint the title on black before building the cave.
+  // Navigation during loading cancels the work before it creates a WebGL context.
+  loadFrame = requestAnimationFrame(() => {
+    loadFrame = requestAnimationFrame(() => {
+      if (disposed) return;
+      try {
+        game = createGame(gameEl, gameOptions);
+        if (devHud) {
+          gameEl.querySelector(":scope > canvas").addEventListener("pointermove", devHud.onPointer(game));
+          window.game = game;
+        }
+        if (params.has("watch") && bestRun) startWatching({ ...bestRun, label: "your best run" });
+      } catch (error) {
+        console.error(error);
+        $("#loading").innerHTML = `<h2>Couldn't open the cave</h2><p>Try reloading the game.</p><a class="button big" href="${back.href}" data-link="up">${esc(back.label)}</a>`;
+      }
+    });
   });
 
-  // The results: time against par, crystals, and the stars, new ones popping in.
+  function updateGuide(w, controls) {
+    const initial = w.startTick < 0 && !watched && !game.pilot;
+    const introHidden = !!watched || w.done || performance.now() >= introUntil;
+    if (introEl.hidden !== introHidden) { introEl.hidden = introHidden; guidePlaced = false; }
+    if (cues.hidden !== !initial) { cues.hidden = !initial; guidePlaced = false; }
+    guide.hidden = finished || !!watched || (!initial && introHidden);
+    if (guide.hidden) return;
+    const mode = controls.hasTilt || onPhone() ? "tilt" : "keys";
+    if (mode !== guideMode) {
+      guideMode = mode;
+      cues.innerHTML = controlPictures(mode === "tilt");
+      guidePlaced = false;
+    }
+    if (guidePlaced) return;
+    const box = gameEl.getBoundingClientRect();
+    const point = game.worldToScreen(w.rocket.x, w.rocket.y);
+    const hudBox = $(".hud").getBoundingClientRect();
+    const hudStyle = getComputedStyle($(".hud"));
+    const position = guidePosition({ x: point.x - box.left, y: point.y - box.top }, box, guide.getBoundingClientRect(), {
+      top: hudBox.bottom - box.top + 12,
+      left: Math.max(16, parseFloat(hudStyle.paddingLeft)), right: Math.max(16, parseFloat(hudStyle.paddingRight)),
+      bottom: 16 + parseFloat(getComputedStyle(gameEl).getPropertyValue("--safe-bottom")),
+    });
+    guide.style.left = `${position.x}px`;
+    guide.style.top = `${position.y}px`;
+    guidePlaced = true;
+  }
+
+  // The results: this run's stars, the saved best run, then the time against par.
   // Watching a run, the replay's results instead.
   function finish(w) {
     finished = true;
+    guide.hidden = true;
     $("#done").hidden = false;
     $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = true;
     $("#next").focus();
@@ -299,23 +381,34 @@ export function play(el, id) {
     const run = game.recording();
     const made = (lastRun = { codes: run.codes, replay: null });
     $("#watch").hidden = run.cheated; // the cheats aren't in its inputs
+    $("#watch").disabled = true;
     makeReplay(def, w, run.codes, { cheated: run.cheated }).then((replay) => {
       made.replay = replay;
       const isBest = !extra && keepRun(runId, replay);
       if (isBest) bestRun = { codes: made.codes, replay };
+      if (disposed || made !== lastRun || !finished || watched) return;
+      $("#watch").disabled = false;
       if (mine) $("#awards").innerHTML = `<p class="hint">${finishNote(replay, isBest)}</p>`;
       syncPauseMenu();
+    }).catch(() => {
+      if (!disposed && made === lastRun && finished && !watched) $("#watch").hidden = true;
     });
     let result = null;
-    if (!extra && !mine && !w.assisted) {
+    if (!extra && !mine && !w.assisted && !run.cheated) {
       result = recordRun(progress, def, { time, crystals: all });
       saveProgress(progress);
     }
-    const best = progress.levels[def.id]?.best;
+    const record = progress.levels[def.id];
+    const best = record?.best;
+    const bestStars = $("#best-stars");
+    bestStars.hidden = extra || !!mine || !record;
+    if (!bestStars.hidden) bestStars.innerHTML = `Best run ${stars(starsOf(def, record))}<small>${formatTime(record.run?.time ?? record.best)}</small>`;
     $("#awards").innerHTML = mine
       ? ""
       : w.assisted
       ? `<p class="hint">Flown with the autopilot, so no stars</p>`
+      : run.cheated
+      ? `<p class="hint">Flown with a cheat, so no stars</p>`
       : result
       ? [
           "Finished",
@@ -324,14 +417,30 @@ export function play(el, id) {
         ]
           .map(
             (label, i) =>
-              `<div class="award${result.after[i] ? " on" : ""}${result.after[i] && !result.before[i] ? " new" : ""}" style="--i: ${i}">${icon("star")}<small>${label}</small></div>`,
+              `<div class="award reveal${result.after[i] ? " on" : ""}" style="--i: ${i}" role="img" aria-label="${label}: ${result.after[i] ? "earned" : "not earned"}">${icon("star")}<small>${label}</small></div>`,
           )
           .join("")
       : "";
-    $("#results").innerHTML = `
-      <dt>Time</dt><dd>${formatTime(time)}${result?.newBest && result.before[0] ? " <b>New best!</b>" : best !== undefined && !result?.newBest ? ` <small>best ${formatTime(best)}</small>` : ""}</dd>
-      ${level.crystals.length ? `<dt>Crystals</dt><dd>${got} of ${level.crystals.length}</dd>` : ""}
-      <dt>Restarts</dt><dd>${w.restarts}</dd>`;
+    showResults(w, { newBest: result?.newBest && result.before[0], best });
+  }
+
+  function showResults(w, { newBest = false, best } = {}) {
+    const time = clock(w);
+    $("#results").innerHTML = `<dt class="time-label">Time</dt><dd class="result-time"><b class="digits" id="finish-time" aria-label="${formatTime(time)}"></b>${newBest ? `<strong class="new-best">${icon("star")}New best</strong>` : ""}</dd>
+      ${def.par ? `<dt>Par</dt><dd>${formatTime(def.par)}${best !== undefined && !newBest ? `<small>Fastest ${formatTime(best)}</small>` : ""}</dd>` : ""}
+      ${level.crystals.length ? `<dt>${icon("crystal")}Crystals</dt><dd>${crystalCount(w)} of ${level.crystals.length}</dd>` : ""}
+      <dt>${icon("retry")}Restarts</dt><dd>${w.restarts}</dd>`;
+    cancelAnimationFrame(countFrame);
+    const digits = $("#finish-time");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setDigits(digits, formatTime(time)); return; }
+    const began = performance.now() + COUNT_AFTER;
+    const count = (now) => {
+      const t = Math.max(0, Math.min(1, (now - began) / COUNT_MS));
+      setDigits(digits, formatTime(time * (1 - (1 - t) ** 3)));
+      if (t < 1 && !disposed) countFrame = requestAnimationFrame(count);
+    };
+    setDigits(digits, formatTime(0));
+    countFrame = requestAnimationFrame(count);
   }
 
   // What a finish of my level means: it's marked finished, with the run kept, if it
@@ -348,6 +457,7 @@ export function play(el, id) {
   function replayResults(w) {
     $("#done-title").textContent = "Replay";
     if ($("#ending")) $("#ending").hidden = true;
+    $("#best-stars").hidden = true;
     const { replay } = watched;
     const ticks = replay?.ticks ?? watched.codes.length;
     const note = !w.done
@@ -358,19 +468,19 @@ export function play(el, id) {
           ? `It landed on the exit on tick ${w.endTick}, as it did.`
           : "";
     $("#awards").innerHTML = note ? `<p class="hint">${note}</p>` : "";
-    $("#results").innerHTML = `
-      <dt>Time</dt><dd>${formatTime(clock(w))}</dd>
-      ${level.crystals.length ? `<dt>Crystals</dt><dd>${crystalCount(w)} of ${level.crystals.length}</dd>` : ""}
-      <dt>Restarts</dt><dd>${w.restarts}</dd>`;
-    $("#retry").textContent = "Play";
-    $("#watch").textContent = "Watch again";
+    showResults(w);
+    $("#retry span").textContent = "Play";
+    $("#watch span").textContent = "Watch again";
+    $("#watch").disabled = false;
   }
 
   // Watches a recorded run from the start: { codes, replay, label }.
   function startWatching(run) {
+    cancelAnimationFrame(countFrame);
     watched = run;
     game.watch(run.codes);
     finished = false;
+    guide.hidden = true;
     $("#done").hidden = true;
     $("#pause-btn").hidden = $("#map-btn").hidden = false;
     $("#auto-btn").hidden = true;
@@ -379,21 +489,24 @@ export function play(el, id) {
 
   // Back to playing, from the start.
   function playAgain() {
+    cancelAnimationFrame(countFrame);
     watched = null;
     game.restartLevel();
     finished = false;
+    introUntil = 0;
+    guidePlaced = false;
     $("#done").hidden = true;
-    $("#done-title").textContent = ending ? ending.title : "Level complete";
+    $("#done-title").textContent = doneTitle;
     if ($("#ending")) $("#ending").hidden = false;
-    $("#retry").textContent = "Retry";
-    $("#watch").textContent = "Watch";
+    $("#retry span").textContent = "Retry";
+    $("#watch span").textContent = "Watch";
     $("#watch").hidden = false;
     $("#pause-btn").hidden = $("#map-btn").hidden = $("#auto-btn").hidden = false;
     syncPauseMenu();
   }
 
   const toggleAutopilot = () => {
-    if (!finished && !watched) game.setAutopilot(!game.pilot);
+    if (game && !finished && !watched) game.setAutopilot(!game.pilot);
   };
   $("#auto-btn").addEventListener("click", () => {
     toggleAutopilot();
@@ -428,7 +541,7 @@ export function play(el, id) {
   const pauseMenu = $("#pause");
   const mapEl = $("#map");
   const openPause = () => {
-    if (finished || !pauseMenu.hidden) return;
+    if (!game || !ready || finished || !pauseMenu.hidden) return;
     closeMap();
     game.pause();
     pauseMenu.hidden = false;
@@ -439,7 +552,7 @@ export function play(el, id) {
     $("#restarts").hidden = $("#auto-menu").hidden = !!watched;
     $("#stop-watch").hidden = !watched;
     $("#watch-best").hidden = !!watched || !bestRun;
-    if (bestRun) show($("#watch-best"), `Watch your best run, ${formatTime(bestRun.replay.time)}`);
+    if (bestRun) $("#watch-best").innerHTML = `${icon("play")}Watch best run <small>${formatTime(bestRun.replay.time)}</small>`;
   }
   const closePause = () => {
     pauseMenu.hidden = true;
@@ -450,10 +563,11 @@ export function play(el, id) {
 
   // The map: the parts of the cave seen so far. The game waits while it's open.
   const openMap = () => {
-    if (finished || !pauseMenu.hidden || !mapEl.hidden) return;
+    if (!game || !ready || finished || !pauseMenu.hidden || !mapEl.hidden) return;
     game.pause();
     mapEl.hidden = false;
     drawMap($("#map-canvas"), game.world);
+    $("#map-close").focus();
   };
   function closeMap() {
     if (mapEl.hidden) return;
@@ -463,13 +577,14 @@ export function play(el, id) {
   }
   $("#map-btn").addEventListener("click", openMap);
   mapEl.addEventListener("click", closeMap);
+  $("#map-close").addEventListener("click", (e) => { e.stopPropagation(); closeMap(); });
   $("#resume").addEventListener("click", closePause);
   $("#restart-pad").addEventListener("click", () => {
     game.restartFromPad();
     closePause();
   });
   $("#restart-level").addEventListener("click", () => {
-    game.restartLevel();
+    playAgain();
     closePause();
   });
   $("#watch-best").addEventListener("click", () => {
@@ -481,8 +596,20 @@ export function play(el, id) {
     closePause();
   });
   const onKey = (e) => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === "KeyO" && pauseMenu.hidden && mapEl.hidden) toggleAutopilot();
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!game || !ready) return;
+    if (e.code === "Tab") {
+      const overlay = [pauseMenu, mapEl, $("#done")].find((el) => !el.hidden);
+      if (overlay) {
+        const buttons = [...overlay.querySelectorAll("button, a[href]")].filter((el) => !el.disabled && el.getClientRects().length);
+        const first = buttons[0], last = buttons.at(-1);
+        if (e.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) { e.preventDefault(); first?.focus(); }
+      }
+      return;
+    }
+    if (e.repeat) return;
+    if (e.code === "KeyO" && mapEl.hidden) toggleAutopilot();
     else if (e.code === "KeyM") {
       if (mapEl.hidden) openMap();
       else closeMap();
@@ -500,23 +627,22 @@ export function play(el, id) {
 
   // The settings, over the pause menu: the level takes them up as they change.
   const applySettings = ({ fullTilt, fps }) => {
-    game.setFullTilt(fullTilt);
+    game?.setFullTilt(fullTilt);
     fpsEl.hidden = !fps && !dev;
   };
   $("#settings").addEventListener("click", () => openSettings({ inGame: true, onChange: applySettings }));
   applySettings(settings);
 
-  if (devHud) {
-    gameEl.querySelector(":scope > canvas").addEventListener("pointermove", devHud.onPointer(game)); // the game's, not the map's
-    window.game = game; // to poke at from the console
-  }
-
   return () => {
+    disposed = true;
+    cancelAnimationFrame(loadFrame);
+    cancelAnimationFrame(countFrame);
     if (window.game === game) delete window.game;
     window.removeEventListener("keydown", onKey);
     document.removeEventListener("visibilitychange", onHidden);
-    unbindFs();
-    game.dispose();
+    window.removeEventListener("resize", onResize);
+    for (const u of unbindFs) u();
+    game?.dispose();
   };
 }
 

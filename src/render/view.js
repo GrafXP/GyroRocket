@@ -141,6 +141,12 @@ export function createView(container, level, outline) {
 
       renderer.render(scene, camera);
     },
+    // Project a point on the plane of flight into client pixels for the HUD.
+    worldToScreen(x, y) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const p = new THREE.Vector3(x, y, 0).project(camera);
+      return { x: rect.left + (p.x + 1) * rect.width / 2, y: rect.top + (1 - p.y) * rect.height / 2 };
+    },
     // Where a point on the screen (client pixels) is on the plane of flight.
     screenToWorld(clientX, clientY) {
       const rect = renderer.domElement.getBoundingClientRect();

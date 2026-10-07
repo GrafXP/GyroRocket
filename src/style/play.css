@@ -9,8 +9,14 @@ body.playing {
   position: fixed;
   inset: 0;
   background: #08090d;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.game,
+.game * {
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .game canvas {
@@ -20,12 +26,100 @@ body.playing {
   touch-action: none;
 }
 
+.game:not(.is-loading) > canvas {
+  animation: cave-in 250ms ease-out both;
+}
+
+.game.is-loading > :not(.level-loading) {
+  visibility: hidden;
+}
+
+@keyframes cave-in {
+  from { opacity: 0; }
+}
+
+.level-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: #08090d;
+  color: #e9ecf5;
+}
+
+.level-loading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.level-loading p {
+  margin: 0;
+}
+
+.level-number,
+.world-intro {
+  font-family: var(--display);
+  color: color-mix(in srgb, var(--world) 65%, #fff);
+}
+
+.level-number {
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.loading-line {
+  width: 100px;
+  height: 3px;
+  margin-top: 12px;
+  background: var(--world);
+  animation: loading 1.4s ease-in-out infinite alternate;
+}
+
+.level-loading > small { color: #949bb5; }
+
+@keyframes loading {
+  from { transform: scaleX(0.25); opacity: 0.4; }
+}
+
+/* Both pictures sit in whichever corner leaves the rocket clear. Taps go through
+   the card to the canvas, and the controls disappear at lift-off. */
+.flight-guide {
+  --fill: var(--panel);
+  --cut: 12px;
+  position: absolute;
+  z-index: 2;
+  width: min(300px, calc(100% - 32px));
+  padding: 12px 16px;
+  pointer-events: none;
+}
+
+.level-intro { margin-bottom: 12px; }
+.level-intro small { font: 600 0.7rem var(--display); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.level-intro h2 { margin: 3px 0; font-size: 1.6rem; color: var(--text); }
+.level-intro p { margin: 0; color: var(--head); font-size: 0.8rem; }
+.control-cues { display: flex; justify-content: space-between; gap: 10px; }
+.control-cue { display: flex; align-items: center; gap: 6px; }
+.control-cue > span { font: 600 0.95rem/1.2 var(--display); }
+.control-cue small { display: block; margin-top: 4px; color: var(--muted); font: 0.65rem/1.2 system-ui, sans-serif; }
+.control-picture { flex: none; width: 54px; height: 44px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.phone-picture .sway { transform-origin: 36px 32px; animation: phone-sway 1.8s ease-in-out infinite alternate; }
+.touch-ring { animation: touch-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes phone-sway { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+@keyframes touch-pulse { to { opacity: 0.25; } }
+
 /* Pause, the pill with the clock, fuel, hull, crystals and speed, and fullscreen along the top. */
 .hud {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -189,6 +283,7 @@ body.playing {
   --cut: 10px;
   --fill: var(--panel);
   position: absolute;
+  z-index: 3;
   left: 50%;
   bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
@@ -197,6 +292,18 @@ body.playing {
   padding: 9px 18px;
   text-align: center;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.message b { display: block; font: 600 1.05rem/1.2 var(--display); }
+.message small { display: block; margin-top: 3px; color: var(--muted); font-size: 0.8rem; }
+.message .icon { width: 26px; height: 26px; color: var(--accent); }
+
+.game:has(> .overlay:not([hidden])) :is(.flight-guide, .message) {
+  visibility: hidden;
 }
 
 .overlay {
@@ -206,9 +313,11 @@ body.playing {
   flex-direction: column;
   justify-content: center;
   gap: 12px;
-  padding: 24px max(16px, calc(50% - 240px));
+  padding: calc(24px + env(safe-area-inset-top, 0px)) max(16px, calc(50% - 240px), env(safe-area-inset-right, 0px))
+    calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, calc(50% - 240px), env(safe-area-inset-left, 0px));
   text-align: center;
   background: color-mix(in srgb, var(--bg) 84%, transparent);
+  z-index: 5;
 }
 
 /* The pause menu and the level complete sheet: one column of panels, or two
@@ -216,7 +325,24 @@ body.playing {
 .overlay.menu {
   overflow-y: auto;
   gap: 12px;
+  justify-content: safe center;
 }
+
+.pause-screen { background: color-mix(in srgb, var(--bg) 65%, transparent); }
+.pause-screen .pause-panel { width: min(700px, 100%); margin: 0 auto; gap: 16px; }
+.pause-panel header { text-align: center; }
+.pause-panel header small { font: 600 0.75rem var(--display); color: var(--head); }
+.pause-panel header h2 { margin: 8px 0; }
+.pause-panel header p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.pause-actions { display: flex; flex-direction: column; gap: 8px; }
+.pause-actions #resume { min-height: 58px; }
+.pause-tools { display: flex; justify-content: center; gap: 12px; }
+.pause-tools [aria-pressed="true"] { color: var(--accent); --edge: var(--accent); }
+.pause-actions small { font-size: 0.75rem; color: var(--muted); }
+.done-actions > .big small { display: block; margin-top: 4px; font-size: 0.85rem; text-transform: none; font-weight: 600; }
+.done-actions .buttons { flex-wrap: wrap; }
+.done-actions .buttons > * { gap: 5px; padding: 10px 8px; }
+.done-summary #ending { margin: 0; font-size: 0.85rem; line-height: 1.4; }
 
 .menu section {
   --cut: 14px;
@@ -244,9 +370,10 @@ body.playing {
 @media (orientation: landscape) and (max-height: 540px) {
   .overlay.menu {
     flex-direction: row;
-    align-items: center;
+    align-items: safe center;
     gap: 14px;
-    padding: 12px max(16px, calc(50% - 370px));
+    padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, calc(50% - 370px), env(safe-area-inset-right, 0px))
+      calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, calc(50% - 370px), env(safe-area-inset-left, 0px));
   }
 
   .menu section {
@@ -259,6 +386,27 @@ body.playing {
   .menu a.button.big {
     padding: 14px;
   }
+
+  .pause-screen .pause-panel {
+    flex: none;
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    grid-template-areas: "heading actions" "tools actions";
+    align-items: center;
+    gap: 16px 24px;
+    padding: 20px;
+  }
+  .pause-panel header { grid-area: heading; }
+  .pause-actions { grid-area: actions; }
+  .pause-tools { grid-area: tools; align-self: end; }
+  .done-screen { max-width: 100%; }
+  .done-screen section { gap: 6px; }
+  .done-screen h2 { font-size: 1.3rem; }
+  .done-summary #ending { font-size: 0.8rem; line-height: 1.3; }
+  .done-summary .award .icon { width: 2.4rem; height: 2.4rem; }
+  .done-summary .result-time { padding: 0 0 4px; }
+  .done-summary .result-time > b { font-size: 2.2rem; }
+  .done-summary .results { gap: 3px 14px; }
 }
 
 /* The stars a finish earns, each over what it's for. */
@@ -291,10 +439,15 @@ body.playing {
   font-size: 0.8rem;
 }
 
-.award.new .icon {
+.award.reveal .icon {
   animation: pop 0.5s ease-out both;
   animation-delay: calc(0.25s + var(--i) * 0.25s);
 }
+
+.award:not(.on).reveal .icon { animation-name: star-fade; }
+@keyframes star-fade { from { opacity: 0; transform: scale(0.8); } }
+.best-run { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--muted); font-size: 0.8rem; }
+.best-run small { font-family: var(--display); }
 
 @keyframes pop {
   from {
@@ -327,12 +480,24 @@ body.playing {
 
 .results small {
   color: var(--muted);
+  display: block;
+  font-size: 0.7rem;
 }
+
+.results .time-label { display: none; }
+.results .result-time { grid-column: 1 / -1; display: flex; align-items: center; flex-direction: column; padding: 3px 0 8px; }
+.result-time > b { color: var(--text); font: 700 2.5rem/1.1 var(--display); }
+.results dt { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.results dt .icon { width: 15px; height: 15px; }
+.new-best { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: var(--accent); font: 600 0.85rem var(--display); text-transform: uppercase; animation: record-in 250ms 1950ms both; }
+.new-best .icon { width: 14px; height: 14px; color: var(--gold); }
+@keyframes record-in { from { opacity: 0; transform: translateY(5px); } }
 
 /* The frame rate display, and the ?dev overlay under it, below the buttons at the
    top left: most levels start at the bottom left, where they'd hide the rocket. */
 .debug {
   position: absolute;
+  z-index: 3;
   left: calc(12px + env(safe-area-inset-left, 0px));
   top: calc(62px + env(safe-area-inset-top, 0px));
   display: flex;
@@ -370,17 +535,34 @@ body.playing {
 
 /* The map: the level scaled to fit, on its own dark panel. */
 .overlay.map {
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 8px;
-  background: rgb(8 9 13 / 0.94);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
 }
+
+.map-frame { --cut: 14px; --fill: var(--panel); display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 12px; gap: 12px; }
+.map-frame header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.map-frame header > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.map-frame h2 { margin: 0; font-size: 1rem; }
+.map-frame header .icon { color: var(--head); }
 
 .overlay.map canvas {
   flex: 1;
   width: 100%;
   min-height: 0;
+  background: #08090d;
 }
 
 .overlay.map .hint {
   margin: 0;
-  color: #8b90a0;
+  color: var(--muted);
+}
+
+.tilt-panel { --fill: var(--panel); padding: 24px; }
+.tilt-panel > .icon { width: 48px; height: 48px; color: var(--accent); }
+.tilt-panel h2 { margin: 12px 0; }
+.tilt-panel p { margin: 0 0 16px; }
+.tilt-panel button { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .game *, .game *::before, .game *::after { animation: none !important; transition: none !important; }
 }

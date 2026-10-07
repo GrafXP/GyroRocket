@@ -1,11 +1,16 @@
 import { LEVELS } from "./levels/index.js";
+import { parseLevel } from "./sim/level.js";
+import { finishOf } from "./runs.js";
+import { starsOf, beatsStarRun } from "./stars.js";
+
+export { starsOf, starCount } from "./stars.js";
 
 // What the player has done, and their settings, kept in localStorage. Everything
 // here works on plain objects so the tests can run it without storage.
 //
-// progress = { levels: { "1-3": { best: seconds, crystals: true } } }: a level is
-// in `levels` once finished; `best` is the fastest finish and `crystals` is whether
-// any finish collected every crystal.
+// progress = { levels: { "1-3": { best: seconds, run: { time, crystals } } } }:
+// a level is in `levels` once finished. `best` is its fastest finish, while `run`
+// is its finish with the most stars (the faster one when stars are tied).
 
 const PROGRESS_KEY = "gyrorocket:progress";
 const SETTINGS_KEY = "gyrorocket:settings";
@@ -15,21 +20,19 @@ const UNLOCK_KEY = "gyrorocket:unlock";
 // display (a debug option in the pause menu).
 export const DEFAULT_SETTINGS = { fullTilt: 35, fps: false };
 
-// The stars a record earns on a level: [finished, beat par, every crystal].
-export function starsOf(level, record) {
-  return [!!record, !!record && record.best <= level.par, !!record?.crystals];
-}
-
-export const starCount = (level, record) => starsOf(level, record).filter(Boolean).length;
-
 // Adds a finished run ({ time, crystals: true if it collected every crystal }) to
-// `progress`, and says what changed: { before, after } stars and whether it's a new best.
+// `progress`: previous best stars, this run's stars, saved best stars, and whether
+// it set a new fastest time. Stars from different runs are never combined.
 export function recordRun(progress, level, { time, crystals }) {
   const old = progress.levels[level.id];
   const before = starsOf(level, old);
-  const record = { best: Math.min(time, old?.best ?? Infinity), crystals: !!old?.crystals || crystals };
+  const run = { time, crystals: !!crystals };
+  const record = {
+    best: Math.min(time, old?.best ?? Infinity),
+    run: beatsStarRun(level, run, old?.run) ? run : old.run,
+  };
   progress.levels[level.id] = record;
-  return { before, after: starsOf(level, record), newBest: !old || time < old.best };
+  return { before, after: starsOf(level, run), best: starsOf(level, record), newBest: !old || time < old.best };
 }
 
 // The first level is always open; each after it opens once the one before is finished.
@@ -45,7 +48,21 @@ export function nextToPlay(progress, levels = LEVELS) {
 
 export function loadProgress() {
   const p = read(PROGRESS_KEY);
-  return { levels: p?.levels && typeof p.levels === "object" ? p.levels : {} };
+  const progress = { levels: p?.levels && typeof p.levels === "object" ? p.levels : {} };
+  // Old saves combined achievements across runs. Their surviving replay is the
+  // actual run we can recover; without it, the next finish starts the run record.
+  for (const level of LEVELS) {
+    const record = progress.levels[level.id];
+    if (!record || record.run) continue;
+    const replay = finishOf(level.id, level);
+    if (replay) {
+      progress.levels[level.id] = {
+        best: record.best,
+        run: { time: replay.time, crystals: replay.crystals === parseLevel(level).crystals.length },
+      };
+    }
+  }
+  return progress;
 }
 
 export const saveProgress = (progress) => write(PROGRESS_KEY, progress);

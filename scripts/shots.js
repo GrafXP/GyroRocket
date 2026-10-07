@@ -14,17 +14,22 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "vite";
+import { checkFlight, checkStarts, checkKeyboard } from "./check-flight.js";
 
 const SIZES = { wide: [844, 390], tall: [390, 844] };
 
 // Some stars to show: worlds 1 and 2 done, and a start on world 3.
 const PROGRESS = { levels: {} };
-for (let w = 1; w <= 2; w++) for (let l = 1; l <= 8; l++) PROGRESS.levels[`${w}-${l}`] = { best: (l % 3 ? 9 : 400) + l, crystals: (w + l) % 2 === 0 };
-Object.assign(PROGRESS.levels, { "3-1": { best: 400, crystals: false }, "3-2": { best: 12, crystals: true } });
+for (let w = 1; w <= 2; w++) for (let l = 1; l <= 8; l++) {
+  const time = (l % 3 ? 9 : 400) + l;
+  PROGRESS.levels[`${w}-${l}`] = { best: time, run: { time, crystals: (w + l) % 2 === 0 } };
+}
+Object.assign(PROGRESS.levels, { "3-1": { best: 400, run: { time: 400, crystals: false } }, "3-2": { best: 12, run: { time: 12, crystals: true } } });
 
 const EXIT = `(() => {
   const w = game.world, p = w.level.pads.find((p) => p.kind === "exit");
   Object.assign(w.rocket, { state: "flying", x: (p.x0 + p.x1) / 2, y: p.y + 2.5, vx: 0, vy: 0, angle: 0 });
+  w.tick = Math.max(w.tick, 431);
   w.startTick = w.tick - 431;
 })()`;
 const CRASH = `Object.assign(game.world.rocket, { state: "flying", y: game.world.rocket.y + 8, vy: -30 })`;
@@ -50,12 +55,20 @@ const SCREENS = [
   { name: "editor-palette", path: (id) => `/editor/${id}`, before: MY_LEVEL, wait: 800, steps: (p) => p.click("#swatch") },
   { name: "editor-menu", path: (id) => `/editor/${id}`, before: MY_LEVEL, wait: 800, steps: (p) => p.click("#menu-btn") },
   { name: "play-start", path: "/play/1-1?dev", play: true },
+  { name: "play-large", path: "/play/10-8?dev", play: true },
   { name: "play-flying", path: "/play/3-2?dev", play: true, steps: flying },
   { name: "pause", path: "/play/3-2?dev", play: true, steps: (p) => p.key("KeyP") },
   { name: "pause-settings", path: "/play/3-2?dev", play: true, steps: (p) => p.key("KeyP").then(() => p.click("#settings")) },
   { name: "map", path: "/play/2-3?dev", play: true, steps: (p) => p.key("KeyM") },
   { name: "crash", path: "/play/1-2?dev", play: true, steps: (p) => p.run(CRASH).then(() => p.wait(1600)) },
+  { name: "out-of-fuel", path: "/play/1-2?dev", play: true, steps: (p) => p.run("game.world.rocket.fuel = 0; game.world.startTick = game.world.tick").then(() => p.wait(2200)) },
   { name: "results", path: "/play/3-3?dev", play: true, steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
+  { name: "results-best", path: "/play/3-3?dev", play: true,
+    before: `(() => { const p = JSON.parse(localStorage.getItem("gyrorocket:progress")); p.levels["3-3"] = { best: 20, run: { time: 20, crystals: true } }; localStorage.setItem("gyrorocket:progress", JSON.stringify(p)); })()`,
+    steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
+  { name: "world-complete", path: "/play/2-8?dev", play: true, steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
+  { name: "part-one-complete", path: "/play/6-8?dev", play: true, steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
+  { name: "all-complete", path: "/play/10-8?dev", play: true, steps: (p) => p.run(EXIT).then(() => p.wait(3200)) },
   { name: "locked", path: "/play/9-9" },
   { name: "kit", path: "/ui?dev", full: true },
 ];
@@ -111,6 +124,7 @@ function connect(url) {
   const ws = new WebSocket(url);
   const waiting = new Map();
   const listeners = new Map();
+  const observers = new Map();
   let next = 0;
   let session;
   ws.addEventListener("message", (e) => {
@@ -123,6 +137,7 @@ function connect(url) {
     } else {
       for (const fn of listeners.get(m.method) ?? []) fn(m.params);
       listeners.delete(m.method);
+      for (const fn of observers.get(m.method) ?? []) fn(m.params);
     }
   });
   const send = (method, params = {}) =>
@@ -135,6 +150,7 @@ function connect(url) {
       resolve({
         send,
         once: (event) => new Promise((done) => listeners.set(event, [...(listeners.get(event) ?? []), done])),
+        on: (event, fn) => observers.set(event, [...(observers.get(event) ?? []), fn]),
         attach: (id) => (session = id),
         close: () => ws.close(),
       }),
@@ -156,6 +172,9 @@ try {
   cdp.attach((await cdp.send("Target.attachToTarget", { targetId, flatten: true })).sessionId);
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
+  const errors = [];
+  cdp.on("Runtime.exceptionThrown", ({ exceptionDetails: e }) => errors.push(e.exception?.description ?? e.text));
+  cdp.on("Runtime.consoleAPICalled", (e) => { if (e.type === "error") errors.push(e.args.map((a) => a.description ?? a.value).join(" ")); });
 
   const run = async (expression) => {
     const { result, exceptionDetails } = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -173,12 +192,22 @@ try {
     click: (selector) => run(`document.querySelector(${JSON.stringify(selector)}).click()`).then(() => wait(300)),
     // A key by its code: pressed and let go, or just "down" or "up".
     async key(code, how = "press") {
-      const key = { code, key: code.replace(/^Key/, "").toLowerCase() };
+      const key = { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code };
       if (how !== "up") await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", ...key });
       if (how !== "down") await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...key });
       await wait(300);
     },
   };
+  const waitForFlight = async () => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      if (errors.length) throw new Error(errors.join("\n"));
+      if (await run(`!!window.game?.world && !document.getElementById("game").classList.contains("is-loading")`)) return;
+      await wait(100);
+    }
+    throw new Error(`Flight didn't open: ${await run(`document.getElementById("loading")?.textContent`)}`);
+  };
+  Object.assign(page, { go, waitForFlight, cdp });
 
   const dir = join("shots", label);
   mkdirSync(dir, { recursive: true });
@@ -188,6 +217,7 @@ try {
       await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true });
       for (const screen of SCREENS) {
         if (only && !only.includes(screen.name)) continue;
+        errors.length = 0;
         // Storage first, from a page of the game's own.
         await go("/help");
         await run(`sessionStorage.clear(); localStorage.setItem("gyrorocket:theme", "${theme}"); localStorage.setItem("gyrorocket:progress", ${JSON.stringify(JSON.stringify(PROGRESS))})`);
@@ -197,11 +227,12 @@ try {
         if (screen.play) {
           // Past the iPhone's question about the motion sensors, if it's asked, and
           // without the developer's overlays.
-          await wait(1500);
+          await waitForFlight();
           await run(`document.querySelector("#tilt-ask:not([hidden]) #tilt-ok")?.click(); for (const id of ["dev", "fps"]) document.getElementById(id).hidden = true`);
         }
         await wait(screen.wait ?? 400);
         await screen.steps?.(page);
+        if (errors.length) throw new Error(`${screen.name}: ${errors.join("\n")}`);
         // The whole page, for one that's `full`; what's on the screen, for the rest.
         const { cssContentSize: all } = await cdp.send("Page.getLayoutMetrics");
         const whole = screen.full ? { captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: all.height, scale: 1 } } : {};
@@ -210,7 +241,19 @@ try {
         writeFileSync(file, Buffer.from(data, "base64"));
         console.log(file);
       }
+      if (args.includes("--check-flight")) {
+        await checkFlight(page);
+        console.log(`Flight checks passed: ${size}, ${theme}`);
+      }
+      if (args.includes("--check-starts") && theme === themes[0]) {
+        await checkStarts(page);
+        console.log(`All 80 starts clear: ${size}`);
+      }
     }
+  }
+  if (args.includes("--check-flight") || args.includes("--check-keys")) {
+    await checkKeyboard(page);
+    console.log("Desktop keys, focus and loading cancellation passed");
   }
 } finally {
   cdp.close();

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tiltAngle, steerOf, FULL_TILT, onPhone, tiltNeedsAsking, requestTiltPermission } from "../src/controls.js";
+import { createControls, tiltAngle, steerOf, FULL_TILT, onPhone, tiltNeedsAsking, requestTiltPermission } from "../src/controls.js";
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≠ ${b}`);
 
@@ -71,4 +71,62 @@ test("a refusal, or a browser that won't ask, reads as no", async () => {
   await browser({ coarse: true, answer: async () => "denied" }, async () => assert.equal(await requestTiltPermission(), false));
   await browser({ coarse: true, answer: async () => Promise.reject(new Error("no tap")) }, async () => assert.equal(await requestTiltPermission(), false));
   await browser({ coarse: true }, async () => assert.equal(await requestTiltPermission(), true));
+});
+
+function setup(t) {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: new EventTarget() });
+  const canvas = new EventTarget();
+  canvas.setPointerCapture = () => {};
+  const controls = createControls(canvas);
+  t.after(() => {
+    controls.dispose();
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else delete globalThis.window;
+  });
+  const pointer = (type, id = 1) => {
+    const event = new Event(`pointer${type}`, { cancelable: true });
+    Object.assign(event, { pointerId: id, pointerType: "touch" });
+    canvas.dispatchEvent(event);
+    return event;
+  };
+  return { canvas, controls, pointer };
+}
+
+test("rapid taps suppress native gestures while each press still drives thrust", (t) => {
+  const { canvas, controls, pointer } = setup(t);
+  for (let i = 0; i < 10; i++) {
+    assert.equal(pointer("down").defaultPrevented, true);
+    const touch = new Event("touchstart", { cancelable: true });
+    canvas.dispatchEvent(touch);
+    assert.equal(touch.defaultPrevented, true);
+    assert.equal(controls.input().thrust, true);
+    pointer("up");
+    assert.equal(controls.input().thrust, false);
+  }
+});
+
+test("native menus are blocked and multi-touch releases thrust after the last finger", (t) => {
+  const { canvas, controls, pointer } = setup(t);
+  pointer("down", 1);
+  pointer("down", 2);
+  const menu = new Event("contextmenu", { cancelable: true });
+  canvas.dispatchEvent(menu);
+  assert.equal(menu.defaultPrevented, true);
+  pointer("up", 1);
+  assert.equal(controls.input().thrust, true);
+  pointer("cancel", 2);
+  assert.equal(controls.input().thrust, false);
+});
+
+test("disposing controls removes native gesture suppression and press handlers", (t) => {
+  const { canvas, controls, pointer } = setup(t);
+  controls.dispose();
+  for (const type of ["touchstart", "contextmenu"]) {
+    const event = new Event(type, { cancelable: true });
+    canvas.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, false);
+  }
+  assert.equal(pointer("down").defaultPrevented, false);
+  assert.equal(controls.input().thrust, false);
 });

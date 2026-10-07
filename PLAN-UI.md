@@ -8,8 +8,10 @@ looks like the caves it's about.
 
 It builds on what's there: the routes, `progress.js`, the play page's states, the
 3D view, and the worlds' colours in `levels/index.js`. Nothing in `src/sim/`
-changes, so `SIM_VERSION` stays where it is, and nothing kept on the phone changes
-shape (progress, settings, runs, my levels). It can come before or after
+changes, so `SIM_VERSION` stays where it is. Settings, replays and my levels keep
+their storage shape. U4 also carries in the agreed star correction: progress
+keeps a single best star run and a separate fastest time, with old saves readable.
+It can come before or after
 `PLAN.md`'s phase 9 (sound, particles, shake) and `PLAN-EDITOR.md`'s E5–E7; where
 they touch, it says so.
 
@@ -425,11 +427,50 @@ eighty open). `npm run shots` has the card as well, and still hasn't been run.
 - [ ] The level card tells you what the three stars are for before you fly.
 - [ ] All 80 stops scroll smoothly on the phone.
 
-### Phase U4: In flight
+### Phase U4: In flight ✅ (built; to check on the phones)
 The pause panel, with settings moved out to the sheet. The results, in sequence.
 The level's title card, the pictures for the two controls, and the prompts in
 the new look. The title card over black while a big level builds. The HUD's pill
 and the map's frame in the new look.
+
+`ui/play.js` now paints the title on black before creating the cave, then fades
+in the view. The number and name stay for two seconds; a world's first entry
+also names the world. Two SVG pictures show Tilt / Hold on phones and arrow
+keys on desktop, until lift-off. Their card uses the camera's projection to
+choose a corner away from the rocket, accounting for the HUD and safe areas;
+it moves again when the screen turns. `ui/flight.js` keeps the positioning,
+world introductions, completion headings and short pictured prompts together,
+with tests. The map has its own cut-corner frame, heading and close button.
+
+Pause is one panel: the level, mid-flight actions, Resume at the bottom, and
+settings / autopilot / fullscreen as icons. Settings remains the U2 sheet and
+keeps the game paused when it closes. Results reveal each star, count up the
+time, then highlight a new fastest time. Next names the next level; Retry,
+Watch and Levels have icons. World finales acknowledge the world, and 6-8 and
+10-8 retain their endings. Reduced motion shows the final state immediately.
+Pause, map and results keep keyboard focus inside their controls.
+
+The main branch's star and iOS touch fixes are carried into this branch.
+Results show the current run's stars with the saved best run underneath;
+progress and the saved replay keep the run with the most stars, then the
+faster one on a tie. Fastest time remains independent, and Workshop finishes
+still choose the fastest run. Rapid taps suppress the native selection and
+callout gestures while preserving thrust and multi-touch release.
+
+Pictures before and after are in `shots/u4-before/` and `shots/u4-after/`: 48
+final pictures at 844 × 390 and 390 × 844, in dark and light, reviewed against
+the baseline.
+`npm run shots` now waits for the cave to be ready and reports browser errors;
+it includes current-versus-best results, both endings, 10-8 and out-of-fuel.
+`--check-flight` exercises touch lift-off, pause/settings/map, star retention,
+retry, replay and reduced motion in both themes and orientations. It also
+checks desktop keys, focus (including held Tab) and cancelling a level before
+its cave builds; those alone can be run with `--check-keys`. `--check-starts`
+checks all 80 starts for rocket overlap in both orientations. All passed.
+`npm test`: 312 pass, one PHP API check
+skipped; the golden replays still land on their original ticks. `npm run build`
+passes. Physical iPhone/Android checks remain:
+
 - [ ] A new player lifts off in 1-1 without reading a sentence.
 - [ ] Pause has nothing in it you wouldn't want mid-level, and Resume is under the thumb.
 - [ ] Finishing a level feels like something: the stars land one at a time and a new best stands out.

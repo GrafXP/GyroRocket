@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { levelById } from "../src/levels/index.js";
+import { parseLevel } from "../src/sim/level.js";
 import { SIM_VERSION } from "../src/sim/world.js";
 import { inputCode } from "../src/sim/input.js";
 import { levelHash } from "../src/hash.js";
@@ -110,7 +111,7 @@ function withStorage(fn) {
   }
 }
 
-test("the best run on a level is kept: the fastest that counts, on this version of it", () => {
+test("the best run on a level is kept: tied stars use the fastest finish that counts, on this version", () => {
   const replay = golden("1-8.json");
   const def = levelById("1-8");
   withStorage(() => {
@@ -129,5 +130,33 @@ test("the best run on a level is kept: the fastest that counts, on this version 
     assert.equal(finishOf("1-8", { ...def, name: "Renamed" })?.time, replay.time + 5, "a renamed one is");
     forgetRun("1-8");
     assert.equal(loadRun("1-8"), null);
+  });
+});
+
+test("saved replays keep the most stars, then the fastest run", () => {
+  const replay = golden("1-8.json");
+  const def = levelById("1-8");
+  const all = parseLevel(def).crystals.length;
+  withStorage(() => {
+    const fast = { ...replay, time: def.par / 2, crystals: 0 };
+    const threeStars = { ...replay, time: def.par, crystals: all };
+    assert.equal(keepRun(def.id, fast), true);
+    assert.equal(keepRun(def.id, threeStars), true, "a slower three-star run beats a two-star run");
+    assert.deepEqual(loadRun(def.id), threeStars);
+    assert.equal(keepRun(def.id, { ...fast, time: 1 }), false, "a faster run with fewer stars cannot replace it");
+    const fasterThreeStars = { ...threeStars, time: def.par - 1 };
+    assert.equal(keepRun(def.id, fasterThreeStars), true, "with three stars tied, faster wins");
+    assert.deepEqual(loadRun(def.id), fasterThreeStars);
+    assert.equal(keepRun(def.id, fasterThreeStars), false, "an identical result keeps the saved replay");
+  });
+});
+
+test("my levels continue to keep their fastest finish", () => {
+  const replay = golden("1-8.json");
+  withStorage(() => {
+    assert.equal(keepRun("my:test", { ...replay, time: 30, crystals: 3 }), true);
+    assert.equal(keepRun("my:test", { ...replay, time: 20, crystals: 0 }), true);
+    assert.equal(keepRun("my:test", { ...replay, time: 25, crystals: 3 }), false);
+    assert.equal(loadRun("my:test").time, 20);
   });
 });
