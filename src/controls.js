@@ -55,10 +55,16 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
     tilt = tiltAngle(e.beta, e.gamma, screenAngle());
   };
   const onDown = (e) => {
+    e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
     pointers.add(e.pointerId);
   };
   const onUp = (e) => pointers.delete(e.pointerId);
+  // iOS can show its selection magnifier despite touch-action/user-select.
+  // Cancel native touches on the play canvas; pointer events still drive thrust.
+  const noNativeGesture = (e) => {
+    if (e.cancelable) e.preventDefault();
+  };
   const onKey = (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     // Keys pressed on a menu's buttons and sliders are theirs.
@@ -76,6 +82,8 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
+  canvas.addEventListener("touchstart", noNativeGesture, { passive: false });
+  canvas.addEventListener("contextmenu", noNativeGesture);
   window.addEventListener("keydown", onKey);
   window.addEventListener("keyup", onKey);
   window.addEventListener("blur", onBlur);
@@ -107,6 +115,8 @@ export function createControls(canvas, { fullTilt = FULL_TILT } = {}) {
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("pointercancel", onUp);
+      canvas.removeEventListener("touchstart", noNativeGesture);
+      canvas.removeEventListener("contextmenu", noNativeGesture);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKey);
       window.removeEventListener("blur", onBlur);

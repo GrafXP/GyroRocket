@@ -299,8 +299,14 @@ body.playing nav {
   position: fixed;
   inset: 0;
   background: var(--bg);
+}
+
+/* Keep iOS selection magnifiers and press-and-hold callouts out of gameplay. */
+.game,
+.game * {
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .game canvas {
