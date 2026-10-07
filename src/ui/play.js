@@ -7,11 +7,11 @@ import { rising } from "../sim/hazards/rise.js";
 import { KEY_LOOKS, css, shapePath } from "../looks.js";
 import { drawMap } from "./map.js";
 import { levelById, nextLevel, endingOf, EXTRAS } from "../levels/index.js";
-import { loadProgress, saveProgress, recordRun, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
+import { loadProgress, saveProgress, recordRun, starsOf, isUnlocked, allUnlocked, loadSettings, saveSettings } from "../progress.js";
 import { playableLevel } from "../mylevels.js";
 import { makeReplay, unpackInput, unplayable, counts } from "../replay.js";
 import { loadRun, keepRun, finishOf } from "../runs.js";
-import { html, icon, esc, formatTime, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
+import { html, icon, esc, formatTime, starsHtml, saveFile, bindFullscreenButton, THEME_PICKER, bindThemePicker } from "./dom.js";
 
 const RESULTS_AFTER = TICK_RATE / 2; // ticks on the exit pad before the results come up
 const LAVA_NEWS = 3 * TICK_RATE; // ticks the HUD says the lava's rising, once it starts
@@ -132,6 +132,7 @@ export function play(el, id) {
           <p class="hint">${esc(title)}</p>
           ${ending ? `<p id="ending">${ending.text}${next ? "" : " That's every level, for now: go back for the stars you missed."}</p>` : ""}
           <div class="awards" id="awards"></div>
+          <p class="best-run" id="best-stars" hidden></p>
           <dl class="results" id="results"></dl>
         </section>
         <section>
@@ -288,7 +289,7 @@ export function play(el, id) {
     },
   });
 
-  // The results: time against par, crystals, and the stars, new ones popping in.
+  // The results: this run's time, crystals and stars, with saved best stars below.
   // Watching a run, the replay's results instead.
   function finish(w) {
     finished = true;
@@ -314,7 +315,13 @@ export function play(el, id) {
       result = recordRun(progress, def, { time, crystals: all });
       saveProgress(progress);
     }
-    const best = progress.levels[def.id]?.best;
+    const record = progress.levels[def.id];
+    const best = record?.best;
+    const bestStars = $("#best-stars");
+    bestStars.hidden = extra || !!mine || !record;
+    if (!bestStars.hidden) {
+      bestStars.innerHTML = `Best run ${starsHtml(starsOf(def, record))} <small>${formatTime(record.run?.time ?? record.best)}</small>`;
+    }
     $("#awards").innerHTML = mine
       ? ""
       : w.assisted
@@ -350,6 +357,7 @@ export function play(el, id) {
   // A watched run's results. It lands on the exit on the tick it did, or something's wrong.
   function replayResults(w) {
     $("#done-title").textContent = "Replay";
+    $("#best-stars").hidden = true;
     if ($("#ending")) $("#ending").hidden = true;
     const { replay } = watched;
     const ticks = replay?.ticks ?? watched.codes.length;
